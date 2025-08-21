@@ -6,10 +6,19 @@ This project implements a facial attendance system that utilizes facial recognit
 
 ```
 facial_attendance_system/
-├── dataset/               # Stores student face images
-│   ├── 2023001/           # Example student folder
-│   │   ├── img1.jpg
-│   │   └── img2.jpg
+├── dataset/
+└── IT164L/
+    ├── AM4/
+    │   ├── 2019123456/
+    │   │   ├── img1.jpg
+    │   │   └── img2.jpg
+    │   ├── 2024123456/
+    ├── AM5/
+    │   ├── 2019123456/
+    │   └── 2024123456/
+    └── BM4/
+        ├── 2019123456/
+        └── 2024123456/
 ├── attendance.db          # SQLite database file (auto-created)
 ├── main.py                # Main script
 ├── utils.py               # Helper functions
