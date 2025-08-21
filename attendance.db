@@ -1,0 +1,3 @@
+The attendance.db file is an SQLite database file that will be auto-created when the application runs. Therefore, it does not contain any predefined contents. 
+
+# This file is intentionally left blank.
