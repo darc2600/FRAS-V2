@@ -1,0 +1,15 @@
+<h2>Attendance Logs</h2>
+<input type="text" placeholder="Course Code" [(ngModel)]="courseCode">
+<input type="text" placeholder="Section" [(ngModel)]="section">
+<button (click)="fetchLogs()">Fetch Logs</button>
+<p>{{message}}</p>
+<table *ngIf="logs.length">
+  <tr>
+    <th>Student ID</th>
+    <th>Timestamp</th>
+  </tr>
+  <tr *ngFor="let log of logs">
+    <td>{{log[0]}}</td>
+    <td>{{log[1]}}</td>
+  </tr>
+</table>

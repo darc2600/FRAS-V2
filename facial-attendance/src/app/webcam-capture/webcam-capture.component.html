@@ -1,0 +1,14 @@
+<h2>Mark Attendance</h2>
+<input type="text" placeholder="Course Code" [(ngModel)]="courseCode"><br>
+<input type="text" placeholder="Section" [(ngModel)]="section"><br>
+
+<webcam
+  [trigger]="triggerObservable"
+  (imageCapture)="handleImage($event)">
+</webcam>
+<br>
+<button (click)="triggerSnapshot()">Capture Photo</button>
+<br>
+<img *ngIf="webcamImage" [src]="webcamImage?.imageAsDataUrl" width="200"><br>
+<button (click)="markAttendance()">Mark Attendance</button>
+<p>{{message}}</p>
