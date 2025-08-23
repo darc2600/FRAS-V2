@@ -18,7 +18,7 @@ export class ApiService {
     return this.http.post(`${this.backendUrl}/recognize`, formData);
   }
 
-  getAttendance(courseCode: string, section: string): Observable<any> {
-    return this.http.get(`${this.backendUrl}/attendance?course_code=${courseCode}&section=${section}`);
+  getAttendance(courseCode: string, section: string) {
+    return this.http.get<any>(`http://127.0.0.1:8000/attendance?course_code=${courseCode}&section=${section}`);
   }
 }

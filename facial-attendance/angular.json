@@ -5,10 +5,10 @@
   "projects": {
     "facial-attendance": {
       "projectType": "application",
-      "schematics": {},
       "root": "",
       "sourceRoot": "src",
       "prefix": "app",
+      "schematics": {},
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:application",
@@ -16,9 +16,7 @@
             "outputPath": "dist/facial-attendance",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": [
-              "zone.js"
-            ],
+            "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
@@ -31,10 +29,7 @@
             ],
             "scripts": [],
             "server": "src/main.server.ts",
-            "prerender": true,
-            "ssr": {
-              "entry": "server.ts"
-            }
+            "ssr": false
           },
           "configurations": {
             "production": {
@@ -60,6 +55,7 @@
           },
           "defaultConfiguration": "production"
         },
+
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
@@ -72,9 +68,26 @@
           },
           "defaultConfiguration": "development"
         },
+
+        "serve-ssr": {
+  "builder": "@angular-devkit/build-angular:ssr-dev-server",
+  "configurations": {
+    "development": {
+      "browserTarget": "facial-attendance:build:development",
+      "serverTarget": "facial-attendance:build:development"
+    },
+    "production": {
+      "browserTarget": "facial-attendance:build:production",
+      "serverTarget": "facial-attendance:build:production"
+    }
+  },
+  "defaultConfiguration": "development"
+},
+
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n"
         },
+
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {

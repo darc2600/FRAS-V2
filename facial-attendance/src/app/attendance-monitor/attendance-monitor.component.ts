@@ -6,5 +6,5 @@ import { Component } from '@angular/core';
   styleUrls: ['./attendance-monitor.component.css']
 })
 export class AttendanceMonitorComponent {
-  // You can expand this to show real-time attendance status
+
 }

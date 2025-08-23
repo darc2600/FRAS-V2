@@ -9,6 +9,6 @@
 <br>
 <button (click)="triggerSnapshot()">Capture Photo</button>
 <br>
-<img *ngIf="webcamImage" [src]="webcamImage?.imageAsDataUrl" width="200"><br>
+<img *ngIf="webcamImage" [src]="webcamImage.imageAsDataUrl" width="200"><br>
 <button (click)="markAttendance()">Mark Attendance</button>
 <p>{{message}}</p>
