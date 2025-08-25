@@ -1,0 +1,63 @@
+<div class="page">
+  <header class="topbar">
+    <h1>Student Facial Recognition Registration</h1>
+    <div class="hint">Allow camera permissions. Capture N images, review, then submit.</div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: Camera + Capture -->
+    <section class="camera">
+      <div class="video-wrap">
+        <video #videoEl playsinline></video>
+      </div>
+
+      <div class="controls">
+        <button class="btn" (click)="captureOne()" [disabled]="!stream || isCapturing">Capture 1</button>
+        <button class="btn primary" (click)="captureSeries()" [disabled]="!stream || isCapturing">
+          {{ isCapturing ? 'Capturing…' : 'Capture Series' }}
+        </button>
+        <button class="btn danger" (click)="clearAll()" [disabled]="previews.length===0">Clear All</button>
+      </div>
+
+      <div class="gallery" *ngIf="previews.length">
+        <div class="thumb" *ngFor="let p of previews; let i = index">
+          <img [src]="p.url" alt="shot {{i+1}}">
+          <button class="x" (click)="removeShot(i)" title="Remove">×</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Form -->
+    <section class="form">
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <label>
+          <span>Course Code</span>
+          <input formControlName="courseCode" placeholder="e.g., IT123L">
+        </label>
+        <label>
+          <span>Section</span>
+          <input formControlName="section" placeholder="e.g., AM-8">
+        </label>
+        <label>
+          <span>Student ID</span>
+          <input formControlName="studentId" placeholder="e.g., 2023001">
+        </label>
+        <label>
+          <span>Student Name</span>
+          <input formControlName="studentName" placeholder="e.g., John Doe">
+        </label>
+        <label>
+          <span># of Images</span>
+          <input type="number" formControlName="imageCount" min="1" max="50">
+        </label>
+        <div class="progress" *ngIf="submitting">
+          <div class="bar" [style.width.%]="uploadProgress"></div>
+        </div>
+        <button class="btn primary block" type="submit" [disabled]="submitting || isCapturing">
+          {{ submitting ? 'Submitting…' : 'Submit Registration' }}
+        </button>
+      </form>
+    </section>
+  </div>
+  <canvas #canvasEl class="hidden-canvas"></canvas>
+</div>

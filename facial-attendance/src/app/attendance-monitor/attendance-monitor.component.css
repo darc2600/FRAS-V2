@@ -1,0 +1,78 @@
+.attendance-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.top-bar {
+  background: #a85c5c;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  font-size: 24px;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+}
+
+.left-panel, .right-panel {
+  padding: 20px;
+}
+
+.left-panel {
+  flex: 2;
+  background: #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.clock {
+  font-size: 40px;
+  margin-bottom: 20px;
+}
+
+.webcam {
+  border: 5px solid #d9a3a3;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.right-panel {
+  flex: 1;
+  background: #fff;
+}
+
+.right-panel h2 {
+  background: #444;
+  color: white;
+  padding: 10px;
+}
+
+table {
+  width: 100%;
+}
+
+td, th {
+  padding: 8px;
+}
+
+.present {
+  color: green;
+}
+
+.late {
+  color: orange;
+}
+
+.absent {
+  color: red;
+}
+
+.message {
+  margin-top: 10px;
+  color: #a85c5c;
+}

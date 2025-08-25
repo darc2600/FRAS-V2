@@ -1,0 +1,41 @@
+<div class="room-schedule">
+  <!-- Header -->
+  <header class="header">
+    <h1>{{ roomNumber }}</h1>
+    <div class="datetime">
+      {{ currentDateTime | date: 'fullDate' }} | {{ currentDateTime | date: 'hh:mm:ss a' }}
+    </div>
+  </header>
+
+  <div class="content">
+    <!-- Left Panel: Schedule -->
+    <div class="schedule">
+      <h2>Course Section Schedule</h2>
+      <ul>
+        <li *ngFor="let cls of schedules"
+            (click)="selectClass(cls)"
+            [class.active]="cls === selectedClass">
+          <span>{{ cls.courseCode }}</span> - 
+          <span>{{ cls.section }}</span> 
+          ({{ cls.startTime }} - {{ cls.endTime }})
+        </li>
+      </ul>
+    </div>
+
+    <!-- Right Panel: Stats -->
+    <div class="stats" *ngIf="selectedClass">
+      <div class="stat present">
+        Present: <strong>{{ selectedClass.present }}</strong>
+      </div>
+      <div class="stat late">
+        Late: <strong>{{ selectedClass.late }}</strong>
+      </div>
+      <div class="stat absent">
+        Absent: <strong>{{ selectedClass.absent }}</strong>
+      </div>
+      <div class="total">
+        Total: <strong>{{ selectedClass.present + selectedClass.late + selectedClass.absent }}</strong>
+      </div>
+    </div>
+  </div>
+</div>

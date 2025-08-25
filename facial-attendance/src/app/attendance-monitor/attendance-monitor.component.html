@@ -1,2 +1,38 @@
-<h2>Attendance Monitor</h2>
-<p>Attendance monitoring in progress...</p>
+Sample Angular (HTML layout sketch)
+<div class="attendance-page">
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <h1>{{ courseCode }} - {{ section }}</h1>
+  </header>
+
+  <div class="main-content">
+    <!-- Left Panel -->
+    <div class="left-panel">
+      <div class="clock">{{ currentTime }}</div>
+      <div class="webcam">
+        <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)"></webcam>
+        <button (click)="triggerSnapshot()">Capture Image</button>
+      </div>
+      <button (click)="markAttendance()">Mark Attendance</button>
+      <div class="message">{{ message }}</div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="right-panel">
+      <h2>Attendance Log</h2>
+      <table>
+        <tr>
+          <th>Name</th>
+          <th>Time</th>
+          <th>Status</th>
+        </tr>
+        <tr *ngFor="let log of attendanceLogs">
+          <td>{{ log.studentName }}</td>
+          <td>{{ log.time | date:'hh:mm:ss a' }}</td>
+          <td [ngClass]="getStatusClass(log.status)">{{ log.status }}</td>
+        </tr>
+      </table>
+      <div *ngIf="attendanceLogs.length === 0">No attendance records yet.</div>
+    </div>
+  </div>
+</div>
