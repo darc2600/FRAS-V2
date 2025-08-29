@@ -1,0 +1,18 @@
+[
+  {
+    "courseCode": "IT123L",
+    "section": "AM3",
+    "professor": "Prof. Cruz",
+    "day": "Monday",
+    "startTime": "07:00AM",
+    "endTime": "08:10AM"
+  },
+  {
+    "courseCode": "IT124L",
+    "section": "PM2",
+    "professor": "Prof. Santos",
+    "day": "Monday",
+    "startTime": "08:10AM",
+    "endTime": "09:20AM"
+  }
+]

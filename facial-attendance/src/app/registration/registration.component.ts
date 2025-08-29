@@ -4,13 +4,14 @@ import {
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { RegistrationService } from './registration.service';
 import { Subscription } from 'rxjs';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-registration',
   standalone: true,
   templateUrl: './registration.component.html',
   styleUrls: ['./registration.component.css'],
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, CommonModule],
 })
 export class RegistrationComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl', { static: true }) videoEl!: ElementRef<HTMLVideoElement>;

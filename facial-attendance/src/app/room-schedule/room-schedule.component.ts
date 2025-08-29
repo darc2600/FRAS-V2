@@ -1,66 +1,59 @@
 import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
-interface ClassSchedule {
-  courseCode: string;
-  section: string;
-  startTime: string;
-  endTime: string;
-  present: number;
-  late: number;
-  absent: number;
-}
+const TIME_SLOTS = [
+  "07:00AM - 08:10AM", "08:10AM - 09:20AM", "09:20AM - 10:30AM", "10:30AM - 11:40AM",
+  "11:40AM - 12:50PM", "12:50PM - 02:00PM", "02:00PM - 03:10PM", "03:10PM - 04:20PM",
+  "04:20PM - 05:30PM", "05:30PM - 06:40PM", "06:40PM - 07:50PM", "07:50PM - 09:00PM"
+];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 @Component({
   selector: 'app-room-schedule',
   standalone: true,
   templateUrl: './room-schedule.component.html',
   styleUrls: ['./room-schedule.component.css'],
-  imports: [CommonModule]
+  imports: [CommonModule, FormsModule]
 })
 export class RoomScheduleComponent implements OnInit {
-  roomNumber = "RO 305";
-  currentDateTime: Date = new Date();
+  room = '';
+  days = DAYS;
+  timeSlots = TIME_SLOTS;
+  grid: any[][] = this.timeSlots.map(() => this.days.map(() => null));
+  message = '';
 
-  schedules: ClassSchedule[] = [
-    { courseCode: 'IT123L', section: 'AM-8', startTime: '10:00', endTime: '13:30', present: 34, late: 12, absent: 5 },
-    { courseCode: 'IT124L', section: 'PM-2', startTime: '14:00', endTime: '17:30', present: 28, late: 6, absent: 10 },
-    { courseCode: 'IT200L', section: 'AM-9', startTime: '09:00', endTime: '12:00', present: 40, late: 4, absent: 2 }
-  ];
-
-  selectedClass?: ClassSchedule;
+  constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    this.updateDateTime();
-    setInterval(() => this.updateDateTime(), 1000);
-
-    this.highlightCurrentClass();
+    this.loadSchedule();
   }
 
-  updateDateTime() {
-    this.currentDateTime = new Date();
-    this.highlightCurrentClass();
-  }
-
-  highlightCurrentClass() {
-    const now = this.getTimeInMinutes(this.currentDateTime);
-    this.selectedClass = this.schedules.find(cls => {
-      const start = this.getTimeInMinutesFromStr(cls.startTime);
-      const end = this.getTimeInMinutesFromStr(cls.endTime);
-      return now >= start && now <= end;
-    });
-  }
-
-  selectClass(cls: ClassSchedule) {
-    this.selectedClass = cls;
-  }
-
-  private getTimeInMinutes(date: Date): number {
-    return date.getHours() * 60 + date.getMinutes();
-  }
-
-  private getTimeInMinutesFromStr(time: string): number {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
+  loadSchedule() {
+    if (!this.room) return;
+    this.http.get<any[]>(`http://127.0.0.1:8000/api/room-schedule/${this.room}`)
+      .subscribe({
+        next: (data) => {
+          this.grid = this.timeSlots.map(() => this.days.map(() => null));
+          (data || []).forEach((entry: any) => {
+            const row = this.timeSlots.findIndex(
+              t => t === `${entry.startTime} - ${entry.endTime}`
+            );
+            const col = this.days.findIndex(d => d === entry.day);
+            if (row !== -1 && col !== -1) {
+              this.grid[row][col] = {
+                courseCode: entry.courseCode,
+                section: entry.section,
+                professor: entry.professor
+              };
+            }
+          });
+          this.message = '';
+        },
+        error: () => {
+          this.message = 'Failed to load schedule.';
+        }
+      });
   }
 }

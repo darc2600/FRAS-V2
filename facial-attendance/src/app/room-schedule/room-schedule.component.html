@@ -1,41 +1,32 @@
-<div class="room-schedule">
-  <!-- Header -->
-  <header class="header">
-    <h1>{{ roomNumber }}</h1>
-    <div class="datetime">
-      {{ currentDateTime | date: 'fullDate' }} | {{ currentDateTime | date: 'hh:mm:ss a' }}
-    </div>
-  </header>
+<h2>Room Schedule Viewer</h2>
+<label>
+  Room:
+  <input [(ngModel)]="room" placeholder="e.g. MPO305">
+  <button (click)="loadSchedule()">Load</button>
+</label>
+<p *ngIf="message">{{message}}</p>
 
-  <div class="content">
-    <!-- Left Panel: Schedule -->
-    <div class="schedule">
-      <h2>Course Section Schedule</h2>
-      <ul>
-        <li *ngFor="let cls of schedules"
-            (click)="selectClass(cls)"
-            [class.active]="cls === selectedClass">
-          <span>{{ cls.courseCode }}</span> - 
-          <span>{{ cls.section }}</span> 
-          ({{ cls.startTime }} - {{ cls.endTime }})
-        </li>
-      </ul>
-    </div>
-
-    <!-- Right Panel: Stats -->
-    <div class="stats" *ngIf="selectedClass">
-      <div class="stat present">
-        Present: <strong>{{ selectedClass.present }}</strong>
-      </div>
-      <div class="stat late">
-        Late: <strong>{{ selectedClass.late }}</strong>
-      </div>
-      <div class="stat absent">
-        Absent: <strong>{{ selectedClass.absent }}</strong>
-      </div>
-      <div class="total">
-        Total: <strong>{{ selectedClass.present + selectedClass.late + selectedClass.absent }}</strong>
-      </div>
-    </div>
-  </div>
+<div class="schedule-grid">
+  <table>
+    <thead>
+      <tr>
+        <th>Schedule</th>
+        <th *ngFor="let day of days">{{ day }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let slot of timeSlots; let row = index">
+        <td>{{ slot }}</td>
+        <td *ngFor="let day of days; let col = index">
+          <div class="cell">
+            <ng-container *ngIf="grid[row][col]">
+              <b>{{ grid[row][col].courseCode }}</b><br>
+              <span>{{ grid[row][col].section }}</span><br>
+              <span>{{ grid[row][col].professor }}</span>
+            </ng-container>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </div>
