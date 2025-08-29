@@ -27,17 +27,9 @@
       </div>
     </section>
 
-    <!-- RIGHT: Form -->
+    <!-- RIGHT: Registration Form + Schedule -->
     <section class="form">
       <form [formGroup]="form" (ngSubmit)="submit()">
-        <label>
-          <span>Course Code</span>
-          <input formControlName="courseCode" placeholder="e.g., IT123L">
-        </label>
-        <label>
-          <span>Section</span>
-          <input formControlName="section" placeholder="e.g., AM-8">
-        </label>
         <label>
           <span>Student ID</span>
           <input formControlName="studentId" placeholder="e.g., 2023001">
@@ -57,6 +49,22 @@
           {{ submitting ? 'Submitting…' : 'Submit Registration' }}
         </button>
       </form>
+
+      <div class="schedule-section">
+        <h3>Class Schedule</h3>
+        <div class="schedule-entry">
+          <input [(ngModel)]="scheduleCourseCode" name="scheduleCourseCode" placeholder="Course Code" maxlength="20">
+          <input [(ngModel)]="scheduleSection" name="scheduleSection" placeholder="Section" maxlength="20">
+          <input [(ngModel)]="scheduleRoom" name="scheduleRoom" placeholder="Room" maxlength="20">
+          <button class="btn" type="button" (click)="addScheduleEntry()">Add</button>
+        </div>
+        <ul class="schedule-list">
+          <li *ngFor="let entry of schedule; let i = index">
+            <span>{{entry.course_code}} - {{entry.section}} ({{entry.room}})</span>
+            <button class="btn danger" type="button" (click)="removeScheduleEntry(i)">Remove</button>
+          </li>
+        </ul>
+      </div>
     </section>
   </div>
   <canvas #canvasEl class="hidden-canvas"></canvas>

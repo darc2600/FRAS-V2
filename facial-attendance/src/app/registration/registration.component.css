@@ -44,3 +44,27 @@ input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); 
 .progress .bar { height: 100%; background: #22c55e; width: 0%; transition: width .2s; }
 
 .hidden-canvas { display: none; }
+
+.schedule-section {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+.schedule-entry {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.schedule-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.schedule-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}

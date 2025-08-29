@@ -16,15 +16,8 @@ export class RegistrationService {
 
   constructor(private http: HttpClient) {}
 
-  registerStudent(data: RegistrationPayload, blobs: Blob[]): Observable<HttpEvent<any>> {
-    const fd = new FormData();
-    fd.set('courseCode', data.courseCode.trim());
-    fd.set('section', data.section.trim());
-    fd.set('studentId', data.studentId.trim());
-    fd.set('studentName', data.studentName.trim());
-    fd.set('imageCount', String(data.imageCount));
-    blobs.forEach((b, i) => fd.append('images', b, `img${i + 1}.jpg`));
-    return this.http.post(`${this.baseUrl}/registration`, fd, {
+  registerStudent(formData: FormData): Observable<HttpEvent<any>> {
+    return this.http.post(`${this.baseUrl}/registration`, formData, {
       reportProgress: true,
       observe: 'events',
     });

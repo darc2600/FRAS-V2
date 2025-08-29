@@ -1,7 +1,7 @@
 import {
   Component, ElementRef, OnDestroy, OnInit, ViewChild
 } from '@angular/core';
-import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { RegistrationService } from './registration.service';
 import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
@@ -11,7 +11,7 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   templateUrl: './registration.component.html',
   styleUrls: ['./registration.component.css'],
-  imports: [ReactiveFormsModule, CommonModule],
+  imports: [ReactiveFormsModule, FormsModule, CommonModule],
 })
 export class RegistrationComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl', { static: true }) videoEl!: ElementRef<HTMLVideoElement>;
@@ -24,7 +24,12 @@ export class RegistrationComponent implements OnInit, OnDestroy {
   previews: { url: string; blob: Blob }[] = [];
   defaultTarget = 10;
 
-  form: any; // <-- Change to late initialization
+  form: any;
+  // For schedule entry
+  scheduleCourseCode = '';
+  scheduleSection = '';
+  scheduleRoom = '';
+  schedule: { course_code: string; section: string; room: string }[] = [];
 
   private subs = new Subscription();
 
@@ -32,10 +37,7 @@ export class RegistrationComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private regSvc: RegistrationService
   ) {
-    // Initialize form here
     this.form = this.fb.group({
-      courseCode: ['', [Validators.required, Validators.maxLength(20)]],
-      section: ['', [Validators.required, Validators.maxLength(20)]],
       studentId: ['', [Validators.required, Validators.maxLength(40)]],
       studentName: ['', [Validators.required, Validators.maxLength(80)]],
       imageCount: [this.defaultTarget, [Validators.required, Validators.min(1), Validators.max(50)]],
@@ -115,6 +117,31 @@ export class RegistrationComponent implements OnInit, OnDestroy {
     this.previews = [];
   }
 
+  // --- Schedule Section ---
+  addScheduleEntry() {
+    const code = this.scheduleCourseCode.trim();
+    const section = this.scheduleSection.trim();
+    const room = this.scheduleRoom.trim();
+    if (code && section && room) {
+      // Prevent duplicates
+      if (!this.schedule.find(e =>
+        e.course_code === code &&
+        e.section === section &&
+        e.room === room
+      )) {
+        this.schedule.push({ course_code: code, section, room });
+        this.scheduleCourseCode = '';
+        this.scheduleSection = '';
+        this.scheduleRoom = '';
+      }
+    }
+  }
+
+  removeScheduleEntry(index: number) {
+    this.schedule.splice(index, 1);
+  }
+
+  // --- Registration Submission ---
   submit() {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -122,6 +149,10 @@ export class RegistrationComponent implements OnInit, OnDestroy {
     }
     if (this.previews.length === 0) {
       alert('Please capture at least 1 image.');
+      return;
+    }
+    if (this.schedule.length === 0) {
+      alert('Please add at least one schedule entry.');
       return;
     }
     this.submitting = true;
@@ -132,10 +163,25 @@ export class RegistrationComponent implements OnInit, OnDestroy {
       studentId: this.form.value.studentId!,
       studentName: this.form.value.studentName!,
       imageCount: this.previews.length,
+      schedule: this.schedule
     };
     const blobs = this.previews.map(p => p.blob);
+    const formData = new FormData();
+    formData.append('courseCode', this.form.value.courseCode);
+    formData.append('section', this.form.value.section);
+    formData.append('studentId', this.form.value.studentId);
+    formData.append('studentName', this.form.value.studentName);
+    formData.append('imageCount', this.previews.length.toString());
+
+    // Add schedule as JSON string
+    formData.append('schedule', JSON.stringify(this.schedule));
+
+    // Add images
+    this.previews.forEach((p, i) => formData.append('images', p.blob, `img${i + 1}.jpg`));
+
+    // Then POST to the backend
     this.subs.add(
-      this.regSvc.registerStudent(payload, blobs).subscribe({
+      this.regSvc.registerStudent(formData).subscribe({
         next: evt => {
           // @ts-ignore
           if (evt?.type === 1 && evt.total) {
@@ -154,6 +200,7 @@ export class RegistrationComponent implements OnInit, OnDestroy {
           alert('Registration uploaded successfully!');
           this.clearAll();
           this.form.patchValue({ imageCount: this.defaultTarget });
+          this.schedule = [];
         }
       })
     );
