@@ -41,7 +41,7 @@ export class WebcamCaptureComponent {
     }
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-    this.api.recognizeFace(file, this.courseCode, this.section).subscribe(
+  this.api.recognizeFace(file, this.courseCode, this.section, '').subscribe(
       res => this.message = res.status === 'success'
         ? `Attendance marked for ${res.student_id}`
         : res.message,

@@ -1,3 +1,4 @@
+
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
@@ -15,8 +16,10 @@ import { CommonModule } from '@angular/common';
 export class AttendanceMonitorComponent implements OnInit {
   courseCode = '';
   section = '';
-  availableCourses: string[] = ['IT123', 'IT164', 'IT164L', 'MALU', 'SW123']; // You can fetch from backend if needed
-  availableSections: string[] = ['AM1', 'AM3', 'AM4', 'PET']; // You can fetch from backend if needed
+  room = '';
+  availableCourses: string[] = [];
+  availableSections: string[] = [];
+  availableRooms: string[] = [];
   currentTime = '';
   message = '';
   webcamImage: WebcamImage | null = null;
@@ -28,10 +31,59 @@ export class AttendanceMonitorComponent implements OnInit {
   ngOnInit() {
     this.updateClock();
     setInterval(() => this.updateClock(), 1000);
-    // Optionally set defaults
-    this.courseCode = this.availableCourses[0];
-    this.section = this.availableSections[0];
-    this.fetchLogs();
+    this.fetchRooms();
+  }
+
+  fetchRooms() {
+    this.api.getRooms().subscribe(
+      (rooms: string[]) => {
+        this.availableRooms = rooms;
+        if (rooms.length > 0) {
+          this.room = rooms[0];
+          this.fetchCourses();
+        }
+      },
+      err => this.message = 'Error fetching rooms.'
+    );
+  }
+
+  onRoomChange() {
+    this.fetchCourses();
+  }
+
+  fetchCourses() {
+    if (!this.room) {
+      this.availableCourses = [];
+      this.availableSections = [];
+      return;
+    }
+    this.api.getCourses(this.room).subscribe(
+      (courses: string[]) => {
+        this.availableCourses = courses;
+        this.courseCode = courses[0] || '';
+        this.fetchSections();
+      },
+      err => this.message = 'Error fetching courses.'
+    );
+  }
+
+  onCourseChange() {
+    this.fetchSections();
+  }
+
+  fetchSections() {
+    if (!this.room || !this.courseCode) {
+      this.availableSections = [];
+      return;
+    }
+    this.api.getSections(this.room, this.courseCode).subscribe(
+      (sections: string[]) => {
+        this.availableSections = sections;
+        this.section = sections[0] || '';
+        this.fetchLogs();
+      },
+      err => this.message = 'Error fetching sections.'
+    );
   }
 
   updateClock() {
@@ -55,13 +107,13 @@ export class AttendanceMonitorComponent implements OnInit {
       this.message = 'Please capture an image first.';
       return;
     }
-    if (!this.courseCode || !this.section) {
-      this.message = 'Please select a course and section.';
+    if (!this.courseCode || !this.section || !this.room) {
+      this.message = 'Please select a room, course, and section.';
       return;
     }
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-    this.api.recognizeFace(file, this.courseCode, this.section).subscribe(
+    this.api.recognizeFace(file, this.courseCode, this.section, this.room).subscribe(
       res => {
         this.message = res.status === 'success'
           ? `Attendance marked for ${res.student_id}`
@@ -73,11 +125,11 @@ export class AttendanceMonitorComponent implements OnInit {
   }
 
   fetchLogs() {
-    if (!this.courseCode || !this.section) {
+    if (!this.courseCode || !this.section || !this.room) {
       this.attendanceLogs = [];
       return;
     }
-    this.api.getAttendance(this.courseCode, this.section).subscribe(
+    this.api.getAttendance(this.courseCode, this.section, this.room).subscribe(
       res => {
         // Adjust this mapping as needed for your backend response
         this.attendanceLogs = (res.attendance || []).map((log: any) => ({

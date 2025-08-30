@@ -1,4 +1,10 @@
 <h2>Attendance Logs</h2>
+<label>
+  Room:
+  <select [(ngModel)]="room">
+    <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
+  </select>
+</label>
 <input type="text" placeholder="Course Code" [(ngModel)]="courseCode">
 <input type="text" placeholder="Section" [(ngModel)]="section">
 <button (click)="fetchLogs()">Fetch Logs</button>
