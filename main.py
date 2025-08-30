@@ -1,73 +1,30 @@
-import cv2
-import os
-import sqlite3
-from datetime import datetime
-from deepface import DeepFace
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-# Configuration
-course_code = "IT164L"
-section = "AM4"
-dataset_path = os.path.join("dataset", course_code, section)
-db_path = "attendance.db"
+from api.attendance import router as attendance_router
+from api.registration import router as registration_router
+from api.recognition import router as recognition_router
+from api.room import router as room_router
+from api.capture import router as capture_router
+from api.schedule import router as schedule_router
+from api.debug import router as debug_router
 
-# Initialize database
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS attendance (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT,
-        course_code TEXT,
-        section TEXT,
-        timestamp TEXT
-    )
-''')
-conn.commit()
+app = FastAPI()
 
-# Load student images
-student_faces = {}
-for student_id in os.listdir(dataset_path):
-    student_folder = os.path.join(dataset_path, student_id)
-    if os.path.isdir(student_folder):
-        images = [os.path.join(student_folder, img) for img in os.listdir(student_folder) if img.lower().endswith(".jpg")]
-        if images:
-            student_faces[student_id] = images[0]  # Use the first image for recognition
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Start webcam
-cap = cv2.VideoCapture(0)
-print("Press 'q' to quit.")
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
 
-    # Save current frame temporarily
-    cv2.imwrite("current_frame.jpg", frame)
-
-    # Try to match with known student faces
-    for student_id, img_path in student_faces.items():
-        try:
-            result = DeepFace.verify(img1_path="current_frame.jpg", img2_path=img_path, model_name="ArcFace", enforce_detection=False)
-            if result["verified"]:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                cursor.execute("""
-                    INSERT INTO attendance (student_id, course_code, section, timestamp)
-                    VALUES (?, ?, ?, ?)
-                """, (student_id, course_code, section, timestamp))
-                conn.commit()
-                print(f"Attendance recorded for {student_id} at {timestamp}")
-                break  # Stop checking after first match
-        except Exception as e:
-            print(f"Error verifying {student_id}: {e}")
-
-    # Display the frame
-    cv2.imshow("Attendance Monitoring", frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Cleanup
-cap.release()
-cv2.destroyAllWindows()
-conn.close()
-print("Attendance monitoring stopped.")
+app.include_router(attendance_router)
+app.include_router(registration_router)
+app.include_router(recognition_router)
+app.include_router(room_router)
+app.include_router(capture_router)
+app.include_router(schedule_router)
+app.include_router(debug_router)
