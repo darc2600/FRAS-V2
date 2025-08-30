@@ -157,27 +157,13 @@ export class RegistrationComponent implements OnInit, OnDestroy {
     }
     this.submitting = true;
     this.uploadProgress = 0;
-    const payload = {
-      courseCode: this.form.value.courseCode!,
-      section: this.form.value.section!,
-      studentId: this.form.value.studentId!,
-      studentName: this.form.value.studentName!,
-      imageCount: this.previews.length,
-      schedule: this.schedule
-    };
-    const blobs = this.previews.map(p => p.blob);
-    const formData = new FormData();
-    formData.append('courseCode', this.form.value.courseCode);
-    formData.append('section', this.form.value.section);
-    formData.append('studentId', this.form.value.studentId);
-    formData.append('studentName', this.form.value.studentName);
-    formData.append('imageCount', this.previews.length.toString());
 
-    // Add schedule as JSON string
-    formData.append('schedule', JSON.stringify(this.schedule));
-
-    // Add images
-    this.previews.forEach((p, i) => formData.append('images', p.blob, `img${i + 1}.jpg`));
+  const formData = new FormData();
+  formData.append('student_id', this.form.value.studentId);
+  formData.append('name', this.form.value.studentName);
+  // Send schedule as JSON string
+  formData.append('schedule', JSON.stringify(this.schedule));
+  this.previews.forEach((p, i) => formData.append('images', p.blob, `img${i + 1}.jpg`));
 
     // Then POST to the backend
     this.subs.add(

@@ -1,0 +1,26 @@
+[
+  {
+    "courseCode": "IT123",
+    "section": "AM1",
+    "professor": "Dev",
+    "day": "Monday",
+    "startTime": "07:00AM",
+    "endTime": "08:10AM"
+  },
+  {
+    "courseCode": "IT123",
+    "section": "AM1",
+    "professor": "Dev",
+    "day": "Monday",
+    "startTime": "08:10AM",
+    "endTime": "09:20AM"
+  },
+  {
+    "courseCode": "IT123",
+    "section": "AM1",
+    "professor": "Dev",
+    "day": "Monday",
+    "startTime": "09:20AM",
+    "endTime": "10:30AM"
+  }
+]

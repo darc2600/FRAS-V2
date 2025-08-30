@@ -15,10 +15,10 @@ export class ApiService {
     formData.append('file', file);
     formData.append('course_code', courseCode);
     formData.append('section', section);
-    return this.http.post(`${this.backendUrl}/recognize`, formData);
+    return this.http.post(`${this.backendUrl}/api/recognize`, formData);
   }
 
   getAttendance(courseCode: string, section: string) {
-    return this.http.get<any>(`http://127.0.0.1:8000/attendance?course_code=${courseCode}&section=${section}`);
+    return this.http.get<any>(`${this.backendUrl}/api/attendance?course_code=${courseCode}&section=${section}`);
   }
 }

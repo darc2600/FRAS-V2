@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
 import { WebcamImage, WebcamModule } from 'ngx-webcam';
 import { ApiService } from '../api.service';
@@ -9,11 +10,13 @@ import { CommonModule } from '@angular/common';
   standalone: true, // <-- Add this if using standalone components
   templateUrl: './attendance-monitor.component.html',
   styleUrls: ['./attendance-monitor.component.css'],
-  imports: [WebcamModule, CommonModule], // <-- Add required modules here
+  imports: [WebcamModule, CommonModule, FormsModule], // <-- Add required modules here
 })
 export class AttendanceMonitorComponent implements OnInit {
-  courseCode = 'IT123';
-  section = 'AM3';
+  courseCode = '';
+  section = '';
+  availableCourses: string[] = ['IT123', 'IT164', 'IT164L', 'MALU', 'SW123']; // You can fetch from backend if needed
+  availableSections: string[] = ['AM1', 'AM3', 'AM4', 'PET']; // You can fetch from backend if needed
   currentTime = '';
   message = '';
   webcamImage: WebcamImage | null = null;
@@ -25,6 +28,9 @@ export class AttendanceMonitorComponent implements OnInit {
   ngOnInit() {
     this.updateClock();
     setInterval(() => this.updateClock(), 1000);
+    // Optionally set defaults
+    this.courseCode = this.availableCourses[0];
+    this.section = this.availableSections[0];
     this.fetchLogs();
   }
 
@@ -49,6 +55,10 @@ export class AttendanceMonitorComponent implements OnInit {
       this.message = 'Please capture an image first.';
       return;
     }
+    if (!this.courseCode || !this.section) {
+      this.message = 'Please select a course and section.';
+      return;
+    }
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
     this.api.recognizeFace(file, this.courseCode, this.section).subscribe(
@@ -63,6 +73,10 @@ export class AttendanceMonitorComponent implements OnInit {
   }
 
   fetchLogs() {
+    if (!this.courseCode || !this.section) {
+      this.attendanceLogs = [];
+      return;
+    }
     this.api.getAttendance(this.courseCode, this.section).subscribe(
       res => {
         // Adjust this mapping as needed for your backend response
