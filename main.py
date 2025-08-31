@@ -11,6 +11,7 @@ from api.debug import router as debug_router
 from api.course_students import router as course_students_router
 from api.student_courses import router as student_courses_router
 from api.room_search import router as room_search_router
+from api.room_floors import router as room_floors_router
 
 
 # Tag metadata for grouping in Swagger UI
@@ -57,3 +58,4 @@ app.include_router(debug_router, tags=["Debug"])
 app.include_router(course_students_router, tags=["Registration"])
 app.include_router(student_courses_router, tags=["Registration"])
 app.include_router(room_search_router, tags=["Rooms", "Courses", "Sections"])
+app.include_router(room_floors_router, tags=["Rooms"])

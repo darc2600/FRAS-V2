@@ -42,4 +42,8 @@ export class ApiService {
   getCourseSections(room: string): Observable<string[]> {
     return this.http.get<string[]>(`${this.backendUrl}/api/course-sections?room=${encodeURIComponent(room)}`);
   }
+
+  getRoomsWithFloors(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/floors`);
+  }
 }
