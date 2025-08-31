@@ -1,5 +1,3 @@
-
-
 # -----------------------
 # Imports
 # -----------------------
@@ -14,6 +12,10 @@ import shutil
 import json
 from datetime import datetime
 from typing import List
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 # -----------------------
 # App initialization
@@ -187,7 +189,10 @@ async def recognize_face(file: UploadFile = File(...), course_code: str = Form(.
             for student_id, img_path in student_faces.items():
                 try:
                     result = DeepFace.verify(img1_path=temp_path, img2_path=img_path, model_name="ArcFace", enforce_detection=False)
-                    if result["verified"]:
+                    distance = result.get('distance')
+                    threshold = 0.3  # Stricter threshold for cosine distance (default is 0.68)
+                    logging.info(f"Comparing temp image with {img_path} (student_id={student_id}): verified={result['verified']}, distance={distance}, threshold={threshold}")
+                    if result["verified"] and distance is not None and distance < threshold:
                         cursor.execute("""
                             SELECT 1 FROM attendance
                             WHERE student_id = ? AND course_code = ? AND section = ? AND room = ? AND DATE(timestamp) = DATE('now')

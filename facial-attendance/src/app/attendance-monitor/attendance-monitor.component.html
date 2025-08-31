@@ -4,22 +4,17 @@ Sample Angular (HTML layout sketch)
 
   <header class="top-bar">
     <h1 style="display: flex; gap: 1rem; align-items: center;">
-      <label>
+      <label style="position: relative;">
         Room:
-        <select [(ngModel)]="room" (change)="onRoomChange()">
-          <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
-        </select>
+        <input type="text" [(ngModel)]="roomSearch" (input)="onRoomSearchChange()" (focus)="showRoomDropdown = true" (blur)="onRoomInputBlur()" placeholder="Search room..." style="width: 120px;" autocomplete="off" />
+        <ul *ngIf="showRoomDropdown && filteredRooms.length > 0" class="dropdown-list">
+          <li *ngFor="let r of filteredRooms" (mousedown)="selectRoom(r)">{{r}}</li>
+        </ul>
       </label>
       <label>
-        Course:
-        <select [(ngModel)]="courseCode" (change)="onCourseChange()">
-          <option *ngFor="let c of availableCourses" [value]="c">{{c}}</option>
-        </select>
-      </label>
-      <label>
-        Section:
-        <select [(ngModel)]="section" (change)="fetchLogs()">
-          <option *ngFor="let s of availableSections" [value]="s">{{s}}</option>
+        Course-Section:
+        <select [(ngModel)]="courseSection" (change)="onCourseSectionChange()">
+          <option *ngFor="let cs of availableCourseSections" [value]="cs">{{cs}}</option>
         </select>
       </label>
     </h1>
@@ -34,6 +29,8 @@ Sample Angular (HTML layout sketch)
         <button (click)="triggerSnapshot()">Capture Image</button>
       </div>
       <button (click)="markAttendance()">Mark Attendance</button>
+      <button (click)="startAutoRecognition()" [disabled]="autoRecognitionActive">Start Auto Recognition</button>
+      <button (click)="stopAutoRecognition()" [disabled]="!autoRecognitionActive">Stop Auto Recognition</button>
       <div class="message">{{ message }}</div>
     </div>
 
@@ -42,11 +39,13 @@ Sample Angular (HTML layout sketch)
       <h2>Attendance Log</h2>
       <table>
         <tr>
+          <th>ID</th>
           <th>Name</th>
           <th>Time</th>
           <th>Status</th>
         </tr>
         <tr *ngFor="let log of attendanceLogs">
+          <td>{{ log.studentId }}</td>
           <td>{{ log.studentName }}</td>
           <td>{{ log.time | date:'hh:mm:ss a' }}</td>
           <td [ngClass]="getStatusClass(log.status)">{{ log.status }}</td>
