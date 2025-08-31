@@ -18,7 +18,20 @@ from typing import List
 # -----------------------
 # App initialization
 # -----------------------
-app = FastAPI()
+
+# Tag metadata for grouping in Swagger UI
+tags_metadata = [
+    {"name": "Rooms", "description": "Room listing and related endpoints."},
+    {"name": "Courses", "description": "Course listing and related endpoints."},
+    {"name": "Sections", "description": "Section listing and related endpoints."},
+    {"name": "Attendance", "description": "Attendance retrieval and management."},
+    {"name": "Registration", "description": "Student registration and management."},
+    {"name": "Recognition", "description": "Face recognition endpoints."},
+    {"name": "Capture", "description": "Image capture endpoints."},
+    {"name": "Debug", "description": "Debug and utility endpoints."},
+]
+
+app = FastAPI(openapi_tags=tags_metadata)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,7 +44,7 @@ app.add_middleware(
 # -----------------------
 # Room, Course, Section Listing Endpoints
 # -----------------------
-@app.get("/api/rooms")
+@app.get("/api/rooms", tags=["Rooms"])
 async def get_rooms():
     schedules_dir = "schedules"
     if not os.path.exists(schedules_dir):
@@ -39,7 +52,7 @@ async def get_rooms():
     rooms = [f[:-5] for f in os.listdir(schedules_dir) if f.endswith(".json")]
     return rooms
 
-@app.get("/api/courses")
+@app.get("/api/courses", tags=["Courses"])
 async def get_courses(room: str):
     schedule_path = os.path.join("schedules", f"{room}.json")
     if not os.path.exists(schedule_path):
@@ -49,7 +62,7 @@ async def get_courses(room: str):
     courses = sorted(list(set(entry.get("courseCode") for entry in schedule if entry.get("courseCode"))))
     return courses
 
-@app.get("/api/sections")
+@app.get("/api/sections", tags=["Sections"])
 async def get_sections(room: str, course: str):
     schedule_path = os.path.join("schedules", f"{room}.json")
     if not os.path.exists(schedule_path):
@@ -147,7 +160,7 @@ init_db()
 # -----------------------
 # Face Recognition
 # -----------------------
-@app.post("/api/recognize")
+@app.post("/api/recognize", tags=["Recognition"])
 async def recognize_face(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), room: str = Form(...)):
     temp_path = f"temp_{file.filename}"
     with open(temp_path, "wb") as buffer:
@@ -201,7 +214,7 @@ async def recognize_face(file: UploadFile = File(...), course_code: str = Form(.
 # -----------------------
 # Image Capture
 # -----------------------
-@app.post("/api/capture")
+@app.post("/api/capture", tags=["Capture"])
 async def capture_image(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), student_id: str = Form(...)):
     save_path = os.path.join("dataset", course_code, section, student_id)
     os.makedirs(save_path, exist_ok=True)
@@ -213,7 +226,7 @@ async def capture_image(file: UploadFile = File(...), course_code: str = Form(..
 # -----------------------
 # Attendance Retrieval
 # -----------------------
-@app.get("/api/attendance")
+@app.get("/api/attendance", tags=["Attendance"])
 async def get_attendance(course_code: str, section: str, room: str = None):
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
@@ -233,7 +246,7 @@ async def get_attendance(course_code: str, section: str, room: str = None):
 # -----------------------
 # Student Registration
 # -----------------------
-@app.post("/api/registration")
+@app.post("/api/registration", tags=["Registration"])
 async def register_student(
     student_id: str = Form(...),
     name: str = Form(...),
@@ -286,6 +299,6 @@ async def register_student(
 # -----------------------
 # Debug: List routes
 # -----------------------
-@app.get("/api/routes")
+@app.get("/api/routes", tags=["Debug"])
 async def list_routes():
     return [route.path for route in app.routes]
