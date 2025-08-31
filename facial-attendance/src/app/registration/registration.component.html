@@ -65,6 +65,20 @@
           </li>
         </ul>
       </div>
+
+      <!-- ANGLE CAPTURE UI -->
+      <div class="angle-guide">
+        <div class="angle-label">Current Angle: <b>{{ currentAngleLabel }}</b></div>
+        <button class="btn" type="button" (click)="captureAngle()" [disabled]="!stream || isCapturing || faceAngles[currentAngleIndex].captured">
+          Capture {{ currentAngleLabel }}
+        </button>
+        <button class="btn danger" type="button" (click)="resetAngles()">Reset Angles</button>
+        <div class="angle-progress">
+          <span *ngFor="let angle of faceAngles; let i = index" [class.captured]="angle.captured">
+            {{ angle.label }}<span *ngIf="i < faceAngles.length - 1">, </span>
+          </span>
+        </div>
+      </div>
     </section>
   </div>
   <canvas #canvasEl class="hidden-canvas"></canvas>

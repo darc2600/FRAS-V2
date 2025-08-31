@@ -6,6 +6,12 @@ import { RegistrationService } from './registration.service';
 import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 
+interface PreviewImage {
+  url: string;
+  blob: Blob;
+  angle?: string;
+}
+
 @Component({
   selector: 'app-registration',
   standalone: true,
@@ -21,7 +27,7 @@ export class RegistrationComponent implements OnInit, OnDestroy {
   isCapturing = false;
   submitting = false;
   uploadProgress = 0;
-  previews: { url: string; blob: Blob }[] = [];
+  previews: PreviewImage[] = [];
   defaultTarget = 10;
 
   form: any;
@@ -30,6 +36,16 @@ export class RegistrationComponent implements OnInit, OnDestroy {
   scheduleSection = '';
   scheduleRoom = '';
   schedule: { course_code: string; section: string; room: string }[] = [];
+
+  // For guided angle capture
+  faceAngles = [
+    { label: 'Center', captured: false },
+    { label: 'Left', captured: false },
+    { label: 'Right', captured: false },
+    { label: 'Up', captured: false },
+    { label: 'Down', captured: false }
+  ];
+  currentAngleIndex = 0;
 
   private subs = new Subscription();
 
@@ -72,7 +88,7 @@ export class RegistrationComponent implements OnInit, OnDestroy {
     this.stream = undefined;
   }
 
-  private async snapOnce(): Promise<{ url: string; blob: Blob }> {
+  private async snapOnce(): Promise<PreviewImage> {
     const video = this.videoEl.nativeElement;
     const canvas = this.canvasEl.nativeElement;
     const w = video.videoWidth || 1280;
@@ -190,5 +206,27 @@ export class RegistrationComponent implements OnInit, OnDestroy {
         }
       })
     );
+  }
+
+  get currentAngleLabel() {
+    return this.faceAngles[this.currentAngleIndex]?.label || '';
+  }
+
+  async captureAngle() {
+    if (!this.stream) return;
+    const shot = await this.snapOnce();
+    shot.angle = this.currentAngleLabel;
+    this.previews.push(shot);
+    this.faceAngles[this.currentAngleIndex].captured = true;
+    // Move to next angle if available
+    if (this.currentAngleIndex < this.faceAngles.length - 1) {
+      this.currentAngleIndex++;
+    }
+  }
+
+  resetAngles() {
+    this.faceAngles.forEach(a => a.captured = false);
+    this.currentAngleIndex = 0;
+    this.clearAll();
   }
 }
