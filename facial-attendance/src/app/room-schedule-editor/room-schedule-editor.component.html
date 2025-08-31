@@ -3,6 +3,7 @@
   Room:
   <input [(ngModel)]="room" placeholder="e.g. MPO305">
   <button (click)="loadSchedule()">Load</button>
+  <button (click)="deleteSchedule()" style="margin-left:8px;">Delete Schedule</button>
 </label>
 <p *ngIf="message">{{message}}</p>
 

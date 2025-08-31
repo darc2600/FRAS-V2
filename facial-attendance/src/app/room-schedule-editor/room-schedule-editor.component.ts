@@ -42,12 +42,13 @@ export class RoomScheduleEditorComponent {
 
   loadSchedule() {
     if (!this.room) return;
-    this.http.get<any[]>(`http://127.0.0.1:8000/api/room-schedule/${this.room}`)
+    this.http.get<any>(`http://127.0.0.1:8000/api/room-schedule/${this.room}`)
       .subscribe(data => {
         // Reset grid
         this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
         // Fill grid with loaded data
-        (data || []).forEach((entry: any) => {
+        const scheduleList = (data && data.schedule) ? data.schedule : [];
+        scheduleList.forEach((entry: any) => {
           const row = this.timeSlots.findIndex(
             t => t === `${entry.startTime} - ${entry.endTime}`
           );
@@ -82,6 +83,19 @@ export class RoomScheduleEditorComponent {
 
   clearCell(row: number, col: number) {
     this.grid[row][col] = {};
+  }
+
+  deleteSchedule() {
+    if (!this.room) return;
+    if (!confirm('Are you sure you want to delete this room schedule?')) return;
+    this.http.delete(`http://127.0.0.1:8000/api/room-schedule/${this.room}`, { responseType: 'text' })
+      .subscribe({
+        next: () => {
+          this.message = 'Schedule deleted!';
+          this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
+        },
+        error: () => this.message = 'Failed to delete schedule.'
+      });
   }
 
   saveSchedule() {

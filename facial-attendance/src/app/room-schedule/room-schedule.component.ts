@@ -32,11 +32,12 @@ export class RoomScheduleComponent implements OnInit {
 
   loadSchedule() {
     if (!this.room) return;
-    this.http.get<any[]>(`http://127.0.0.1:8000/api/room-schedule/${this.room}`)
+    this.http.get<any>(`http://127.0.0.1:8000/api/room-schedule/${this.room}`)
       .subscribe({
         next: (data) => {
           this.grid = this.timeSlots.map(() => this.days.map(() => null));
-          (data || []).forEach((entry: any) => {
+          const scheduleList = (data && data.schedule) ? data.schedule : [];
+          scheduleList.forEach((entry: any) => {
             const row = this.timeSlots.findIndex(
               t => t === `${entry.startTime} - ${entry.endTime}`
             );
@@ -49,10 +50,11 @@ export class RoomScheduleComponent implements OnInit {
               };
             }
           });
-          this.message = '';
+          this.message = scheduleList.length ? '' : 'No schedule found for this room.';
         },
         error: () => {
-          this.message = 'Failed to load schedule.';
+          this.grid = this.timeSlots.map(() => this.days.map(() => null));
+          this.message = 'Room schedule not found.';
         }
       });
   }

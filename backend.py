@@ -277,36 +277,6 @@ async def register_student(
 
     return {"status": "success", "message": "Student registered and images saved.", "image_paths": saved_files}
 
-# -----------------------
-# Room Schedule Endpoints
-# -----------------------
-@app.get("/api/room-schedule/{room_code}")
-async def get_room_schedule(room_code: str):
-    schedule_path = os.path.join("schedules", f"{room_code}.json")
-    if not os.path.exists(schedule_path):
-        raise HTTPException(status_code=404, detail="Room schedule not found")
-    with open(schedule_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-@app.post("/api/room-schedule/{room_code}")
-async def update_room_schedule(room_code: str, request: Request):
-    os.makedirs("schedules", exist_ok=True)
-    schedule_path = os.path.join("schedules", f"{room_code}.json")
-    content_type = request.headers.get("content-type", "")
-
-    if "application/json" in content_type:
-        schedule = await request.json()
-    elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-        form = await request.form()
-        schedule_str = form.get("schedule")
-        if not schedule_str:
-            raise HTTPException(status_code=400, detail="Missing 'schedule' field in form data.")
-        try:
-            schedule = json.loads(schedule_str)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid JSON in 'schedule' field.")
-    else:
-        raise HTTPException(status_code=415, detail="Unsupported Media Type")
 
     with open(schedule_path, "w", encoding="utf-8") as f:
         json.dump(jsonable_encoder(schedule), f, ensure_ascii=False, indent=2)

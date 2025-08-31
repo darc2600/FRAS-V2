@@ -4,13 +4,20 @@ from fastapi import Request, HTTPException
 from models.schedule import ScheduleResponse
 
 class ScheduleRepository:
-    async def get_room_schedule(self, room_code: str) -> ScheduleResponse:
+    async def get_room_schedule(self, room_code: str):
         schedule_path = os.path.join("schedules", f"{room_code}.json")
         if not os.path.exists(schedule_path):
             raise HTTPException(status_code=404, detail="Room schedule not found")
         with open(schedule_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return ScheduleResponse(schedule=data)
+        # Always return a list
+        if isinstance(data, list):
+            return data
+        elif isinstance(data, dict):
+            return [data]
+        else:
+            return []
+
 
     async def update_room_schedule(self, room_code: str, request: Request) -> ScheduleResponse:
         os.makedirs("schedules", exist_ok=True)
@@ -33,5 +40,20 @@ class ScheduleRepository:
             json.dump(schedule, f, ensure_ascii=False, indent=2)
         return ScheduleResponse(schedule=schedule)
 
+    async def delete_room_schedule(self, room_code: str):
+        schedule_path = os.path.join("schedules", f"{room_code}.json")
+        if not os.path.exists(schedule_path):
+            raise HTTPException(status_code=404, detail="Room schedule not found")
+        os.remove(schedule_path)
+        return {"detail": "Room schedule deleted"}
+
 def get_schedule_repository():
     return ScheduleRepository()
+
+
+    async def delete_room_schedule(self, room_code: str):
+        schedule_path = os.path.join("schedules", f"{room_code}.json")
+        if not os.path.exists(schedule_path):
+            raise HTTPException(status_code=404, detail="Room schedule not found")
+        os.remove(schedule_path)
+        return {"detail": "Room schedule deleted"}
