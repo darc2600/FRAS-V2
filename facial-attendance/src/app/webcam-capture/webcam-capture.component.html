@@ -1,14 +1,54 @@
-<h2>Mark Attendance</h2>
-<input type="text" placeholder="Course Code" [(ngModel)]="courseCode"><br>
-<input type="text" placeholder="Section" [(ngModel)]="section"><br>
+<ion-app>
+  <!-- Sidebar -->
+  <ion-menu side="start" contentId="main-content" class="sidebar">
+    <ion-header>
+      <ion-toolbar color="dark">
+        <ion-title>
+          <img src="assets/logo.png" alt="Logo" class="logo">
+        </ion-title>
+      </ion-toolbar>
+    </ion-header>
 
-<webcam
-  [trigger]="triggerObservable"
-  (imageCapture)="handleImage($event)">
-</webcam>
-<br>
-<button (click)="triggerSnapshot()">Capture Photo</button>
-<br>
-<img *ngIf="webcamImage" [src]="webcamImage.imageAsDataUrl" width="200"><br>
-<button (click)="markAttendance()">Mark Attendance</button>
-<p>{{message}}</p>
+    <ion-content>
+      <ion-list lines="none">
+        <ion-item button>MONITOR</ion-item>
+        <ion-item button>REPORT</ion-item>
+        <ion-item button>LOGS</ion-item>
+        <ion-item button>REGISTER</ion-item>
+        <ion-item button>ADD COURSE</ion-item>
+      </ion-list>
+    </ion-content>
+
+    <ion-footer>
+      <ion-toolbar>
+        <ion-title class="signout">Sign Out</ion-title>
+      </ion-toolbar>
+    </ion-footer>
+  </ion-menu>
+
+  <!-- Main Content -->
+  <div class="main-content" id="main-content">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <h2>Facial Recognition</h2>
+    </div>
+
+    <!-- Webcam Capture Box -->
+    <div class="webcam-box">
+      <webcam
+        [trigger]="triggerObservable"
+        (imageCapture)="handleImage($event)">
+      </webcam>
+    </div>
+
+    <!-- Student Info Row -->
+    <div class="student-info">
+      <span>Date: 8-26-25</span>
+      <span>Time: XX:XXam</span>
+      <span>Student #: 2019110315</span>
+      <span>Status: <b class="present">Present</b> - <b class="ontime">OnTime</b></span>
+    </div>
+  </div>
+
+  
+</ion-app>

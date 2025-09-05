@@ -9,10 +9,8 @@ import { NavbarComponent } from '../components/navbar/navbar.component';
 
 @Component({
   selector: 'app-attendance-monitor',
-  standalone: true,
   templateUrl: './attendance-monitor.component.html',
   styleUrls: ['./attendance-monitor.component.css'],
-  imports: [WebcamModule, CommonModule, FormsModule, NavbarComponent],
 })
 export class AttendanceMonitorComponent implements OnInit {
   courseCode = '';

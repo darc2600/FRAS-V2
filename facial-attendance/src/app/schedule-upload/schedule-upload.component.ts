@@ -5,10 +5,8 @@ import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-schedule-upload',
-  standalone: true,
   templateUrl: './schedule-upload.component.html',
   styleUrls: ['./schedule-upload.component.css'],
-  imports: [FormsModule, CommonModule],
 })
 export class ScheduleUploadComponent {
   studentId = '';

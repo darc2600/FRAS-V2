@@ -12,10 +12,8 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 
 @Component({
   selector: 'app-room-schedule',
-  standalone: true,
   templateUrl: './room-schedule.component.html',
   styleUrls: ['./room-schedule.component.css'],
-  imports: [CommonModule, FormsModule]
 })
 export class RoomScheduleComponent implements OnInit {
   room = '';

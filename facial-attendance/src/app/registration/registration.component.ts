@@ -14,10 +14,8 @@ interface PreviewImage {
 
 @Component({
   selector: 'app-registration',
-  standalone: true,
   templateUrl: './registration.component.html',
   styleUrls: ['./registration.component.css'],
-  imports: [ReactiveFormsModule, FormsModule, CommonModule],
 })
 export class RegistrationComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl', { static: true }) videoEl!: ElementRef<HTMLVideoElement>;

@@ -1,5 +1,6 @@
 
 import { Component } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { WebcamModule, WebcamImage, WebcamInitError } from 'ngx-webcam';
 import { Subject, Observable } from 'rxjs';
@@ -7,11 +8,9 @@ import { ApiService } from '../api.service';
 import { CommonModule } from '@angular/common';
 
 @Component({
-  standalone: true,
   selector: 'app-webcam-capture',
   templateUrl: './webcam-capture.component.html',
-  styleUrls: ['./webcam-capture.component.css'],
-  imports: [FormsModule, WebcamModule, CommonModule], // ✅ Add required modules
+  styleUrls: ['./webcam-capture.component.css']
 })
 export class WebcamCaptureComponent {
   courseCode = '';

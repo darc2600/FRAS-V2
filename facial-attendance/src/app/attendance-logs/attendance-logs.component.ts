@@ -6,11 +6,9 @@ import { CommonModule } from '@angular/common';
 
 
 @Component({
-  standalone: true,
   selector: 'app-attendance-logs',
   templateUrl: './attendance-logs.component.html',
   styleUrls: ['./attendance-logs.component.css'],
-  imports: [FormsModule, WebcamModule, CommonModule],
 })
 export class AttendanceLogsComponent implements OnInit {
   room = '';
