@@ -1,33 +1,22 @@
+
 from fastapi import APIRouter
+import sqlite3
 import os
-import re
 
 router = APIRouter()
 
-def normalize_room_code(room: str) -> str:
-    # Extract digits from room code (e.g., MPO305 -> 305)
-    match = re.search(r"(\d{3,})", room)
-    return match.group(1) if match else room
-
-def get_floor_from_room(room: str) -> int:
-    norm = normalize_room_code(room)
-    if len(norm) >= 3 and norm.isdigit():
-        return int(norm[0])  # 305 -> 3rd floor
-    return 0
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
 @router.get("/api/rooms/floors")
 def get_rooms_with_floors():
-    schedules_dir = "schedules"
-    if not os.path.exists(schedules_dir):
-        return []
-    rooms = [f[:-5] for f in os.listdir(schedules_dir) if f.endswith(".json")]
-    result = []
-    for room in rooms:
-        norm = normalize_room_code(room)
-        floor = get_floor_from_room(room)
-        result.append({
-            "room": room,
-            "normalized": norm,
-            "floor": floor
-        })
-    return result
+    print(f"[DEBUG] Using database file: {os.path.abspath(DB_PATH)}")
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT room_id, floor_level, room_number FROM rooms")
+        rows = cursor.fetchall()
+        print(f"[DEBUG] /api/rooms/floors fetched rows: {rows}")
+        rooms = [
+            {"room_id": row[0], "floor_level": row[1], "room_number": row[2]}
+            for row in rows
+        ]
+    return rooms

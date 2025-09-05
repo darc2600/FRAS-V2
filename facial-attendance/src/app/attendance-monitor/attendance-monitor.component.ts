@@ -1,3 +1,4 @@
+
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
@@ -20,6 +21,9 @@ export class AttendanceMonitorComponent implements OnInit {
   availableCourses: string[] = [];
   availableSections: string[] = [];
   availableRooms: string[] = [];
+  allRooms: any[] = [];
+  availableFloors: number[] = [];
+  selectedFloor: number | null = null;
   currentTime = '';
   message = '';
   webcamImage: WebcamImage | null = null;
@@ -48,17 +52,41 @@ export class AttendanceMonitorComponent implements OnInit {
   }
 
   fetchRooms() {
-    this.api.getRooms().subscribe(
-      (rooms: string[]) => {
-        this.availableRooms = rooms;
-        this.filteredRooms = rooms;
-        if (rooms.length > 0) {
-          this.room = rooms[0];
-          this.fetchCourseSections();
+    this.api.getRoomsWithFloors().subscribe(
+      (rooms: any[]) => {
+        this.allRooms = rooms;
+        // Get unique floor levels
+        this.availableFloors = Array.from(new Set(rooms.map(r => r.floor_level).filter(f => f != null))).sort((a, b) => a - b);
+        // Default to first floor if available
+        if (this.availableFloors.length > 0) {
+          this.selectedFloor = this.availableFloors[0];
+          this.filterRoomsByFloor();
+        } else {
+          this.availableRooms = [];
+          this.filteredRooms = [];
         }
       },
       err => this.message = 'Error fetching rooms.'
     );
+  }
+
+  filterRoomsByFloor() {
+    if (this.selectedFloor == null) {
+      this.availableRooms = [];
+      this.filteredRooms = [];
+      return;
+    }
+    const roomsOnFloor = this.allRooms.filter(r => r.floor_level === this.selectedFloor).map(r => r.room_id);
+    this.availableRooms = roomsOnFloor;
+    this.filteredRooms = roomsOnFloor;
+    if (roomsOnFloor.length > 0) {
+      this.room = roomsOnFloor[0];
+      this.fetchCourseSections();
+    } else {
+      this.room = '';
+      this.availableCourseSections = [];
+      this.courseSection = '';
+    }
   }
 
   onRoomSearchChange() {

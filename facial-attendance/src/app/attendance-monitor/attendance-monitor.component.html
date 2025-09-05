@@ -1,9 +1,23 @@
+<!-- DEBUG OUTPUT FOR TROUBLESHOOTING -->
+<div style="background: #fff3cd; color: #856404; padding: 0.5rem; margin-bottom: 1rem; font-size: 0.9em;">
+  <div><b>availableFloors:</b> {{ availableFloors | json }}</div>
+  <div><b>selectedFloor:</b> {{ selectedFloor }}</div>
+  <div><b>availableRooms:</b> {{ availableRooms | json }}</div>
+  <div><b>filteredRooms:</b> {{ filteredRooms | json }}</div>
+  <div><b>availableCourseSections:</b> {{ availableCourseSections | json }}</div>
+</div>
 Sample Angular (HTML layout sketch)
 <div class="attendance-page">
   <!-- Top Bar -->
   <!-- <app-navbar></app-navbar> -->
   <header class="top-bar">
     <h1 style="display: flex; gap: 1rem; align-items: center;">
+      <label>
+        Floor:
+        <select [(ngModel)]="selectedFloor" (change)="filterRoomsByFloor()">
+          <option *ngFor="let f of availableFloors" [value]="f">{{f}}</option>
+        </select>
+      </label>
       <label style="position: relative;">
         Room:
         <input type="text" [(ngModel)]="roomSearch" (input)="onRoomSearchChange()" (focus)="showRoomDropdown = true" (blur)="onRoomInputBlur()" placeholder="Search room..." style="width: 120px;" autocomplete="off" />

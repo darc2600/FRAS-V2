@@ -1,7 +1,9 @@
+
 # -----------------------
+print("[DEBUG] backend.py loaded (test for correct file)")
 # Imports
 # -----------------------
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
@@ -21,6 +23,72 @@ logging.basicConfig(level=logging.INFO)
 # -----------------------
 # App initialization
 # -----------------------
+
+DB_PATH = os.path.join(os.path.dirname(__file__), "attendance.db")
+print(f"[DEBUG] Using database file: {os.path.abspath(DB_PATH)}")
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace with ["http://localhost:4200"] for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# -----------------------
+# Room List with Floor Level Endpoint
+# -----------------------
+@app.get("/api/rooms/floors", tags=["Rooms"])
+async def get_rooms_with_floors():
+    print("[DEBUG] Entered /api/rooms/floors endpoint")
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT room_id, floor_level, room_number FROM rooms")
+        rows = cursor.fetchall()
+        print(f"[DEBUG] /api/rooms/floors fetched rows: {rows}")
+        rooms = [
+            {"room_id": row[0], "floor_level": row[1], "room_number": row[2]}
+            for row in rows
+        ]
+    return rooms
+
+def migrate_classes_table():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        # Check if the table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='classes'")
+        if cursor.fetchone():
+            # Get current schema
+            cursor.execute("PRAGMA table_info(classes)")
+            columns = [row[1] for row in cursor.fetchall()]
+            # Check for old unique constraint
+            cursor.execute("PRAGMA index_list(classes)")
+            indexes = cursor.fetchall()
+            for idx in indexes:
+                if idx[1] == 'sqlite_autoindex_classes_2':
+                    # Drop the old table and recreate with new constraint
+                    cursor.execute("ALTER TABLE classes RENAME TO classes_old")
+                    cursor.execute("""
+                        CREATE TABLE classes (
+                            class_id VARCHAR(50) PRIMARY KEY,
+                            course_code VARCHAR(20),
+                            section VARCHAR(20),
+                            room_id VARCHAR(20),
+                            instructor_name VARCHAR(100),
+                            day_of_week VARCHAR(10),
+                            start_time TIME,
+                            end_time TIME,
+                            UNIQUE(course_code, section, room_id, day_of_week)
+                        )
+                    """)
+                    cursor.execute("INSERT INTO classes (class_id, course_code, section, room_id, instructor_name, day_of_week, start_time, end_time) SELECT class_id, course_code, section, room_id, instructor_name, day_of_week, start_time, end_time FROM classes_old")
+                    cursor.execute("DROP TABLE classes_old")
+                    conn.commit()
+                    break
+
+migrate_classes_table()
 
 # Tag metadata for grouping in Swagger UI
 tags_metadata = [
@@ -44,36 +112,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -----------------------
-# Room, Course, Section Listing Endpoints
-# -----------------------
-@app.get("/api/rooms", tags=["Rooms"])
-async def get_rooms():
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT room_id FROM classes")
-        rooms = [row[0] for row in cursor.fetchall() if row[0]]
-    return rooms
 
-@app.get("/api/courses", tags=["Courses"])
-async def get_courses(room: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT course_code FROM classes WHERE room_id = ?", (room,))
-        courses = [row[0] for row in cursor.fetchall() if row[0]]
-    return courses
 
-@app.get("/api/sections", tags=["Sections"])
-async def get_sections(room: str, course: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT section FROM classes WHERE room_id = ? AND course_code = ?", (room, course))
-        sections = [row[0] for row in cursor.fetchall() if row[0]]
-    return sections
-# New endpoints for schedule CRUD using the database
-from fastapi import Body
-
-@app.get("/api/room-schedule/{room}", tags=["Rooms"])
 async def get_room_schedule(room: str):
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
