@@ -8,12 +8,29 @@ class RegistrationService:
     def __init__(self, repo: RegistrationRepository):
         self.repo = repo
 
-    async def register_student(self, student_id: str, name: str, schedule: str, images: List[UploadFile]) -> RegistrationResponse:
+    async def register_student(
+        self,
+        student_id: str,
+        last_name: str,
+        first_name: str,
+        email: str,
+        created_at: str,
+        schedule: str,
+        images: List[UploadFile]
+    ) -> RegistrationResponse:
         try:
             schedule_entries = json.loads(schedule)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schedule: {e}")
-        return await self.repo.register_student(student_id, name, schedule_entries, images)
+        return await self.repo.register_student(
+            student_id,
+            last_name,
+            first_name,
+            email,
+            created_at,
+            schedule_entries,
+            images
+        )
 
 def get_registration_service(repo: RegistrationRepository = Depends(get_registration_repository)):
     return RegistrationService(repo)

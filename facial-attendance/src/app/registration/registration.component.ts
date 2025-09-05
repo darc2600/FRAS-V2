@@ -55,7 +55,9 @@ export class RegistrationComponent implements OnInit, OnDestroy {
   ) {
     this.form = this.fb.group({
       studentId: ['', [Validators.required, Validators.maxLength(40)]],
-      studentName: ['', [Validators.required, Validators.maxLength(80)]],
+      lastName: ['', [Validators.required, Validators.maxLength(100)]],
+      firstName: ['', [Validators.required, Validators.maxLength(100)]],
+      email: ['', [Validators.email, Validators.maxLength(100)]],
       imageCount: [this.defaultTarget, [Validators.required, Validators.min(1), Validators.max(50)]],
     });
   }
@@ -175,8 +177,15 @@ export class RegistrationComponent implements OnInit, OnDestroy {
     this.uploadProgress = 0;
 
   const formData = new FormData();
+
   formData.append('student_id', this.form.value.studentId);
-  formData.append('name', this.form.value.studentName);
+  formData.append('last_name', this.form.value.lastName);
+  formData.append('first_name', this.form.value.firstName);
+  formData.append('email', this.form.value.email || '');
+  // Optionally, set face_data_path as blank (backend can update after saving images)
+  formData.append('face_data_path', '');
+  // Set created_at to current date/time in ISO format
+  formData.append('created_at', new Date().toISOString());
   // Send schedule as JSON string
   formData.append('schedule', JSON.stringify(this.schedule));
   this.previews.forEach((p, i) => formData.append('images', p.blob, `img${i + 1}.jpg`));

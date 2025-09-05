@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from backend import init_db
 from fastapi.middleware.cors import CORSMiddleware
 from api.attendance import router as attendance_router
 from api.registration import router as registration_router
@@ -27,7 +28,13 @@ tags_metadata = [
     {"name": "Debug", "description": "Debug and utility endpoints."},
 ]
 
+
 app = FastAPI(openapi_tags=tags_metadata)
+
+# Ensure DB tables are created on startup
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 # Add CORS middleware to allow requests from Angular frontend
 app.add_middleware(

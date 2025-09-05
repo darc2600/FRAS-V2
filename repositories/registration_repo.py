@@ -7,17 +7,23 @@ from typing import List
 DB_PATH = "attendance.db"
 
 class RegistrationRepository:
-    async def register_student(self, student_id: str, name: str, schedule_entries: list, images: List[UploadFile]):
+    async def register_student(self, student_id: str, last_name: str, first_name: str, email: str, created_at: str, schedule_entries: list, images: List[UploadFile]):
+        face_data_path = os.path.join("dataset", student_id)
+
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            try:
-                cursor.execute('''
-                    INSERT OR IGNORE INTO students (student_id, name)
-                    VALUES (?, ?)
-                ''', (student_id, name))
-                conn.commit()
-            except sqlite3.IntegrityError:
-                raise HTTPException(status_code=400, detail="Student ID already registered.")
+            # Upsert student info: update if exists, insert if not
+            cursor.execute('''
+                INSERT INTO students (student_id, last_name, first_name, email, face_data_path, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(student_id) DO UPDATE SET
+                    last_name=excluded.last_name,
+                    first_name=excluded.first_name,
+                    email=excluded.email,
+                    face_data_path=excluded.face_data_path,
+                    created_at=excluded.created_at
+            ''', (student_id, last_name, first_name, email, face_data_path, created_at))
+            conn.commit()
 
             # Clear and re-insert schedule
             cursor.execute('DELETE FROM student_courses WHERE student_id = ?', (student_id,))
@@ -29,7 +35,7 @@ class RegistrationRepository:
             conn.commit()
 
         # Save images under dataset/{student_id}/
-        save_path = os.path.join("dataset", student_id)
+        save_path = face_data_path
         os.makedirs(save_path, exist_ok=True)
         saved_files = []
         for file in images:

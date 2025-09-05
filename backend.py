@@ -12,6 +12,7 @@ import shutil
 import json
 from datetime import datetime
 from typing import List
+from repositories.registration_repo import RegistrationRepository
 import logging
 
 # Set up logging
@@ -48,31 +49,82 @@ app.add_middleware(
 # -----------------------
 @app.get("/api/rooms", tags=["Rooms"])
 async def get_rooms():
-    schedules_dir = "schedules"
-    if not os.path.exists(schedules_dir):
-        return []
-    rooms = [f[:-5] for f in os.listdir(schedules_dir) if f.endswith(".json")]
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT room_id FROM classes")
+        rooms = [row[0] for row in cursor.fetchall() if row[0]]
     return rooms
 
 @app.get("/api/courses", tags=["Courses"])
 async def get_courses(room: str):
-    schedule_path = os.path.join("schedules", f"{room}.json")
-    if not os.path.exists(schedule_path):
-        return []
-    with open(schedule_path, "r", encoding="utf-8") as f:
-        schedule = json.load(f)
-    courses = sorted(list(set(entry.get("courseCode") for entry in schedule if entry.get("courseCode"))))
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT course_code FROM classes WHERE room_id = ?", (room,))
+        courses = [row[0] for row in cursor.fetchall() if row[0]]
     return courses
 
 @app.get("/api/sections", tags=["Sections"])
 async def get_sections(room: str, course: str):
-    schedule_path = os.path.join("schedules", f"{room}.json")
-    if not os.path.exists(schedule_path):
-        return []
-    with open(schedule_path, "r", encoding="utf-8") as f:
-        schedule = json.load(f)
-    sections = sorted(list(set(entry.get("section") for entry in schedule if entry.get("courseCode") == course and entry.get("section"))))
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT section FROM classes WHERE room_id = ? AND course_code = ?", (room, course))
+        sections = [row[0] for row in cursor.fetchall() if row[0]]
     return sections
+# New endpoints for schedule CRUD using the database
+from fastapi import Body
+
+@app.get("/api/room-schedule/{room}", tags=["Rooms"])
+async def get_room_schedule(room: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT course_code, section, instructor_name, day_of_week, start_time, end_time
+            FROM classes WHERE room_id = ?
+        """, (room,))
+        schedule = [
+            {
+                "courseCode": row[0],
+                "section": row[1],
+                "professor": row[2],
+                "day": row[3],
+                "startTime": row[4],
+                "endTime": row[5]
+            }
+            for row in cursor.fetchall()
+        ]
+    return {"schedule": schedule}
+
+@app.post("/api/room-schedule/{room}", tags=["Rooms"])
+async def save_room_schedule(room: str, schedule: list = Body(...)):
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        # Remove existing schedule for this room
+        cursor.execute("DELETE FROM classes WHERE room_id = ?", (room,))
+        # Insert new schedule
+        for entry in schedule:
+            cursor.execute("""
+                INSERT INTO classes (class_id, course_code, section, room_id, instructor_name, day_of_week, start_time, end_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                f"{entry.get('courseCode','')}_{entry.get('section','')}_{room}_{entry.get('day','')}_{entry.get('startTime','')}",
+                entry.get('courseCode',''),
+                entry.get('section',''),
+                room,
+                entry.get('professor',''),
+                entry.get('day',''),
+                entry.get('startTime',''),
+                entry.get('endTime','')
+            ))
+        conn.commit()
+    return {"status": "success"}
+
+@app.delete("/api/room-schedule/{room}", tags=["Rooms"])
+async def delete_room_schedule(room: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM classes WHERE room_id = ?", (room,))
+        conn.commit()
+    return {"status": "deleted"}
 
 
 
@@ -126,23 +178,46 @@ DB_PATH = "attendance.db"
 # Database setup
 # -----------------------
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS attendance (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                student_id TEXT,
-                course_code TEXT,
-                section TEXT,
-                room TEXT,
-                timestamp TEXT
+            CREATE TABLE IF NOT EXISTS AttendanceLogs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id VARCHAR(20),
+                class_id VARCHAR(20),
+                timestamp DATETIME,
+                attendance_date DATE,
+                image_path TEXT,
+                status VARCHAR(20),
+                FOREIGN KEY(student_id) REFERENCES students(student_id),
+                FOREIGN KEY(class_id) REFERENCES classes(class_id),
+                UNIQUE(student_id, class_id, attendance_date)
             )
         ''')
+with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS classes (
+                class_id VARCHAR(20) PRIMARY KEY,
+                course_code VARCHAR(20),
+                section VARCHAR(20),
+                room_id VARCHAR(20),
+                instructor_name VARCHAR(100),
+                day_of_week VARCHAR(10),
+                start_time TIME,
+                end_time TIME,
+                UNIQUE(course_code, section),
+                FOREIGN KEY(room_id) REFERENCES rooms(room_id)
+            )
+        ''')
+    # Removed old attendance table creation
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS students (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 student_id TEXT UNIQUE,
-                name TEXT
+                last_name TEXT,
+                first_name TEXT,
+                email TEXT,
+                face_data_path TEXT,
+                created_at DATETIME
             )
         ''')
         cursor.execute('''
@@ -155,7 +230,37 @@ def init_db():
                 FOREIGN KEY(student_id) REFERENCES students(student_id)
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rooms (
+                room_id VARCHAR(20) PRIMARY KEY,
+                floor_level INTEGER,
+                room_number VARCHAR(10)
+            )
+        ''')
+        # Optionally, add columns to existing rooms table if they don't exist (for migrations)
+        try:
+            cursor.execute('ALTER TABLE rooms ADD COLUMN floor_level INTEGER')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            cursor.execute('ALTER TABLE rooms ADD COLUMN room_number VARCHAR(10)')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         conn.commit()
+# Helper to extract floor level from room_id (e.g., '305' -> 3, '1201' -> 12)
+def extract_floor_level(room_id: str) -> int:
+    digits = ''.join([c for c in room_id if c.isdigit()])
+    if not digits:
+        return 0
+    # If room_id is 3 or 4 digits, use first 1 or 2 digits as floor
+    if len(digits) >= 4:
+        return int(digits[:2])
+    return int(digits[0])
+
+# Helper to extract just the numeric room number (e.g., 'MPO305' -> '305')
+def extract_room_number(room_id: str) -> str:
+    digits = ''.join([c for c in room_id if c.isdigit()])
+    return digits if digits else room_id
 
 init_db()
 
@@ -193,19 +298,28 @@ async def recognize_face(file: UploadFile = File(...), course_code: str = Form(.
                     threshold = 0.3  # Stricter threshold for cosine distance (default is 0.68)
                     logging.info(f"Comparing temp image with {img_path} (student_id={student_id}): verified={result['verified']}, distance={distance}, threshold={threshold}")
                     if result["verified"] and distance is not None and distance < threshold:
-                        cursor.execute("""
-                            SELECT 1 FROM attendance
-                            WHERE student_id = ? AND course_code = ? AND section = ? AND room = ? AND DATE(timestamp) = DATE('now')
-                        """, (student_id, course_code, section, room))
-                        if cursor.fetchone() is None:
-                            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            cursor.execute("""
-                                INSERT INTO attendance (student_id, course_code, section, room, timestamp)
-                                VALUES (?, ?, ?, ?, ?)
-                            """, (student_id, course_code, section, room, timestamp))
-                            conn.commit()
-                        recognized_id = student_id
-                        break
+                        # Find class_id for this course_code, section, and room
+                        cursor.execute('''
+                            SELECT class_id FROM classes
+                            WHERE course_code = ? AND section = ? AND (room_id = ? OR room_id IS NULL)
+                        ''', (course_code, section, room))
+                        class_row = cursor.fetchone()
+                        if class_row:
+                            class_id = class_row[0]
+                            # Check for duplicate attendance for today
+                            cursor.execute('''
+                                SELECT 1 FROM AttendanceLogs
+                                WHERE student_id = ? AND class_id = ? AND attendance_date = DATE('now')
+                            ''', (student_id, class_id))
+                            if cursor.fetchone() is None:
+                                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                cursor.execute('''
+                                    INSERT INTO AttendanceLogs (student_id, class_id, timestamp, attendance_date, image_path, status)
+                                    VALUES (?, ?, ?, DATE('now'), ?, ?)
+                                ''', (student_id, class_id, timestamp, temp_path, 'present'))
+                                conn.commit()
+                            recognized_id = student_id
+                            break
                 except Exception:
                     continue
     finally:
@@ -235,71 +349,31 @@ async def capture_image(file: UploadFile = File(...), course_code: str = Form(..
 async def get_attendance(course_code: str, section: str, room: str = None):
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
+        # Find class_id for this course_code, section, and room
         if room:
-            cursor.execute("""
-                SELECT student_id, timestamp FROM attendance
-                WHERE course_code = ? AND section = ? AND room = ?
-            """, (course_code, section, room))
+            cursor.execute('''
+                SELECT class_id FROM classes
+                WHERE course_code = ? AND section = ? AND (room_id = ? OR room_id IS NULL)
+            ''', (course_code, section, room))
         else:
-            cursor.execute("""
-                SELECT student_id, timestamp FROM attendance
+            cursor.execute('''
+                SELECT class_id FROM classes
                 WHERE course_code = ? AND section = ?
-            """, (course_code, section))
+            ''', (course_code, section))
+        class_row = cursor.fetchone()
+        if not class_row:
+            return {"attendance": []}
+        class_id = class_row[0]
+        cursor.execute('''
+            SELECT student_id, timestamp, attendance_date, image_path, status FROM AttendanceLogs
+            WHERE class_id = ?
+        ''', (class_id,))
         rows = cursor.fetchall()
     return {"attendance": rows}
 
-# -----------------------
-# Student Registration
-# -----------------------
-@app.post("/api/registration", tags=["Registration"])
-async def register_student(
-    student_id: str = Form(...),
-    name: str = Form(...),
-    schedule: str = Form(...),  # JSON list of {course_code, section, room}
-    images: List[UploadFile] = File(...)
-):
-    try:
-        schedule_entries = json.loads(schedule)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid schedule: {e}")
-
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute('''
-                INSERT OR IGNORE INTO students (student_id, name)
-                VALUES (?, ?)
-            ''', (student_id, name))
-            conn.commit()
-        except sqlite3.IntegrityError:
-            raise HTTPException(status_code=400, detail="Student ID already registered.")
-
-        # Clear and re-insert schedule
-        cursor.execute('DELETE FROM student_courses WHERE student_id = ?', (student_id,))
-        for entry in schedule_entries:
-            cursor.execute('''
-                INSERT INTO student_courses (student_id, course_code, section, room)
-                VALUES (?, ?, ?, ?)
-            ''', (student_id, entry.get("course_code"), entry.get("section"), entry.get("room")))
-        conn.commit()
-
-    # Save images under dataset/{student_id}/
-    save_path = os.path.join("dataset", student_id)
-    os.makedirs(save_path, exist_ok=True)
-    saved_files = []
-    for file in images:
-        img_path = os.path.join(save_path, file.filename)
-        with open(img_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        saved_files.append(img_path)
-
-    return {"status": "success", "message": "Student registered and images saved.", "image_paths": saved_files}
 
 
-    with open(schedule_path, "w", encoding="utf-8") as f:
-        json.dump(jsonable_encoder(schedule), f, ensure_ascii=False, indent=2)
-
-    return {"status": "success", "message": f"Schedule for {room_code} updated."}
+# Clear and re-insert schedule
 
 # -----------------------
 # Debug: List routes
