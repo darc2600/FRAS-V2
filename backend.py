@@ -225,7 +225,6 @@ def init_db():
                 class_id VARCHAR(20),
                 timestamp DATETIME,
                 attendance_date DATE,
-                image_path TEXT,
                 status VARCHAR(20),
                 FOREIGN KEY(student_id) REFERENCES students(student_id),
                 FOREIGN KEY(class_id) REFERENCES classes(class_id),

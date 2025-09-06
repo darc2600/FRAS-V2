@@ -26,11 +26,25 @@
     </ion-footer>
   </ion-menu>
 
+
   <!-- Main Content -->
   <div class="main-content" id="main-content">
     <!-- Top Bar -->
     <div class="top-bar">
       <h2>Facial Recognition</h2>
+    </div>
+
+    <!-- Room and Course-Section Selection -->
+    <div style="margin: 16px 0;">
+      <label for="roomSelect">Room:</label>
+      <select id="roomSelect" [(ngModel)]="selectedRoom" (change)="onRoomChange()">
+        <option *ngFor="let room of availableRooms" [value]="room">{{ room }}</option>
+      </select>
+
+      <label for="courseSectionSelect" style="margin-left: 16px;">Course-Section:</label>
+      <select id="courseSectionSelect" [(ngModel)]="courseCodeSection">
+        <option *ngFor="let cs of availableCourseSections" [value]="cs">{{ cs }}</option>
+      </select>
     </div>
 
     <!-- Webcam Capture Box -->

@@ -46,4 +46,8 @@ export class ApiService {
   getRoomsWithFloors(): Observable<any[]> {
     return this.http.get<any[]>(`${this.backendUrl}/api/rooms/floors`);
   }
+
+  getRoomSchedule(roomCode: string): Observable<any> {
+    return this.http.get<any>(`${this.backendUrl}/api/room-schedule/${encodeURIComponent(roomCode)}`);
+  }
 }

@@ -37,16 +37,52 @@ class RecognitionRepository:
                         result = DeepFace.verify(img1_path=temp_path, img2_path=img_path, model_name="ArcFace", enforce_detection=False)
                         print(f"[DEBUG] DeepFace result for {student_id}: {result}")
                         if result["verified"]:
+                            # Find class_id for this attendance
+                            cursor.execute('''
+                                SELECT class_id FROM classes
+                                WHERE course_code = ? AND section = ? AND room_id = ?
+                            ''', (course_code, section, room))
+                            class_row = cursor.fetchone()
+                            if not class_row:
+                                print(f"[DEBUG] No class_id found for course_code={course_code}, section={section}, room={room}")
+                                continue
+                            class_id = class_row[0]
+                            # Get class start_time
+                            cursor.execute('''
+                                SELECT start_time FROM classes WHERE class_id = ?
+                            ''', (class_id,))
+                            class_time_row = cursor.fetchone()
+                            if not class_time_row:
+                                print(f"[DEBUG] No start_time found for class_id={class_id}")
+                                continue
+                            start_time_str = class_time_row[0]  # e.g., '07:00AM'
+                            # Parse times
+                            now = datetime.now()
+                            timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+                            attendance_date = now.strftime("%Y-%m-%d")
+                            # Convert start_time to datetime for today
+                            try:
+                                class_start = datetime.strptime(attendance_date + ' ' + start_time_str, "%Y-%m-%d %I:%M%p")
+                            except Exception as e:
+                                print(f"[DEBUG] Could not parse start_time: {e}")
+                                continue
+                            delta = (now - class_start).total_seconds() / 60.0
+                            if 0 <= delta <= 30:
+                                status = "Present"
+                                print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= 30 mins)")
+                            else:
+                                status = "Late"
+                                print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start (> 30 mins)")
+                            # Check for duplicate attendance
                             cursor.execute("""
-                                SELECT 1 FROM attendance
-                                WHERE student_id = ? AND course_code = ? AND section = ? AND room = ? AND DATE(timestamp) = DATE('now')
-                            """, (student_id, course_code, section, room))
+                                SELECT 1 FROM AttendanceLogs
+                                WHERE student_id = ? AND class_id = ? AND attendance_date = ?
+                            """, (student_id, class_id, attendance_date))
                             if cursor.fetchone() is None:
-                                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 cursor.execute("""
-                                    INSERT INTO attendance (student_id, course_code, section, room, timestamp)
+                                    INSERT INTO AttendanceLogs (student_id, class_id, timestamp, attendance_date, status)
                                     VALUES (?, ?, ?, ?, ?)
-                                """, (student_id, course_code, section, room, timestamp))
+                                """, (student_id, class_id, timestamp, attendance_date, status))
                                 conn.commit()
                             recognized_id = student_id
                             break

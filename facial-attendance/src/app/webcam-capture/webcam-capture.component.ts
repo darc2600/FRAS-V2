@@ -15,11 +15,49 @@ import { CommonModule } from '@angular/common';
 export class WebcamCaptureComponent {
   courseCode = '';
   section = '';
+  courseCodeSection = '';
   message = '';
   webcamImage: WebcamImage | null = null;
   private trigger: Subject<void> = new Subject<void>();
 
-  constructor(private api: ApiService) {}
+  availableRooms: string[] = [];
+  selectedRoom: string = '';
+  availableCourseSections: string[] = [];
+
+  constructor(private api: ApiService) {
+    this.loadRooms();
+  }
+
+  loadRooms() {
+    this.api.getRooms().subscribe(rooms => {
+      this.availableRooms = rooms;
+      if (rooms.length > 0) {
+        this.selectedRoom = rooms[0];
+        this.onRoomChange();
+      }
+    });
+  }
+
+  onRoomChange() {
+    if (!this.selectedRoom) {
+      this.availableCourseSections = [];
+      this.courseCodeSection = '';
+      return;
+    }
+    this.api.getRoomSchedule(this.selectedRoom).subscribe(result => {
+      if (result && Array.isArray(result.schedule)) {
+        const pairs = result.schedule.map((cls: any) => `${cls.courseCode}-${cls.section}`);
+        this.availableCourseSections = Array.from(new Set(pairs));
+        // Reset selection if not in new list
+        if (!this.availableCourseSections.includes(this.courseCodeSection)) {
+          this.courseCodeSection = '';
+        }
+      } else {
+        this.availableCourseSections = [];
+        this.courseCodeSection = '';
+      }
+    });
+  }
 
   public get triggerObservable(): Observable<void> {
     return this.trigger.asObservable();
@@ -34,13 +72,19 @@ export class WebcamCaptureComponent {
   }
 
   markAttendance() {
+    // Split courseCodeSection into courseCode and section
+    if (this.courseCodeSection) {
+      const [code, ...sectionParts] = this.courseCodeSection.split('-');
+      this.courseCode = code;
+      this.section = sectionParts.join('-');
+    }
     if (!this.webcamImage || !this.courseCode || !this.section) {
       this.message = 'Please provide all fields and capture an image.';
       return;
     }
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-  this.api.recognizeFace(file, this.courseCode, this.section, '').subscribe(
+    this.api.recognizeFace(file, this.courseCode, this.section, this.selectedRoom).subscribe(
       res => this.message = res.status === 'success'
         ? `Attendance marked for ${res.student_id}`
         : res.message,
