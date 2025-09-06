@@ -1,9 +1,6 @@
+
 import { Component, OnInit } from '@angular/core';
 import { ApiService } from '../api.service';
-import { FormsModule } from '@angular/forms';
-import { WebcamModule } from 'ngx-webcam';
-import { CommonModule } from '@angular/common';
-
 
 @Component({
   selector: 'app-attendance-logs',
@@ -11,65 +8,100 @@ import { CommonModule } from '@angular/common';
   styleUrls: ['./attendance-logs.component.css'],
 })
 export class AttendanceLogsComponent implements OnInit {
-  room = '';
-  availableRooms: string[] = [];
-  courseCode = '';
-  section = '';
-  logs: any[] = [];
-  message = '';
-
+  availableFloors: number[] = [];
   selectedFloor: number | null = null;
-  availableFloors: number[] = [1, 2, 3, 4, 5, 6, 7];
-  floorRooms: { [floor: number]: string[] } = {
-    1: ['101', '102', '103', '104', '105'],
-    2: ['201', '202', '203', '204', '205'],
-    3: ['301', '302', '303', '304', '305'],
-    4: ['401', '402', '403', '404', '405'],
-    5: ['501', '502', '503', '504', '505'],
-    6: ['601', '602', '603', '604', '605'],
-    7: ['701', '702', '703', '704', '705'],
-  };
+  allRooms: any[] = [];
+  availableRooms: string[] = [];
   filteredRooms: string[] = [];
+  roomSearch = '';
+  showRoomDropdown = false;
+  room = '';
   availableCourseSections: string[] = [];
   courseSection = '';
+  logs: any[] = [];
+  message = '';
   loading = false;
-  roomsWithFloors: any[] = [];
-  dynamicFloors: number[] = [1, 2, 3, 4, 5, 6, 7];
-  dynamicRooms: any[] = [];
 
   constructor(private api: ApiService) {}
 
   ngOnInit() {
-    this.api.getRoomsWithFloors().subscribe(
+    this.api.getRooms().subscribe(
       (rooms: any[]) => {
-        this.roomsWithFloors = rooms;
-        // Always show floors 1-7
-        this.selectedFloor = this.dynamicFloors[0];
-        this.onFloorChange();
+        this.allRooms = rooms;
+        this.availableFloors = Array.from(new Set(rooms.map(r => r.floor_level).filter(f => f != null))).sort((a, b) => a - b);
+        if (this.availableFloors.length > 0) {
+          this.selectedFloor = this.availableFloors[0];
+          this.filterRoomsByFloor();
+        } else {
+          this.availableRooms = rooms.map(r => r.room_id || r.id || r.name);
+          this.filteredRooms = this.availableRooms;
+        }
       },
-      err => this.message = 'Error fetching rooms/floors.'
+      err => this.message = 'Error fetching rooms.'
     );
   }
 
-  onFloorChange() {
-    if (this.selectedFloor) {
-      this.dynamicRooms = this.roomsWithFloors.filter(r => r.floor === this.selectedFloor);
-      this.room = this.dynamicRooms[0]?.room || '';
-      this.onRoomChange();
+  filterRoomsByFloor() {
+    if (this.selectedFloor == null) {
+      this.availableRooms = [];
+      this.filteredRooms = [];
+      return;
+    }
+    const roomsOnFloor = this.allRooms.filter(r => r.floor_level === this.selectedFloor).map(r => r.room_id);
+    this.availableRooms = roomsOnFloor;
+    this.filteredRooms = roomsOnFloor;
+    if (roomsOnFloor.length > 0) {
+      this.room = roomsOnFloor[0];
+      this.fetchCourseSections();
+    } else {
+      this.room = '';
+      this.availableCourseSections = [];
+      this.courseSection = '';
     }
   }
 
-  onRoomChange() {
+  onRoomSearchChange() {
+    if (!this.roomSearch) {
+      this.filteredRooms = this.availableRooms;
+      this.showRoomDropdown = false;
+      return;
+    }
+    this.filteredRooms = this.availableRooms.filter(r =>
+      (r || '').toLowerCase().includes(this.roomSearch.toLowerCase())
+    );
+    this.showRoomDropdown = true;
+  }
+
+  selectRoom(room: string) {
+    this.room = room;
+    this.roomSearch = room;
+    this.showRoomDropdown = false;
+    this.fetchCourseSections();
+  }
+
+  onRoomInputBlur() {
+    setTimeout(() => {
+      this.showRoomDropdown = false;
+    }, 200);
+  }
+
+  fetchCourseSections() {
     if (!this.room) {
       this.availableCourseSections = [];
       this.courseSection = '';
       return;
     }
-    this.api.getCourseSections(this.room).subscribe(
-      (pairs: string[]) => {
-        this.availableCourseSections = pairs;
-        this.courseSection = pairs[0] || '';
-        this.logs = [];
+    this.api.getRoomSchedule(this.room).subscribe(
+      (result: any) => {
+        if (result && Array.isArray(result.schedule)) {
+          const pairs = result.schedule.map((cls: any) => `${cls.course_code || cls.courseCode} - ${cls.section}`);
+          this.availableCourseSections = Array.from(new Set(pairs));
+          this.courseSection = this.availableCourseSections[0] || '';
+        } else {
+          this.availableCourseSections = [];
+          this.courseSection = '';
+        }
+        this.fetchLogs();
       },
       err => this.message = 'Error fetching course-sections.'
     );
@@ -89,7 +121,12 @@ export class AttendanceLogsComponent implements OnInit {
     this.loading = true;
     this.api.getAttendance(courseCode, section, this.room).subscribe(
       res => {
-        this.logs = res.attendance;
+        this.logs = (res.attendance || []).map((log: any) => ({
+          studentId: log[0],
+          studentName: log[1],
+          time: log[2],
+          status: log[3] || 'Unknown'
+        }));
         this.loading = false;
         if (!this.logs || this.logs.length === 0) {
           this.message = 'No records found.';
@@ -104,15 +141,15 @@ export class AttendanceLogsComponent implements OnInit {
     );
   }
 
-  // Helper to format date/time
+  getStatusClass(status: string) {
+    if (status === 'Present') return 'present';
+    if (status === 'Late') return 'late';
+    if (status === 'Absent') return 'absent';
+    return '';
+  }
+
   formatDateTime(dt: string): string {
     const d = new Date(dt);
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
-  }
-
-  // Helper to get status (for now, always 'Present')
-  getStatus(log: any): string {
-    // You can enhance this logic if you have more status info
-    return 'Present';
   }
 }

@@ -40,7 +40,7 @@ export class RoomScheduleEditorComponent {
 
   loadSchedule() {
     if (!this.room) return;
-    this.http.get<any>(`http://127.0.0.1:8000/api/room-schedule/${this.room}`)
+  this.http.get<any>(`http://127.0.0.1:8000/api/schedule/${this.room}`)
       .subscribe(data => {
         // Reset grid
         this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
@@ -94,14 +94,9 @@ export class RoomScheduleEditorComponent {
   deleteSchedule() {
     if (!this.room) return;
     if (!confirm('Are you sure you want to delete this room schedule?')) return;
-    this.http.delete(`http://127.0.0.1:8000/api/room-schedule/${this.room}`, { responseType: 'text' })
-      .subscribe({
-        next: () => {
-          this.message = 'Schedule deleted!';
-          this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
-        },
-        error: () => this.message = 'Failed to delete schedule.'
-      });
+  // DELETE not supported in backend. Optionally, clear grid and show message.
+  this.message = 'Delete not supported. Please clear cells manually and save.';
+  this.grid = this.timeSlots.map(() => this.days.map(() => ({ })));
   }
 
   saveSchedule() {
@@ -124,7 +119,7 @@ export class RoomScheduleEditorComponent {
       }
     }
     console.log('Saving schedule:', schedule);
-    this.http.post(`http://127.0.0.1:8000/api/room-schedule/${this.room}`, schedule)
+  this.http.post(`http://127.0.0.1:8000/api/schedule/${this.room}`, schedule)
       .subscribe({
         next: () => this.message = 'Schedule saved!',
         error: () => this.message = 'Failed to save schedule.'

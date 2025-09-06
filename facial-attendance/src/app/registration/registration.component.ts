@@ -176,12 +176,10 @@ export class RegistrationComponent implements OnInit, OnDestroy {
 
   const formData = new FormData();
 
-  formData.append('student_id', this.form.value.studentId);
+  formData.append('student_number', this.form.value.studentId);
   formData.append('last_name', this.form.value.lastName);
   formData.append('first_name', this.form.value.firstName);
   formData.append('email', this.form.value.email || '');
-  // Optionally, set face_data_path as blank (backend can update after saving images)
-  formData.append('face_data_path', '');
   // Set created_at to current date/time in ISO format
   formData.append('created_at', new Date().toISOString());
   // Send schedule as JSON string

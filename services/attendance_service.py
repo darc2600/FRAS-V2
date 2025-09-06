@@ -8,7 +8,13 @@ class AttendanceService:
 
     def get_attendance(self, course_code: str, section: str, room: str = None) -> AttendanceResponse:
         records = self.repo.fetch_attendance(course_code, section, room)
-        return AttendanceResponse(attendance=records)
+        # Convert student_id (first element) to string in each record
+        fixed_records = []
+        for rec in records:
+            rec = list(rec)
+            rec[0] = str(rec[0])
+            fixed_records.append(tuple(rec))
+        return AttendanceResponse(attendance=fixed_records)
 
 def get_attendance_service(repo: AttendanceRepository = Depends(get_attendance_repository)):
     return AttendanceService(repo)

@@ -17,15 +17,23 @@ class RecognitionRepository:
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 cursor = conn.cursor()
+                # Lookup students enrolled in the class (by course_code, section, room_id)
                 cursor.execute('''
-                    SELECT student_id FROM student_courses
-                    WHERE course_code = ? AND section = ? AND (room = ? OR room IS NULL)
+                    SELECT e.student_id FROM enrollments e
+                    JOIN classes c ON e.class_id = c.class_id
+                    WHERE c.course_code = ? AND c.section = ? AND c.room_id = ?
                 ''', (course_code, section, room))
                 student_ids = [row[0] for row in cursor.fetchall()]
                 print(f"[DEBUG] student_ids: {student_ids}")
                 student_faces = {}
                 for student_id in student_ids:
-                    student_folder = os.path.join("dataset", student_id)
+                    # Lookup student_number for this student_id
+                    cursor.execute('SELECT student_number FROM students WHERE student_id = ?', (student_id,))
+                    row = cursor.fetchone()
+                    if not row:
+                        continue
+                    student_number = row[0]
+                    student_folder = os.path.join("dataset", str(student_number))
                     if os.path.isdir(student_folder):
                         images = [os.path.join(student_folder, img) for img in os.listdir(student_folder) if img.lower().endswith(".jpg")]
                         if images:
@@ -75,14 +83,14 @@ class RecognitionRepository:
                                 print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start (> 30 mins)")
                             # Check for duplicate attendance
                             cursor.execute("""
-                                SELECT 1 FROM AttendanceLogs
-                                WHERE student_id = ? AND class_id = ? AND attendance_date = ?
+                                SELECT 1 FROM attendance_logs
+                                WHERE student_id = ? AND class_id = ? AND DATE(timestamp) = ?
                             """, (student_id, class_id, attendance_date))
                             if cursor.fetchone() is None:
                                 cursor.execute("""
-                                    INSERT INTO AttendanceLogs (student_id, class_id, timestamp, attendance_date, status)
-                                    VALUES (?, ?, ?, ?, ?)
-                                """, (student_id, class_id, timestamp, attendance_date, status))
+                                    INSERT INTO attendance_logs (student_id, class_id, timestamp, status)
+                                    VALUES (?, ?, ?, ?)
+                                """, (student_id, class_id, timestamp, status))
                                 conn.commit()
                             recognized_id = student_id
                             break
@@ -92,7 +100,7 @@ class RecognitionRepository:
         finally:
             os.remove(temp_path)
         if recognized_id:
-            return RecognitionResponse(status="success", student_id=recognized_id)
+            return RecognitionResponse(status="success", student_id=str(recognized_id))
         else:
             return RecognitionResponse(status="failed", message="No match found")
 

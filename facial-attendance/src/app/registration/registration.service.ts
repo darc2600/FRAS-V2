@@ -17,7 +17,7 @@ export class RegistrationService {
   constructor(private http: HttpClient) {}
 
   registerStudent(formData: FormData): Observable<HttpEvent<any>> {
-    return this.http.post(`${this.baseUrl}/registration`, formData, {
+  return this.http.post(`${this.baseUrl}/register`, formData, {
       reportProgress: true,
       observe: 'events',
     });
