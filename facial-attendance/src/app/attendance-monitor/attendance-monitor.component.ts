@@ -128,10 +128,16 @@ export class AttendanceMonitorComponent implements OnInit {
       this.courseSection = '';
       return;
     }
-    this.api.getCourseSections(this.room).subscribe(
-      (pairs: string[]) => {
-        this.availableCourseSections = pairs;
-        this.courseSection = pairs[0] || '';
+    this.api.getRoomSchedule(this.room).subscribe(
+      (result: any) => {
+        if (result && Array.isArray(result.schedule)) {
+          const pairs = result.schedule.map((cls: any) => `${cls.courseCode} - ${cls.section}`);
+          this.availableCourseSections = Array.from(new Set(pairs));
+          this.courseSection = this.availableCourseSections[0] || '';
+        } else {
+          this.availableCourseSections = [];
+          this.courseSection = '';
+        }
         this.fetchLogs();
       },
       err => this.message = 'Error fetching course-sections.'

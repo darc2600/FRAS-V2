@@ -47,17 +47,25 @@ export class RoomScheduleEditorComponent {
         // Fill grid with loaded data
         const scheduleList = (data && data.schedule) ? data.schedule : [];
         scheduleList.forEach((entry: any) => {
-          const row = this.timeSlots.findIndex(
-            t => t === `${entry.startTime} - ${entry.endTime}`
-          );
           const col = this.days.findIndex(d => d === entry.day);
-          if (row !== -1 && col !== -1) {
-            this.grid[row][col] = {
-              courseCode: entry.courseCode,
-              section: entry.section,
-              professor: entry.professor,
-              room: this.room
-            };
+          if (col === -1) return;
+          // Find all slots covered by this class
+          let inRange = false;
+          for (let row = 0; row < this.timeSlots.length; row++) {
+            const [slotStart, slotEnd] = this.timeSlots[row].split(' - ');
+            // If the slot matches the start or is within the range, fill it
+            if (slotStart === entry.startTime) inRange = true;
+            if (inRange) {
+              this.grid[row][col] = {
+                courseCode: entry.courseCode,
+                section: entry.section,
+                professor: entry.professor,
+                room: this.room
+              };
+            }
+            if (slotEnd === entry.endTime) {
+              inRange = false;
+            }
           }
         });
         console.log('Loaded schedule:', data);
