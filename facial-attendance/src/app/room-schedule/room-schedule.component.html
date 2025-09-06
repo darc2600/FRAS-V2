@@ -1,0 +1,35 @@
+
+
+<h2>Room Schedule Viewer</h2>
+<label>
+  Room:
+  <input [(ngModel)]="room" placeholder="e.g. MPO305">
+  <button (click)="loadSchedule()">Load</button>
+</label>
+<p *ngIf="message">{{message}}</p>
+
+<div class="schedule-grid">
+  <table>
+    <thead>
+      <tr>
+        <th>Schedule</th>
+        <th *ngFor="let day of days">{{ day }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let slot of timeSlots; let row = index">
+        <td>{{ slot }}</td>
+        <td *ngFor="let day of days; let col = index">
+          <div class="cell">
+            <ng-container *ngIf="grid[row][col]">
+              <b>{{ grid[row][col].courseCode }}</b><br>
+              <span>{{ grid[row][col].section }}</span><br>
+              <span>{{ grid[row][col].professor }}</span>
+            </ng-container>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+

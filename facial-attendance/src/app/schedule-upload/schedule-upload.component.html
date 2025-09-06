@@ -1,0 +1,17 @@
+<h2>Upload Your Schedule (Image)</h2>
+<label>
+  Student Number:
+  <input [(ngModel)]="studentId" placeholder="e.g. 2019110417">
+</label>
+<br>
+<label>
+  Schedule Image:
+  <input type="file" accept="image/*" (change)="onFileChange($event)">
+</label>
+<br>
+<button (click)="upload()">Upload</button>
+<p>{{message}}</p>
+<div *ngIf="extractedText">
+  <h3>Extracted Text:</h3>
+  <pre>{{extractedText}}</pre>
+</div>

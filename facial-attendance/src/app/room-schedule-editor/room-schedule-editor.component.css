@@ -1,0 +1,43 @@
+.schedule-grid table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.schedule-grid th, .schedule-grid td {
+  border: 1px solid #ccc;
+  text-align: center;
+  min-width: 120px;
+  min-height: 60px;
+  position: relative;
+  vertical-align: top;
+}
+.cell {
+  cursor: pointer;
+  padding: 6px;
+  min-height: 60px;
+}
+.cell .add {
+  color: #aaa;
+  font-size: 24px;
+}
+.editor {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #fff;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.editor form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.editor input {
+  padding: 4px;
+  margin-bottom: 2px;
+}
+.editor button {
+  margin: 2px 0;
+}
