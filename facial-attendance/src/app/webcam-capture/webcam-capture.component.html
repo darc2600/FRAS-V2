@@ -1,0 +1,68 @@
+<ion-app>
+  <!-- Sidebar -->
+  <ion-menu side="start" contentId="main-content" class="sidebar">
+    <ion-header>
+      <ion-toolbar color="dark">
+        <ion-title>
+          <img src="assets/logo.png" alt="Logo" class="logo">
+        </ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <ion-list lines="none">
+        <ion-item button>MONITOR</ion-item>
+        <ion-item button>REPORT</ion-item>
+        <ion-item button>LOGS</ion-item>
+        <ion-item button>REGISTER</ion-item>
+        <ion-item button>ADD COURSE</ion-item>
+      </ion-list>
+    </ion-content>
+
+    <ion-footer>
+      <ion-toolbar>
+        <ion-title class="signout">Sign Out</ion-title>
+      </ion-toolbar>
+    </ion-footer>
+  </ion-menu>
+
+
+  <!-- Main Content -->
+  <div class="main-content" id="main-content">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <h2>Facial Recognition</h2>
+    </div>
+
+    <!-- Room and Course-Section Selection -->
+    <div style="margin: 16px 0;">
+      <label for="roomSelect">Room:</label>
+      <select id="roomSelect" [(ngModel)]="selectedRoom" (change)="onRoomChange()">
+        <option *ngFor="let room of availableRooms" [value]="room">{{ room }}</option>
+      </select>
+
+      <label for="courseSectionSelect" style="margin-left: 16px;">Course-Section:</label>
+      <select id="courseSectionSelect" [(ngModel)]="courseCodeSection">
+        <option *ngFor="let cs of availableCourseSections" [value]="cs">{{ cs }}</option>
+      </select>
+    </div>
+
+    <!-- Webcam Capture Box -->
+    <div class="webcam-box">
+      <webcam
+        [trigger]="triggerObservable"
+        (imageCapture)="handleImage($event)">
+      </webcam>
+    </div>
+
+    <!-- Student Info Row -->
+    <div class="student-info">
+      <span>Date: 8-26-25</span>
+      <span>Time: XX:XXam</span>
+      <span>Student #: 2019110315</span>
+      <span>Status: <b class="present">Present</b> - <b class="ontime">OnTime</b></span>
+    </div>
+  </div>
+
+  
+</ion-app>

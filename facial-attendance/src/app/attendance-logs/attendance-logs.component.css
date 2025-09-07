@@ -1,0 +1,31 @@
+/* Simple Bootstrap-inspired responsive tweaks */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+.table {
+  font-size: 1rem;
+}
+.table-dark th {
+  background: #343a40;
+  color: #fff;
+}
+.spinner-border {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.alert {
+  margin-top: 1rem;
+}
+.badge.bg-success {
+  background-color: #28a745;
+  color: #fff;
+  font-size: 1em;
+  padding: 0.5em 1em;
+  border-radius: 0.5em;
+}
