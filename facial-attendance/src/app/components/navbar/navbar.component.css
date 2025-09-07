@@ -4,7 +4,7 @@
   top: 0;
   left: 0;
   height: 100vh;
-  width: 220px;
+  width: 200px;
   background: #990000; /* Mapua Red */
   display: flex;
   flex-direction: column;
@@ -31,8 +31,8 @@ body {
 .sidebar-links {
   list-style: none;
   padding: 0;
-  margin: 0;
-  width: 100%;
+  margin: -10%;
+  width: -10%;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -46,43 +46,27 @@ body {
 
 .sidebar-links a {
   display: block;
-  width: 100%;
-  padding: 12px 24px;
+  width: 100px;
+  min-width: 200px;
+  max-width: 200px;
+  padding: 16px 24px;
   color: #FFD700;
   text-decoration: none;
   font-weight: bold;
   font-size: 18px;
-  border-radius: 6px;
+  border-radius: 0px;
   text-align: left;
   transition: background 0.2s, color 0.2s;
+  box-sizing: border-box;
 }
 
 .sidebar-links a.active,
 .sidebar-links a:hover {
-  background: #b30000;
+  background: #bb5d00;
   color: #fff;
+  z-index: 1;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  /* Prevent overlap with sidebar edge */
 }
 
-.sidebar-signout {
-  margin-bottom: 32px;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.signout-btn {
-  background: #FFD700;
-  color: #990000;
-  border: none;
-  padding: 10px 32px;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background 0.2s, color 0.2s;
-}
-
-.signout-btn:hover {
-  background: #fff;
-  color: #990000;
-}

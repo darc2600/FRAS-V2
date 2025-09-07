@@ -1,8 +1,12 @@
 <div class="app-shell">
   <app-navbar></app-navbar>
-  <button class="burger-btn" (click)="toggleSidebar()">
-    &#9776;
-  </button>
+  <div class="burger-container">
+    <button class="burger-btn" (click)="toggleSidebar()">
+      <span *ngIf="!sidebarOpen">&#9776;</span>
+      <span *ngIf="sidebarOpen">&#10005;</span>
+    </button>
+    <div class="burger-label"></div>
+  </div>
   <app-profile-sidebar [isOpen]="sidebarOpen"></app-profile-sidebar>
   <div class="app-content">
     <router-outlet></router-outlet>

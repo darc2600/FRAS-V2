@@ -1,9 +1,14 @@
 <div class="profile-sidebar" [class.open]="isOpen">
+  <div class="sidebar-header-space"></div>
   <!-- Sidebar content here -->
-  <h3>Profile Sidebar</h3>
+  
   <ul class="sidebar-menu">
+    <li><span class="sidebar-title">Profile Sidebar</span></li>
     <li><a href="#" (click)="$event.preventDefault();">Edit Profile</a></li>
     <li><a href="#" (click)="$event.preventDefault();">Settings</a></li>
-    <li><a href="#" (click)="$event.preventDefault();">Sign Out</a></li>
+   
   </ul>
+    <div class="sidebar-signout">
+        <button class="signout-btn">Sign Out</button>
+    </div>
 </div>
