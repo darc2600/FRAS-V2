@@ -16,6 +16,7 @@ import { RoomScheduleComponent } from './room-schedule/room-schedule.component';
 import { RegistrationComponent } from './registration/registration.component';
 import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.component';
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
+import { ProfileSidebarComponent } from './components/profile-sidebar/profile-sidebar.component';
 // Import other components as needed
 
 @NgModule({
@@ -28,7 +29,8 @@ import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedul
     RoomScheduleComponent,
     RegistrationComponent,
     ScheduleUploadComponent,
-    RoomScheduleEditorComponent
+    RoomScheduleEditorComponent,
+    ProfileSidebarComponent
   ],
   imports: [
   BrowserModule,

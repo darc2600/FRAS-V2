@@ -1,0 +1,36 @@
+.profile-sidebar {
+  position: fixed;
+  top: 0;
+  right: -300px;
+  width: 300px;
+  height: 100vh;
+  background: #fff;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+  transition: right 0.3s ease;
+  z-index: 1100;
+  padding: 32px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.profile-sidebar.open {
+  right: 0;
+}
+
+@media (max-width: 600px) {
+  .profile-sidebar {
+    width: 90vw;
+    right: -90vw;
+  }
+  .profile-sidebar.open {
+    right: 0;
+  }
+}
+
+/* Temporary styles for debugging 
+.profile-sidebar {
+  right: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+*/

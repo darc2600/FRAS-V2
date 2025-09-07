@@ -4,3 +4,22 @@
 }
 
 /* If you use a router-outlet, wrap it in a div with class 'app-content' in app.component.html */
+
+.burger-btn {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1200;
+  background: #FFD700;
+  color: #990000;
+  border: none;
+  font-size: 32px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.burger-btn:focus {
+  outline: none;
+}
