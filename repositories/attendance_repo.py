@@ -23,7 +23,7 @@ class AttendanceRepository:
                 return []
             class_id = class_row[0]
             cursor.execute("""
-                SELECT a.student_id, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp FROM AttendanceLogs a
+                SELECT a.student_id, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, a.status FROM attendance_logs a
                 LEFT JOIN students s ON a.student_id = s.student_id
                 WHERE a.class_id = ?
             """, (class_id,))

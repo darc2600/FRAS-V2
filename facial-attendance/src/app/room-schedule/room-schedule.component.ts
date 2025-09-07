@@ -29,8 +29,8 @@ export class RoomScheduleComponent implements OnInit {
   }
 
   loadSchedule() {
-    if (!this.room) return;
-    this.http.get<any>(`http://127.0.0.1:8000/api/room-schedule/${this.room}`)
+  if (!this.room) return;
+  this.http.get<any>(`http://127.0.0.1:8000/api/schedule/${this.room}`)
       .subscribe({
         next: (data) => {
           this.grid = this.timeSlots.map(() => this.days.map(() => null));

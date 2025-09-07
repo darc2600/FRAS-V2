@@ -23,31 +23,31 @@ export class ApiService {
     return this.http.get<any>(`${this.backendUrl}/api/attendance?course_code=${courseCode}&section=${section}&room=${room}`);
   }
 
-  getRooms(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.backendUrl}/api/rooms`);
+  getRooms(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/rooms`);
   }
 
-  getCourses(room: string): Observable<string[]> {
-    return this.http.get<string[]>(`${this.backendUrl}/api/courses?room=${room}`);
+  getCourses(roomId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses`);
   }
 
-  getSections(room: string, course: string): Observable<string[]> {
-    return this.http.get<string[]>(`${this.backendUrl}/api/sections?room=${room}&course=${course}`);
+  getSections(roomId: string, courseCode: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses/${courseCode}/sections`);
   }
 
-  searchRooms(query: string): Observable<string[]> {
-    return this.http.get<string[]>(`${this.backendUrl}/api/rooms/search?query=${encodeURIComponent(query)}`);
+  getRoomSchedule(roomId: string): Observable<any> {
+    return this.http.get<any>(`${this.backendUrl}/api/schedule/${roomId}`);
   }
 
-  getCourseSections(room: string): Observable<string[]> {
-    return this.http.get<string[]>(`${this.backendUrl}/api/course-sections?room=${encodeURIComponent(room)}`);
+  updateRoomSchedule(roomId: string, data: any): Observable<any> {
+    return this.http.post<any>(`${this.backendUrl}/api/schedule/${roomId}`, data);
   }
 
-  getRoomsWithFloors(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/floors`);
+  registerStudent(formData: FormData): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/register`, formData);
   }
 
-  getRoomSchedule(roomCode: string): Observable<any> {
-    return this.http.get<any>(`${this.backendUrl}/api/room-schedule/${encodeURIComponent(roomCode)}`);
+  captureImage(formData: FormData): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/capture`, formData);
   }
 }

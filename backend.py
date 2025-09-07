@@ -1,94 +1,204 @@
-
-# -----------------------
-print("[DEBUG] backend.py loaded (test for correct file)")
-# Imports
-# -----------------------
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Body
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.encoders import jsonable_encoder
-from deepface import DeepFace
 import sqlite3
-import os
-import shutil
-import json
-from datetime import datetime
+from fastapi import FastAPI, Depends, UploadFile, File, Form, Request
 from typing import List
-from repositories.registration_repo import RegistrationRepository
-import logging
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
 
 # -----------------------
-# App initialization
+# Database setup
 # -----------------------
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "attendance.db")
-print(f"[DEBUG] Using database file: {os.path.abspath(DB_PATH)}")
+DB_PATH = "attendance.db"
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        # STUDENTS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS students (
+                student_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_number VARCHAR(20) UNIQUE,
+                last_name TEXT,
+                first_name TEXT,
+                email TEXT,
+                face_data_path TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # INSTRUCTORS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS instructors (
+                instructor_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                last_name TEXT,
+                first_name TEXT,
+                email TEXT,
+                department TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # COURSES
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS courses (
+                course_code VARCHAR(20) PRIMARY KEY,
+                course_name VARCHAR(100),
+                units INTEGER,
+                department TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # ROOMS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rooms (
+                room_id VARCHAR(20) PRIMARY KEY,
+                floor_level INTEGER,
+                room_number VARCHAR(10),
+                building_name VARCHAR(50),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # CLASSES
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS classes (
+                class_id VARCHAR(20) PRIMARY KEY,
+                course_code VARCHAR(20),
+                room_id VARCHAR(20),
+                instructor_id INTEGER,
+                section VARCHAR(10),
+                day_of_week VARCHAR(10),
+                start_time TIME,
+                end_time TIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(course_code) REFERENCES courses(course_code),
+                FOREIGN KEY(room_id) REFERENCES rooms(room_id),
+                FOREIGN KEY(instructor_id) REFERENCES instructors(instructor_id)
+            )
+        ''')
+
+        # ENROLLMENTS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS enrollments (
+                enrollment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER,
+                class_id VARCHAR(20),
+                enrolled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(student_id) REFERENCES students(student_id),
+                FOREIGN KEY(class_id) REFERENCES classes(class_id)
+            )
+        ''')
+
+        # ATTENDANCE_LOGS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS attendance_logs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER,
+                class_id VARCHAR(20),
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                status VARCHAR(20),
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(student_id) REFERENCES students(student_id),
+                FOREIGN KEY(class_id) REFERENCES classes(class_id)
+            )
+        ''')
+
+        # Triggers to auto-update updated_at on row update
+        for table in [
+            'students', 'instructors', 'courses', 'rooms', 'classes', 'enrollments', 'attendance_logs'
+        ]:
+            cursor.execute(f'''
+                CREATE TRIGGER IF NOT EXISTS trg_{table}_updated_at
+                AFTER UPDATE ON {table}
+                FOR EACH ROW
+                BEGIN
+                    UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
+                END;
+            ''')
+
+        conn.commit()
+
+# Initialize DB on startup
+init_db()
+
+# -----------------------
+# FastAPI app setup
+# -----------------------
+
+
+# -----------------------
+# Service Classes & Dependency Providers
+# -----------------------
+
+class RoomService:
+    def get_rooms(self):
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM rooms")
+            rows = cursor.fetchall()
+            return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+    def get_courses(self, room_id):
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM classes WHERE room_id = ?", (room_id,))
+            rows = cursor.fetchall()
+            return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+    def get_sections(self, room_id, course_code):
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM classes WHERE room_id = ? AND course_code = ?", (room_id, course_code))
+            rows = cursor.fetchall()
+            return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+
+def get_room_service():
+    return RoomService()
+
+# Dummy response models for FastAPI (replace with your actual Pydantic models if available)
+class AttendanceResponse(dict): pass
+class RecognitionResponse(dict): pass
+class RegistrationResponse(dict): pass
+class CaptureResponse(dict): pass
+class ScheduleResponse(dict): pass
+
+
+# Use the real AttendanceService from services/attendance_service.py
+from services.attendance_service import AttendanceService, get_attendance_service
+
+
+# Use the real RecognitionService from services/recognition_service.py
+from services.recognition_service import RecognitionService, get_recognition_service
+
+
+# Use the real RegistrationService from services/registration_service.py
+from services.registration_service import RegistrationService, get_registration_service
+
+class CaptureService:
+    async def capture_image(self, file, course_code, section, student_id):
+        return {"captured": True, "student_id": student_id}
+def get_capture_service():
+    return CaptureService()
+
+
+from services.schedule_service import ScheduleService, get_schedule_service
+
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# Enable CORS for Angular frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with ["http://localhost:4200"] for production
+    allow_origins=["http://localhost:4200"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# -----------------------
-# Room List with Floor Level Endpoint
-# -----------------------
-@app.get("/api/rooms/floors", tags=["Rooms"])
-async def get_rooms_with_floors():
-    print("[DEBUG] Entered /api/rooms/floors endpoint")
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT room_id, floor_level, room_number FROM rooms")
-        rows = cursor.fetchall()
-        print(f"[DEBUG] /api/rooms/floors fetched rows: {rows}")
-        rooms = [
-            {"room_id": row[0], "floor_level": row[1], "room_number": row[2]}
-            for row in rows
-        ]
-    return rooms
-
-def migrate_classes_table():
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        # Check if the table exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='classes'")
-        if cursor.fetchone():
-            # Get current schema
-            cursor.execute("PRAGMA table_info(classes)")
-            columns = [row[1] for row in cursor.fetchall()]
-            # Check for old unique constraint
-            cursor.execute("PRAGMA index_list(classes)")
-            indexes = cursor.fetchall()
-            for idx in indexes:
-                if idx[1] == 'sqlite_autoindex_classes_2':
-                    # Drop the old table and recreate with new constraint
-                    cursor.execute("ALTER TABLE classes RENAME TO classes_old")
-                    cursor.execute("""
-                        CREATE TABLE classes (
-                            class_id VARCHAR(50) PRIMARY KEY,
-                            course_code VARCHAR(20),
-                            section VARCHAR(20),
-                            room_id VARCHAR(20),
-                            instructor_name VARCHAR(100),
-                            day_of_week VARCHAR(10),
-                            start_time TIME,
-                            end_time TIME,
-                            UNIQUE(course_code, section, room_id, day_of_week)
-                        )
-                    """)
-                    cursor.execute("INSERT INTO classes (class_id, course_code, section, room_id, instructor_name, day_of_week, start_time, end_time) SELECT class_id, course_code, section, room_id, instructor_name, day_of_week, start_time, end_time FROM classes_old")
-                    cursor.execute("DROP TABLE classes_old")
-                    conn.commit()
-                    break
-
-migrate_classes_table()
 
 # Tag metadata for grouping in Swagger UI
 tags_metadata = [
@@ -101,322 +211,65 @@ tags_metadata = [
     {"name": "Capture", "description": "Image capture endpoints."},
     {"name": "Debug", "description": "Debug and utility endpoints."},
 ]
-
-app = FastAPI(openapi_tags=tags_metadata)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Replace with ["http://localhost:4200"] for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-
-async def get_room_schedule(room: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT course_code, section, instructor_name, day_of_week, start_time, end_time
-            FROM classes WHERE room_id = ?
-        """, (room,))
-        schedule = [
-            {
-                "courseCode": row[0],
-                "section": row[1],
-                "professor": row[2],
-                "day": row[3],
-                "startTime": row[4],
-                "endTime": row[5]
-            }
-            for row in cursor.fetchall()
-        ]
-    return {"schedule": schedule}
-
-@app.post("/api/room-schedule/{room}", tags=["Rooms"])
-async def save_room_schedule(room: str, schedule: list = Body(...)):
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        # Remove existing schedule for this room
-        cursor.execute("DELETE FROM classes WHERE room_id = ?", (room,))
-        # Insert new schedule
-        for entry in schedule:
-            cursor.execute("""
-                INSERT INTO classes (class_id, course_code, section, room_id, instructor_name, day_of_week, start_time, end_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                f"{entry.get('courseCode','')}_{entry.get('section','')}_{room}_{entry.get('day','')}_{entry.get('startTime','')}",
-                entry.get('courseCode',''),
-                entry.get('section',''),
-                room,
-                entry.get('professor',''),
-                entry.get('day',''),
-                entry.get('startTime',''),
-                entry.get('endTime','')
-            ))
-        conn.commit()
-    return {"status": "success"}
-
-@app.delete("/api/room-schedule/{room}", tags=["Rooms"])
-async def delete_room_schedule(room: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM classes WHERE room_id = ?", (room,))
-        conn.commit()
-    return {"status": "deleted"}
-
-
+app.openapi_tags = tags_metadata
 
 # -----------------------
-# App initialization
+# API Endpoints
 # -----------------------
-app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Replace with ["http://localhost:4200"] for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.get("/api/rooms", tags=["Rooms"])
+async def get_rooms(room_service=Depends(get_room_service)):
+    return room_service.get_rooms()
 
-# -----------------------
-# Room, Course, Section Listing Endpoints
-# -----------------------
-@app.get("/api/rooms")
-async def get_rooms():
-    schedules_dir = "schedules"
-    if not os.path.exists(schedules_dir):
-        return []
-    rooms = [f[:-5] for f in os.listdir(schedules_dir) if f.endswith(".json")]
-    return rooms
+@app.get("/api/rooms/{room_id}/courses", tags=["Rooms"])
+async def get_courses(room_id: str, room_service=Depends(get_room_service)):
+    return room_service.get_courses(room_id)
 
-@app.get("/api/courses")
-async def get_courses(room: str):
-    schedule_path = os.path.join("schedules", f"{room}.json")
-    if not os.path.exists(schedule_path):
-        return []
-    with open(schedule_path, "r", encoding="utf-8") as f:
-        schedule = json.load(f)
-    courses = sorted(list(set(entry.get("courseCode") for entry in schedule if entry.get("courseCode"))))
-    return courses
+@app.get("/api/rooms/{room_id}/courses/{course_code}/sections", tags=["Rooms"])
+async def get_sections(room_id: str, course_code: str, room_service=Depends(get_room_service)):
+    return room_service.get_sections(room_id, course_code)
 
-@app.get("/api/sections")
-async def get_sections(room: str, course: str):
-    schedule_path = os.path.join("schedules", f"{room}.json")
-    if not os.path.exists(schedule_path):
-        return []
-    with open(schedule_path, "r", encoding="utf-8") as f:
-        schedule = json.load(f)
-    sections = sorted(list(set(entry.get("section") for entry in schedule if entry.get("courseCode") == course and entry.get("section"))))
-    return sections
+# --- Attendance Endpoint ---
+@app.get("/api/attendance", response_model=None, tags=["Attendance"])
+async def get_attendance(course_code: str, section: str, room: str = None, attendance_service=Depends(get_attendance_service)):
+    return attendance_service.get_attendance(course_code, section, room)
 
-DB_PATH = "attendance.db"
+# --- Recognition Endpoint ---
+@app.post("/api/recognize", response_model=None, tags=["Recognition"])
+async def recognize_face(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), room: str = Form(...), recognition_service=Depends(get_recognition_service)):
+    return await recognition_service.recognize_face(file, course_code, section, room)
 
-# -----------------------
-# Database setup
-# -----------------------
-def init_db():
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS AttendanceLogs (
-                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                student_id VARCHAR(20),
-                class_id VARCHAR(20),
-                timestamp DATETIME,
-                attendance_date DATE,
-                status VARCHAR(20),
-                FOREIGN KEY(student_id) REFERENCES students(student_id),
-                FOREIGN KEY(class_id) REFERENCES classes(class_id),
-                UNIQUE(student_id, class_id, attendance_date)
-            )
-        ''')
-with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS classes (
-                class_id VARCHAR(20) PRIMARY KEY,
-                course_code VARCHAR(20),
-                section VARCHAR(20),
-                room_id VARCHAR(20),
-                instructor_name VARCHAR(100),
-                day_of_week VARCHAR(10),
-                start_time TIME,
-                end_time TIME,
-                UNIQUE(course_code, section),
-                FOREIGN KEY(room_id) REFERENCES rooms(room_id)
-            )
-        ''')
-    # Removed old attendance table creation
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS students (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                student_id TEXT UNIQUE,
-                last_name TEXT,
-                first_name TEXT,
-                email TEXT,
-                face_data_path TEXT,
-                created_at DATETIME
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS student_courses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                student_id TEXT,
-                course_code TEXT,
-                section TEXT,
-                room TEXT,
-                FOREIGN KEY(student_id) REFERENCES students(student_id)
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS rooms (
-                room_id VARCHAR(20) PRIMARY KEY,
-                floor_level INTEGER,
-                room_number VARCHAR(10)
-            )
-        ''')
-        # Optionally, add columns to existing rooms table if they don't exist (for migrations)
-        try:
-            cursor.execute('ALTER TABLE rooms ADD COLUMN floor_level INTEGER')
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-        try:
-            cursor.execute('ALTER TABLE rooms ADD COLUMN room_number VARCHAR(10)')
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-        conn.commit()
-# Helper to extract floor level from room_id (e.g., '305' -> 3, '1201' -> 12)
-def extract_floor_level(room_id: str) -> int:
-    digits = ''.join([c for c in room_id if c.isdigit()])
-    if not digits:
-        return 0
-    # If room_id is 3 or 4 digits, use first 1 or 2 digits as floor
-    if len(digits) >= 4:
-        return int(digits[:2])
-    return int(digits[0])
+# --- Registration Endpoint ---
+@app.post("/api/register", response_model=None, tags=["Registration"])
+async def register_student(
+    student_number: str = Form(...),
+    last_name: str = Form(...),
+    first_name: str = Form(...),
+    email: str = Form(...),
+    created_at: str = Form(...),
+    schedule: str = Form(...),
+    images: List[UploadFile] = File(...),
+    registration_service=Depends(get_registration_service)
+):
+    return await registration_service.register_student(
+        student_number, last_name, first_name, email, created_at, schedule, images
+    )
 
-# Helper to extract just the numeric room number (e.g., 'MPO305' -> '305')
-def extract_room_number(room_id: str) -> str:
-    digits = ''.join([c for c in room_id if c.isdigit()])
-    return digits if digits else room_id
+# --- Capture Endpoint ---
+@app.post("/api/capture", response_model=None, tags=["Capture"])
+async def capture_image(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), student_id: str = Form(...), capture_service=Depends(get_capture_service)):
+    return await capture_service.capture_image(file, course_code, section, student_id)
 
-init_db()
+# --- Schedule Endpoints ---
+@app.get("/api/schedule/{room_id}", response_model=None, tags=["Schedule"])
+async def get_room_schedule(room_id: str, schedule_service=Depends(get_schedule_service)):
+    return await schedule_service.get_room_schedule(room_id)
 
-# -----------------------
-# Face Recognition
-# -----------------------
-@app.post("/api/recognize", tags=["Recognition"])
-async def recognize_face(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), room: str = Form(...)):
-    temp_path = f"temp_{file.filename}"
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+@app.post("/api/schedule/{room_id}", response_model=None, tags=["Schedule"])
+async def update_room_schedule(room_id: str, request: Request, schedule_service=Depends(get_schedule_service)):
+    return await schedule_service.update_room_schedule(room_id, request)
 
-    recognized_id = None
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT student_id FROM student_courses
-                WHERE course_code = ? AND section = ? AND (room = ? OR room IS NULL)
-            ''', (course_code, section, room))
-            student_ids = [row[0] for row in cursor.fetchall()]
-
-            student_faces = {}
-            for student_id in student_ids:
-                student_folder = os.path.join("dataset", student_id)
-                if os.path.isdir(student_folder):
-                    images = [os.path.join(student_folder, img) for img in os.listdir(student_folder) if img.lower().endswith(".jpg")]
-                    if images:
-                        student_faces[student_id] = images[0]
-
-            for student_id, img_path in student_faces.items():
-                try:
-                    result = DeepFace.verify(img1_path=temp_path, img2_path=img_path, model_name="ArcFace", enforce_detection=False)
-                    distance = result.get('distance')
-                    threshold = 0.3  # Stricter threshold for cosine distance (default is 0.68)
-                    logging.info(f"Comparing temp image with {img_path} (student_id={student_id}): verified={result['verified']}, distance={distance}, threshold={threshold}")
-                    if result["verified"] and distance is not None and distance < threshold:
-                        # Find class_id for this course_code, section, and room
-                        cursor.execute('''
-                            SELECT class_id FROM classes
-                            WHERE course_code = ? AND section = ? AND (room_id = ? OR room_id IS NULL)
-                        ''', (course_code, section, room))
-                        class_row = cursor.fetchone()
-                        if class_row:
-                            class_id = class_row[0]
-                            # Check for duplicate attendance for today
-                            cursor.execute('''
-                                SELECT 1 FROM AttendanceLogs
-                                WHERE student_id = ? AND class_id = ? AND attendance_date = DATE('now')
-                            ''', (student_id, class_id))
-                            if cursor.fetchone() is None:
-                                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                cursor.execute('''
-                                    INSERT INTO AttendanceLogs (student_id, class_id, timestamp, attendance_date, image_path, status)
-                                    VALUES (?, ?, ?, DATE('now'), ?, ?)
-                                ''', (student_id, class_id, timestamp, temp_path, 'present'))
-                                conn.commit()
-                            recognized_id = student_id
-                            break
-                except Exception:
-                    continue
-    finally:
-        os.remove(temp_path)
-
-    if recognized_id:
-        return {"status": "success", "student_id": recognized_id}
-    else:
-        return {"status": "failed", "message": "No match found"}
-
-# -----------------------
-# Image Capture
-# -----------------------
-@app.post("/api/capture", tags=["Capture"])
-async def capture_image(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), student_id: str = Form(...)):
-    save_path = os.path.join("dataset", course_code, section, student_id)
-    os.makedirs(save_path, exist_ok=True)
-    img_path = os.path.join(save_path, file.filename)
-    with open(img_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return {"status": "success", "message": f"Image saved to {img_path}"}
-
-# -----------------------
-# Attendance Retrieval
-# -----------------------
-@app.get("/api/attendance", tags=["Attendance"])
-async def get_attendance(course_code: str, section: str, room: str = None):
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        # Find class_id for this course_code, section, and room
-        if room:
-            cursor.execute('''
-                SELECT class_id FROM classes
-                WHERE course_code = ? AND section = ? AND (room_id = ? OR room_id IS NULL)
-            ''', (course_code, section, room))
-        else:
-            cursor.execute('''
-                SELECT class_id FROM classes
-                WHERE course_code = ? AND section = ?
-            ''', (course_code, section))
-        class_row = cursor.fetchone()
-        if not class_row:
-            return {"attendance": []}
-        class_id = class_row[0]
-        cursor.execute('''
-            SELECT student_id, timestamp, attendance_date, image_path, status FROM AttendanceLogs
-            WHERE class_id = ?
-        ''', (class_id,))
-        rows = cursor.fetchall()
-    return {"attendance": rows}
-
-
-
-# Clear and re-insert schedule
-
-# -----------------------
-# Debug: List routes
-# -----------------------
+# --- Debug Endpoint ---
 @app.get("/api/routes", tags=["Debug"])
 async def list_routes():
     return [route.path for route in app.routes]

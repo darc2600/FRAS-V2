@@ -3,16 +3,16 @@
   <div class="row g-3 align-items-end mb-3">
     <div class="col-md-3">
       <label>Floor:</label>
-      <select class="form-select" [(ngModel)]="selectedFloor" (change)="onFloorChange()">
-        <option *ngFor="let f of dynamicFloors" [value]="f">Floor {{f}}</option>
+      <select class="form-select" [(ngModel)]="selectedFloor" (change)="filterRoomsByFloor()">
+        <option *ngFor="let f of availableFloors" [value]="f">Floor {{f}}</option>
       </select>
     </div>
     <div class="col-md-3">
       <label>Room:</label>
-      <select class="form-select" [(ngModel)]="room" (change)="onRoomChange()" [disabled]="!dynamicRooms.length">
-        <option *ngFor="let r of dynamicRooms" [value]="r.room">{{r.room}}</option>
-      </select>
-      <div *ngIf="dynamicRooms.length === 0" class="text-danger small">No rooms for this floor.</div>
+      <input type="text" class="form-control" [(ngModel)]="roomSearch" (input)="onRoomSearchChange()" (focus)="showRoomDropdown = true" (blur)="onRoomInputBlur()" placeholder="Search room..." autocomplete="off" />
+      <ul *ngIf="showRoomDropdown && filteredRooms.length > 0" class="dropdown-list">
+        <li *ngFor="let r of filteredRooms" (mousedown)="selectRoom(r)">{{r}}</li>
+      </ul>
     </div>
     <div class="col-md-4">
       <label>Course-Section:</label>
@@ -44,11 +44,17 @@
         <tbody>
           <tr *ngFor="let log of logs; let i = index">
             <td>{{i + 1}}</td>
-            <td>{{log[0]}}</td>
-            <td>{{log[1]}}</td>
-            <td>{{ formatDateTime(log[2]).split(' ')[0] }}</td>
-            <td>{{ formatDateTime(log[2]).split(' ')[1] + ' ' + formatDateTime(log[2]).split(' ')[2] }}</td>
-            <td><span class="badge bg-success">{{ getStatus(log) }}</span></td>
+            <td>{{log.studentId}}</td>
+            <td>{{log.studentName}}</td>
+            <td>{{ formatDateTime(log.time).split(' ')[0] }}</td>
+            <td>{{ formatDateTime(log.time).split(' ')[1] + ' ' + formatDateTime(log.time).split(' ')[2] }}</td>
+            <td>
+              <span [ngClass]="{
+                'badge bg-success': log.status === 'Present',
+                'badge bg-warning text-dark': log.status === 'Late',
+                'badge bg-danger': log.status === 'Absent'
+              }">{{ log.status }}</span>
+            </td>
           </tr>
         </tbody>
       </table>

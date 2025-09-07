@@ -22,6 +22,12 @@ export class AttendanceMonitorComponent implements OnInit {
   allRooms: any[] = [];
   availableFloors: number[] = [];
   selectedFloor: number | null = null;
+  // Room type for clarity
+  private getRoomLabel(room: any): string {
+    if (!room) return '';
+    if (typeof room === 'string') return room;
+    return room.room_id || room.id || room.name || '';
+  }
   currentTime = '';
   message = '';
   webcamImage: WebcamImage | null = null;
@@ -50,18 +56,17 @@ export class AttendanceMonitorComponent implements OnInit {
   }
 
   fetchRooms() {
-    this.api.getRoomsWithFloors().subscribe(
+    this.api.getRooms().subscribe(
       (rooms: any[]) => {
         this.allRooms = rooms;
-        // Get unique floor levels
+        // If rooms have floor_level, extract unique floors
         this.availableFloors = Array.from(new Set(rooms.map(r => r.floor_level).filter(f => f != null))).sort((a, b) => a - b);
-        // Default to first floor if available
         if (this.availableFloors.length > 0) {
           this.selectedFloor = this.availableFloors[0];
           this.filterRoomsByFloor();
         } else {
-          this.availableRooms = [];
-          this.filteredRooms = [];
+          this.availableRooms = rooms.map(r => r.room_id || r.id || r.name);
+          this.filteredRooms = this.availableRooms;
         }
       },
       err => this.message = 'Error fetching rooms.'
@@ -93,16 +98,11 @@ export class AttendanceMonitorComponent implements OnInit {
       this.showRoomDropdown = false;
       return;
     }
-    this.api.searchRooms(this.roomSearch).subscribe(
-      (rooms: string[]) => {
-        this.filteredRooms = rooms;
-        this.showRoomDropdown = true;
-      },
-      err => {
-        this.filteredRooms = [];
-        this.showRoomDropdown = false;
-      }
+    // Simple client-side filter
+    this.filteredRooms = this.availableRooms.filter(r =>
+      this.getRoomLabel(r).toLowerCase().includes(this.roomSearch.toLowerCase())
     );
+    this.showRoomDropdown = true;
   }
 
   selectRoom(room: string) {
@@ -131,7 +131,7 @@ export class AttendanceMonitorComponent implements OnInit {
     this.api.getRoomSchedule(this.room).subscribe(
       (result: any) => {
         if (result && Array.isArray(result.schedule)) {
-          const pairs = result.schedule.map((cls: any) => `${cls.courseCode} - ${cls.section}`);
+          const pairs = result.schedule.map((cls: any) => `${cls.course_code || cls.courseCode} - ${cls.section}`);
           this.availableCourseSections = Array.from(new Set(pairs));
           this.courseSection = this.availableCourseSections[0] || '';
         } else {
@@ -241,7 +241,7 @@ export class AttendanceMonitorComponent implements OnInit {
           studentId: log[0],
           studentName: log[1],
           time: log[2],
-          status: 'Present'
+          status: log[3] || 'Unknown'
         }));
       },
       err => this.message = 'Error fetching logs.'

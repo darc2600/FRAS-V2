@@ -7,23 +7,57 @@ DB_PATH = "attendance.db"
 
 class ScheduleRepository:
     async def get_room_schedule(self, room_code: str):
+        TIME_SLOTS = [
+            "07:00AM - 08:10AM", "08:10AM - 09:20AM", "09:20AM - 10:30AM", "10:30AM - 11:40AM",
+            "11:40AM - 12:50PM", "12:50PM - 02:00PM", "02:00PM - 03:10PM", "03:10PM - 04:20PM",
+            "04:20PM - 05:30PM", "05:30PM - 06:40PM", "06:40PM - 07:50PM", "07:50PM - 09:00PM"
+        ]
+        DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        def time_to_minutes(t):
+            import re
+            match = re.match(r"(\d{1,2}):(\d{2})(AM|PM)", t)
+            if not match:
+                return None
+            hour, minute, ampm = int(match.group(1)), int(match.group(2)), match.group(3)
+            if ampm == "PM" and hour != 12:
+                hour += 12
+            if ampm == "AM" and hour == 12:
+                hour = 0
+            return hour * 60 + minute
+        def slot_range(start, end):
+            slots = []
+            in_range = False
+            for slot in TIME_SLOTS:
+                slot_start, slot_end = slot.split(' - ')
+                if slot_start == start:
+                    in_range = True
+                if in_range:
+                    slots.append(slot)
+                if slot_end == end:
+                    break
+            return slots
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT course_code, section, instructor_name, day_of_week, start_time, end_time
-                FROM classes WHERE room_id = ?
+                SELECT c.course_code, c.section, i.last_name || ', ' || i.first_name as professor, c.day_of_week, c.start_time, c.end_time, c.instructor_id
+                FROM classes c
+                LEFT JOIN instructors i ON c.instructor_id = i.instructor_id
+                WHERE c.room_id = ?
             """, (room_code,))
-            schedule = [
-                {
-                    "courseCode": row[0],
-                    "section": row[1],
-                    "professor": row[2],
-                    "day": row[3],
-                    "startTime": row[4],
-                    "endTime": row[5]
-                }
-                for row in cursor.fetchall()
-            ]
+            schedule = []
+            for row in cursor.fetchall():
+                courseCode, section, professor, day, startTime, endTime, instructorId = row
+                for slot in slot_range(startTime, endTime):
+                    slot_start, slot_end = slot.split(' - ')
+                    schedule.append({
+                        "courseCode": courseCode,
+                        "section": section,
+                        "professor": professor,
+                        "day": day,
+                        "startTime": slot_start,
+                        "endTime": slot_end,
+                        "instructorId": instructorId
+                    })
         return schedule
 
     async def update_room_schedule(self, room_code: str, request: Request) -> ScheduleResponse:
@@ -117,15 +151,16 @@ class ScheduleRepository:
 
             for entry in merged:
                 class_id = f"{entry.get('courseCode','')}_{entry.get('section','')}_{room_code}_{entry.get('day','')}"
+                instructor_id = entry.get('instructorId') or None
                 cursor.execute("""
-                    INSERT INTO classes (class_id, course_code, section, room_id, instructor_name, day_of_week, start_time, end_time)
+                    INSERT INTO classes (class_id, course_code, section, room_id, instructor_id, day_of_week, start_time, end_time)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     class_id,
                     entry.get('courseCode',''),
                     entry.get('section',''),
                     room_code,
-                    entry.get('professor',''),
+                    instructor_id,
                     entry.get('day',''),
                     entry.get('startTime',''),
                     entry.get('endTime','')

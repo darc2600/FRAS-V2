@@ -8,7 +8,7 @@ router = APIRouter()
 
 @router.post("/api/registration", response_model=RegistrationResponse)
 async def register_student(
-    student_id: str = Form(...),
+    student_number: str = Form(...),
     last_name: str = Form(...),
     first_name: str = Form(...),
     email: str = Form(...),
@@ -18,7 +18,7 @@ async def register_student(
     service: RegistrationService = Depends(get_registration_service)
 ):
     return await service.register_student(
-        student_id=student_id,
+        student_number=student_number,
         last_name=last_name,
         first_name=first_name,
         email=email,

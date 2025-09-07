@@ -10,7 +10,7 @@ class RegistrationService:
 
     async def register_student(
         self,
-        student_id: str,
+        student_number: str,
         last_name: str,
         first_name: str,
         email: str,
@@ -23,7 +23,7 @@ class RegistrationService:
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schedule: {e}")
         return await self.repo.register_student(
-            student_id,
+            student_number,
             last_name,
             first_name,
             email,
