@@ -12,7 +12,7 @@
 
 .camera .video-wrap {
   background: #111;
-  border-radius: 14px;
+  border-radius: 5px;
   overflow: hidden;
   position: relative;
   box-shadow: 0 4px 18px rgba(0,0,0,.1);
@@ -67,4 +67,32 @@ input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); 
   align-items: center;
   gap: 12px;
   margin-bottom: 6px;
+}
+
+header, .registration-header {
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.angle-guide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.angle-label {
+  margin: 10px;
+}
+
+.angle-label-bordered {
+  display: inline-block;
+}
+
+.angle-progress {
+  margin-top: 8px;
 }

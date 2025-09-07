@@ -11,12 +11,18 @@
         <video #videoEl playsinline></video>
       </div>
 
-      <div class="controls">
-        <button class="btn" (click)="captureOne()" [disabled]="!stream || isCapturing">Capture 1</button>
-        <button class="btn primary" (click)="captureSeries()" [disabled]="!stream || isCapturing">
-          {{ isCapturing ? 'Capturing…' : 'Capture Series' }}
+      <!-- ANGLE CAPTURE UI -->
+      <div class="angle-guide">
+        <div class="angle-label">Current Angle: <span class="angle-label-bordered">{{ currentAngleLabel }}</span></div>
+        <button class="btn" type="button" (click)="captureAngle()" [disabled]="!stream || isCapturing || faceAngles[currentAngleIndex].captured">
+          Capture {{ currentAngleLabel }}
         </button>
-        <button class="btn danger" (click)="clearAll()" [disabled]="previews.length===0">Clear All</button>
+        <button class="btn danger" type="button" (click)="resetAngles()">Reset Angles</button>
+        <div class="angle-progress">
+          <span *ngFor="let angle of faceAngles; let i = index" [class.captured]="angle.captured">
+            {{ angle.label }}<span *ngIf="i < faceAngles.length - 1">, </span>
+          </span>
+        </div>
       </div>
 
       <div class="gallery" *ngIf="previews.length">
@@ -74,19 +80,7 @@
         </ul>
       </div>
 
-      <!-- ANGLE CAPTURE UI -->
-      <div class="angle-guide">
-        <div class="angle-label">Current Angle: <b>{{ currentAngleLabel }}</b></div>
-        <button class="btn" type="button" (click)="captureAngle()" [disabled]="!stream || isCapturing || faceAngles[currentAngleIndex].captured">
-          Capture {{ currentAngleLabel }}
-        </button>
-        <button class="btn danger" type="button" (click)="resetAngles()">Reset Angles</button>
-        <div class="angle-progress">
-          <span *ngFor="let angle of faceAngles; let i = index" [class.captured]="angle.captured">
-            {{ angle.label }}<span *ngIf="i < faceAngles.length - 1">, </span>
-          </span>
-        </div>
-      </div>
+      
     </section>
   </div>
   <canvas #canvasEl class="hidden-canvas"></canvas>
