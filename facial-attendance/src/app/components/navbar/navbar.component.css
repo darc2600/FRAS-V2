@@ -1,101 +1,87 @@
-.navbar {
+/* Sidebar Navbar Styles */
+.sidebar-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 220px;
+  background: #990000; /* Mapua Red */
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  background-color: #990000; /* Mapua Red */
-  padding: 10px 24px;
-  color: #FFD700;
-  width: 100%;
-  min-height: 56px;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.08);
+  z-index: 1000;
+  /* Ensure sidebar stays fixed and above other content */
 }
-.nav-left {
-  display: flex;
-  align-items: center;
+
+body {
+  margin-left: 220px; /* Prevent content from hiding behind sidebar */
 }
-.nav-right {
-  display: flex;
-  align-items: center;
-}
-.logo {
-  margin-bottom: 32px;
+
+.sidebar-logo {
+  margin: 32px 0 24px 0;
   width: 100%;
   text-align: center;
 }
-.logo img {
-  height: 40px;
+
+.sidebar-logo img {
+  height: 48px;
 }
-.nav-links {
-  display: flex;
+
+.sidebar-links {
   list-style: none;
-  margin: 0 32px;
   padding: 0;
-}
-.nav-links li {
-  margin: 0 16px;
-}
-.nav-links a {
-  color: #FFD700;
-  text-decoration: none;
-  font-weight: bold;
-  font-size: 16px;
-  transition: color 0.2s;
-}
-.nav-links a:hover {
-  color: #fff;
-}
-.nav-links {
+  margin: 0;
+  width: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  width: 100%;
+  align-items: center;
 }
-.nav-links li {
-  margin: 12px 0;
+
+.sidebar-links li {
   width: 100%;
+  margin-bottom: 16px;
 }
-.nav-links a {
+
+.sidebar-links a {
+  display: block;
+  width: 100%;
+  padding: 12px 24px;
   color: #FFD700;
   text-decoration: none;
   font-weight: bold;
   font-size: 18px;
-  padding: 8px 24px;
-  display: block;
-  width: 100%;
-  border-radius: 4px;
+  border-radius: 6px;
+  text-align: left;
   transition: background 0.2s, color 0.2s;
 }
-.nav-links a:hover {
+
+.sidebar-links a.active,
+.sidebar-links a:hover {
   background: #b30000;
   color: #fff;
 }
-.signout {
-  margin-top: auto;
+
+.sidebar-signout {
+  margin-bottom: 32px;
   width: 100%;
-  text-align: right;
-  padding: 0 24px 0 0;
+  display: flex;
+  justify-content: center;
 }
-.signout a {
-  color: #FFD700;
-  text-decoration: none;
-  font-weight: bold;
-  font-size: 16px;
-}
-.signout a:hover {
-  color: #fff;
-}
+
 .signout-btn {
   background: #FFD700;
-  border: none;
   color: #990000;
-  font-weight: bold;
-  padding: 6px 16px;
+  border: none;
+  padding: 10px 32px;
   border-radius: 6px;
+  font-weight: bold;
   cursor: pointer;
   font-size: 16px;
   transition: background 0.2s, color 0.2s;
 }
+
 .signout-btn:hover {
   background: #fff;
   color: #990000;

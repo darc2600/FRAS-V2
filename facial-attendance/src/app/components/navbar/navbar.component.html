@@ -1,13 +1,15 @@
-<nav class="navbar">
-  <div class="nav-left">
-    <img src="assets/mapua-logo.png" alt="Mapua Logo" height="32" style="vertical-align: middle; margin-right: 12px;" />
-    <span style="font-weight: bold; color: #FFD700; font-size: 18px;">MONITOR</span>
-    <span style="font-weight: bold; color: #FFD700; font-size: 18px; margin-left: 24px;">REPORT</span>
-    <span style="font-weight: bold; color: #FFD700; font-size: 18px; margin-left: 24px;">LOGS</span>
-    <span style="font-weight: bold; color: #FFD700; font-size: 18px; margin-left: 24px;">REGISTER</span>
-    <span style="font-weight: bold; color: #FFD700; font-size: 18px; margin-left: 24px;">ADD COURSE</span>
+<nav class="sidebar-navbar">
+  <div class="sidebar-logo">
+    <img src="assets/mapua-logo.png" alt="Mapua Logo" height="48" />
   </div>
-  <div class="nav-right">
+  <ul class="sidebar-links">
+    <li><a routerLink="/monitor" routerLinkActive="active">Monitor</a></li>
+    <li><a routerLink="/report" routerLinkActive="active">Report</a></li>
+    <li><a routerLink="/logs" routerLinkActive="active">Logs</a></li>
+    <li><a routerLink="/register" routerLinkActive="active">Register</a></li>
+    <li><a routerLink="/add-course" routerLinkActive="active">Add Course</a></li>
+  </ul>
+  <div class="sidebar-signout">
     <button class="signout-btn">Sign Out</button>
   </div>
 </nav>
