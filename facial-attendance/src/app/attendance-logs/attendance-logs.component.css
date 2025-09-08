@@ -1,31 +1,86 @@
-/* Simple Bootstrap-inspired responsive tweaks */
-.container {
-  max-width: 900px;
-  margin: 0 auto;
+.attendance-logs-main {
+  background: #fff;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  padding-left: 0;
 }
-.card {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+
+.logs-header {
+  font-size: 2em;
+  margin-bottom: 20px;
+  color: #333;
+  margin-top: 0;
+  padding-top: 24px;
+}
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-bottom: 20px;
+}
+.top-bar label {
+  font-weight: bold;
+  color: #333;
+}
+.top-bar select {
+  margin-left: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+.time-display {
+  margin-left: auto;
+  font-size: 1.3em;
+  color: #333;
+}
+.attendance-log-box {
+  margin-top: 30px;
+  background: #fff;
   border-radius: 8px;
-  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  padding: 0;
 }
-.table {
-  font-size: 1rem;
+.attendance-log-header {
+  background: #FFA500;
+  color: #333;
+  font-weight: bold;
+  font-size: 1.2em;
+  padding: 12px 24px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
 }
-.table-dark th {
-  background: #343a40;
-  color: #fff;
-}
-.spinner-border {
-  width: 2.5rem;
-  height: 2.5rem;
-}
-.alert {
-  margin-top: 1rem;
-}
-.badge.bg-success {
-  background-color: #28a745;
-  color: #fff;
+.log-date {
   font-size: 1em;
-  padding: 0.5em 1em;
-  border-radius: 0.5em;
+  font-weight: normal;
+}
+.attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.05em;
+  margin-top: 0;
+}
+.attendance-table th, .attendance-table td {
+  border: 1px solid #e0e0e0;
+  padding: 10px 12px;
+  text-align: center;
+}
+.attendance-table th {
+  background: #FFA500; /* this was supposed to be the header color */
+  color: #333;
+  font-weight: bold;
+}
+.attendance-table tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* Responsive tweaks */
+@media (max-width: 900px) {
+  .attendance-log-header, .attendance-table th, .attendance-table td {
+    font-size: 0.95em;
+    padding: 8px 6px;
+  }
 }
