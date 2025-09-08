@@ -1,55 +1,57 @@
-<h2>Room Schedule Grid Editor</h2>
-<label>
-  Room:
-  <input [(ngModel)]="room" placeholder="e.g. MPO305">
-  <button (click)="loadSchedule()">Load</button>
-  <button (click)="deleteSchedule()" style="margin-left:8px;">Delete Schedule</button>
-</label>
-<p *ngIf="message">{{message}}</p>
 
-<!-- Input fields for new entry -->
-<div class="inputs">
-  <label>
-    Course:
-    <input [(ngModel)]="courseCode" placeholder="Course Code">
-  </label>
-  <label>
-    Section:
-    <input [(ngModel)]="section" placeholder="Section">
-  </label>
-  <label>
-    Professor:
-    <input [(ngModel)]="professor" placeholder="Professor">
-  </label>
+<div class="room-schedule-editor-main">
+  <div class="editor-header">Scheduler Editor</div>
+  <div class="editor-inputs">
+    <div class="editor-field">
+      <label>Room Number</label>
+      <input [(ngModel)]="room" placeholder="e.g., 305">
+    </div>
+    <div class="editor-field">
+      <label>Course Code</label>
+      <input [(ngModel)]="courseCode" placeholder="e.g., IT123L">
+    </div>
+    <div class="editor-field">
+      <label>Section</label>
+      <input [(ngModel)]="section" placeholder="e.g., AM1">
+    </div>
+    <div class="editor-field">
+      <label>Professor</label>
+      <input [(ngModel)]="professor" placeholder="e.g., Lastname">
+    </div>
+    <div class="editor-actions">
+      <button (click)="addSchedule()">ADD</button>
+      <button (click)="loadSchedule()">LOAD</button>
+      <button (click)="deleteSchedule()">DELETE</button>
+    </div>
+  </div>
+  <div *ngIf="message" class="editor-message">{{message}}</div>
+  <div class="schedule-grid">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th *ngFor="let day of days">{{ day }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let slot of timeSlots; let row = index">
+          <td class="time-label">{{ slot }}</td>
+          <td *ngFor="let day of days; let col = index">
+            <div class="cell">
+              <ng-container *ngIf="grid[row][col]?.courseCode">
+                <b>{{ grid[row][col].courseCode }}</b><br>
+                <span>{{ grid[row][col].section }}</span><br>
+                <span>{{ grid[row][col].professor }}</span>
+                <button class="cell-clear" (click)="clearCell(row, col); $event.stopPropagation()">✕</button>
+              </ng-container>
+              <ng-container *ngIf="!grid[row][col]?.courseCode">
+                <span class="add" (click)="fillCell(row, col)">+</span>
+              </ng-container>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <button class="editor-save-btn" (click)="saveSchedule()">Save Schedule</button>
 </div>
-
-<div class="schedule-grid">
-  <table>
-    <thead>
-      <tr>
-        <th>Schedule</th>
-        <th *ngFor="let day of days">{{ day }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let slot of timeSlots; let row = index">
-        <td>{{ slot }}</td>
-        <td *ngFor="let day of days; let col = index">
-          <div class="cell">
-            <ng-container *ngIf="grid[row][col]?.courseCode">
-              <b>{{ grid[row][col].courseCode }}</b><br>
-              <span>{{ grid[row][col].section }}</span><br>
-              <span>{{ grid[row][col].professor }}</span>
-              <button (click)="clearCell(row, col); $event.stopPropagation()">✕</button>
-            </ng-container>
-            <ng-container *ngIf="!grid[row][col]?.courseCode">
-              <span class="add" (click)="fillCell(row, col)">+</span>
-            </ng-container>
-          </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-
-<button (click)="saveSchedule()" style="margin-top:16px;">Save Schedule</button>

@@ -1,43 +1,147 @@
-.schedule-grid table {
-  border-collapse: collapse;
-  width: 100%;
-}
-.schedule-grid th, .schedule-grid td {
-  border: 1px solid #ccc;
-  text-align: center;
-  min-width: 120px;
-  min-height: 60px;
-  position: relative;
-  vertical-align: top;
-}
-.cell {
-  cursor: pointer;
-  padding: 6px;
-  min-height: 60px;
-}
-.cell .add {
-  color: #aaa;
-  font-size: 24px;
-}
-.editor {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+
+.room-schedule-editor-main {
   background: #fff;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  padding: 0 32px 32px 32px;
 }
-.editor form {
+.editor-header {
+  font-size: 2em;
+  font-weight: bold;
+  color: #222;
+  margin-top: 24px;
+  margin-bottom: 18px;
+}
+.editor-inputs {
+  display: flex;
+  gap: 18px;
+  align-items: flex-end;
+  margin-bottom: 18px;
+}
+.editor-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.editor input {
-  padding: 4px;
+.editor-field label {
+  font-weight: bold;
+  font-size: 1em;
+  color: #333;
+}
+.editor-field input {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1em;
+  outline: none;
+  min-width: 120px;
+}
+.editor-field input:focus {
+  border-color: #8a3f3f;
+  box-shadow: 0 0 4px rgba(138,63,63,0.2);
+}
+.editor-actions {
+  display: flex;
+  gap: 8px;
+}
+.editor-actions button {
+  background: #8a3f3f;
+  color: #FFD700;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-weight: bold;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.editor-actions button:hover {
+  background: #a85c5c;
+}
+.editor-message {
+  color: #a85c5c;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+.schedule-grid {
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+.schedule-grid table {
+  border-collapse: collapse;
+  width: 100%;
+  background: #f8f8f8;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  overflow: hidden;
+}
+.schedule-grid th, .schedule-grid td {
+  border: 1px solid #bbb;
+  text-align: center;
+  min-width: 100px;
+  min-height: 48px;
+  position: relative;
+  vertical-align: top;
+  font-size: 1em;
+}
+.schedule-grid th {
+  background: #e0e0e0;
+  color: #333;
+  font-weight: bold;
+  font-size: 1.05em;
+}
+.time-label {
+  background: #f4f4f4;
+  color: #333;
+  font-weight: bold;
+  font-size: 1em;
+}
+.cell {
+  cursor: pointer;
+  padding: 6px;
+  min-height: 48px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: background 0.2s;
+}
+.cell:hover {
+  background: #f0e6e6;
+}
+.cell .add {
+  color: #aaa;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.cell-clear {
+  background: #a85c5c;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 1em;
+  cursor: pointer;
+  margin-top: 4px;
   margin-bottom: 2px;
 }
-.editor button {
-  margin: 2px 0;
+.cell-clear:hover {
+  background: #8a3f3f;
+}
+.editor-save-btn {
+  background: #FFA500;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 28px;
+  font-weight: bold;
+  font-size: 1.1em;
+  cursor: pointer;
+  margin-top: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  transition: background 0.2s;
+}
+.editor-save-btn:hover {
+  background: #FFD700;
 }
