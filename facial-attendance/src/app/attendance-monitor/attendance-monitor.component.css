@@ -1,118 +1,64 @@
-.attendance-page {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  width: 100%;
+
+body, html {
+  height: 100%;
   margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+  background-color: #f0f2f5;
 }
 
-.top-bar {
-  background: #a85c5c;
-  color: white;
-  text-align: center;
-  padding: 10px;
-  font-size: 24px;
-}
-
-.main-content {
-  display: flex;
-  flex: 1;
-  width: 100%;
-}
-
-.left-panel, .right-panel {
+.sidebar {
+  width: 200px;
+  background-color: #8B0000;
   padding: 20px;
-}
-
-.left-panel {
-  flex: 2;
-  background: #f0f0f0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+  position: fixed; 
+  height: 100vh;
 }
 
-.clock {
-  font-size: 40px;
-  margin-bottom: 20px;
+.sidebar .logo {
+  padding-bottom: 20px;
 }
 
-.webcam {
-  border: 5px solid #d9a3a3;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 20px;
+.sidebar a {
+  color: yellow;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 10px 15px;
+  border-radius: 5px;
+  transition: background-color 0.3s;
 }
 
-.right-panel {
-  flex: 1;
-  background: #fff;
+.sidebar a:hover {
+  background-color: #a52a2a;
 }
 
-.right-panel h2 {
-  background: #444;
-  color: white;
-  padding: 10px;
+.sidebar a.active {
+  background-color: #8B4513;
 }
 
-table {
-  width: 100%;
-}
 
-td, th {
-  padding: 8px;
-}
-
-.present {
-  color: green;
-}
-
-.late {
-  color: orange;
-}
-
-.absent {
-  color: red;
-}
-
-.message {
-  margin-top: 10px;
-  color: #a85c5c;
-}
-
-.dropdown-list {
-  position: absolute;
-  background: #fff;
-  border: 1px solid #ccc;
-  width: 120px;
-  max-height: 150px;
+.content-area {
+  margin-left: 150px; 
+  padding: 30px;
   overflow-y: auto;
-  z-index: 10;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  min-height: 100vh;
+  width: calc(100% - 200px); 
 }
 
-.dropdown-list li {
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-.dropdown-list li:hover {
-  background: #a85c5c;
-  color: #fff;
-}
 
 .top-bar {
-  background: #8a3f3f;
+  background: #a85c5c;
+  color: white;
   padding: 12px 24px;
   display: flex;
   gap: 2rem;
-  align-items: flex-end;
-  color: white;
+  align-items: center;
   font-family: Arial, sans-serif;
+  margin-bottom: 20px;
+  border-radius: 8px;
 }
 
 .top-bar .field {
@@ -166,4 +112,141 @@ td, th {
 .dropdown-list li:hover {
   background: #8a3f3f;
   color: white;
+}
+
+/* Main Content Section (Below the top bar) */
+.main-content {
+  display: flex;
+  flex: 1;
+  gap: 20px;
+}
+
+.left-panel {
+  flex: 2;
+  background: #fff;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
+
+.clock {
+  font-size: 40px;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.webcam {
+  border: 5px solid #d9a3a3;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  width: 100%;
+  height: 400px;
+  position: relative;
+}
+
+.webcam webcam, .webcam img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.webcam .capture-button {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  padding: 10px 15px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  cursor: pointer;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.button-group button {
+  padding: 10px 15px;
+  font-size: 14px;
+  font-weight: bold;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.button-group .mark-btn {
+  background: #28a745;
+  color: white;
+}
+
+.button-group .start-btn {
+  background: #007bff;
+  color: white;
+}
+
+.button-group .stop-btn {
+  background: #dc3545;
+  color: white;
+}
+
+.right-panel {
+  flex: 1;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  padding: 0;
+  border-radius: 8px;
+}
+
+.right-panel h2 {
+  background: #444;
+  color: white;
+  padding: 15px;
+  margin: 0;
+  font-size: 18px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.attendance-table {
+  padding: 15px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+td, th {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+th {
+  background-color: #f2f2f2;
+}
+
+.present {
+  color: green;
+}
+
+.late {
+  color: orange;
+}
+
+.absent {
+  color: red;
+}
+
+.message {
+  margin-top: 15px;
+  color: #a85c5c;
+  font-weight: bold;
 }

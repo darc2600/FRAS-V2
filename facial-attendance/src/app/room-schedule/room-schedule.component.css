@@ -3,6 +3,7 @@
   background: #fff;
   min-height: 100vh;
   font-family: Arial, sans-serif;
+  margin-left: 240px;
   padding: 0 32px 32px 32px;
 }
 .viewer-header {

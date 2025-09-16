@@ -4,6 +4,7 @@
   min-height: 100vh;
   font-family: Arial, sans-serif;
   padding: 0 32px 32px 32px;
+  margin-left: 240px;
 }
 .editor-header {
   font-size: 2em;

@@ -1,93 +1,86 @@
-<div class="page">
-  <header class="topbar">
-    <h1>Student Facial Recognition Registration</h1>
-    <div class="hint">Allow camera permissions. Capture N images, review, then submit.</div>
-  </header>
+<div class="main-layout">
+  <main class="content-area">
+    <div class="page">
+      <header class="topbar registration-header">
+        <h1>Student Facial Recognition Registration</h1>
+        <div class="hint">Allow camera permissions. Capture N images, review, then submit.</div>
+      </header>
 
-  <div class="grid">
-    <!-- LEFT: Camera + Capture -->
-    <section class="camera">
-      <div class="video-wrap">
-        <video #videoEl playsinline></video>
+      <div class="grid">
+        <section class="camera">
+          <div class="video-wrap">
+            <video #videoEl playsinline></video>
+          </div>
+
+          <div class="angle-guide">
+            <div class="angle-label">Current Angle: <span class="angle-label-bordered">{{ currentAngleLabel }}</span></div>
+            <button class="btn" type="button" (click)="captureAngle()" [disabled]="!stream || isCapturing || faceAngles[currentAngleIndex].captured">
+              Capture {{ currentAngleLabel }}
+            </button>
+            <button class="btn danger" type="button" (click)="resetAngles()">Reset Angles</button>
+            <div class="angle-progress">
+              <span *ngFor="let angle of faceAngles; let i = index" [class.captured]="angle.captured">
+                {{ angle.label }}<span *ngIf="i < faceAngles.length - 1">, </span>
+              </span>
+            </div>
+          </div>
+
+          <div class="gallery" *ngIf="previews.length">
+            <div class="thumb" *ngFor="let p of previews; let i = index">
+              <img [src]="p.url" alt="shot {{i+1}}">
+              <button class="x" (click)="removeShot(i)" title="Remove">×</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="form">
+          <form [formGroup]="form" (ngSubmit)="submit()">
+            <label>
+              <span>Student ID</span>
+              <input formControlName="studentId" placeholder="e.g., 2023001">
+            </label>
+            <label>
+              <span>Last Name</span>
+              <input formControlName="lastName" placeholder="e.g., Doe">
+            </label>
+            <label>
+              <span>First Name</span>
+              <input formControlName="firstName" placeholder="e.g., John">
+            </label>
+            <label>
+              <span>Email</span>
+              <input formControlName="email" placeholder="e.g., john.doe@email.com" type="email">
+            </label>
+            <label>
+              <span># of Images</span>
+              <input type="number" formControlName="imageCount" min="1" max="50">
+            </label>
+            <div class="progress" *ngIf="submitting">
+              <div class="bar" [style.width.%]="uploadProgress"></div>
+            </div>
+            <button class="btn primary block" type="submit" [disabled]="submitting || isCapturing">
+              {{ submitting ? 'Submitting…' : 'Submit Registration' }}
+            </button>
+          </form>
+
+          <div class="schedule-section">
+            <h3>Class Schedule</h3>
+            <div class="schedule-entry">
+              <input [(ngModel)]="scheduleCourseCode" name="scheduleCourseCode" placeholder="Course Code" maxlength="20">
+              <input [(ngModel)]="scheduleSection" name="scheduleSection" placeholder="Section" maxlength="20">
+              <input [(ngModel)]="scheduleRoom" name="scheduleRoom" placeholder="Room" maxlength="20">
+              <button class="btn" type="button" (click)="addScheduleEntry()">Add</button>
+            </div>
+            <ul class="schedule-list">
+              <li *ngFor="let entry of schedule; let i = index">
+                <span>{{entry.course_code}} - {{entry.section}} ({{entry.room}})</span>
+                <button class="btn danger" type="button" (click)="removeScheduleEntry(i)">Remove</button>
+              </li>
+            </ul>
+          </div>
+        </section>
       </div>
-
-      <div class="controls">
-        <button class="btn" (click)="captureOne()" [disabled]="!stream || isCapturing">Capture 1</button>
-        <button class="btn primary" (click)="captureSeries()" [disabled]="!stream || isCapturing">
-          {{ isCapturing ? 'Capturing…' : 'Capture Series' }}
-        </button>
-        <button class="btn danger" (click)="clearAll()" [disabled]="previews.length===0">Clear All</button>
-      </div>
-
-      <div class="gallery" *ngIf="previews.length">
-        <div class="thumb" *ngFor="let p of previews; let i = index">
-          <img [src]="p.url" alt="shot {{i+1}}">
-          <button class="x" (click)="removeShot(i)" title="Remove">×</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- RIGHT: Registration Form + Schedule -->
-    <section class="form">
-      <form [formGroup]="form" (ngSubmit)="submit()">
-        <label>
-          <span>Student ID</span>
-          <input formControlName="studentId" placeholder="e.g., 2023001">
-        </label>
-        <label>
-          <span>Last Name</span>
-          <input formControlName="lastName" placeholder="e.g., Doe">
-        </label>
-        <label>
-          <span>First Name</span>
-          <input formControlName="firstName" placeholder="e.g., John">
-        </label>
-        <label>
-          <span>Email</span>
-          <input formControlName="email" placeholder="e.g., john.doe@email.com" type="email">
-        </label>
-        <label>
-          <span># of Images</span>
-          <input type="number" formControlName="imageCount" min="1" max="50">
-        </label>
-        <div class="progress" *ngIf="submitting">
-          <div class="bar" [style.width.%]="uploadProgress"></div>
-        </div>
-        <button class="btn primary block" type="submit" [disabled]="submitting || isCapturing">
-          {{ submitting ? 'Submitting…' : 'Submit Registration' }}
-        </button>
-      </form>
-
-      <div class="schedule-section">
-        <h3>Class Schedule</h3>
-        <div class="schedule-entry">
-          <input [(ngModel)]="scheduleCourseCode" name="scheduleCourseCode" placeholder="Course Code" maxlength="20">
-          <input [(ngModel)]="scheduleSection" name="scheduleSection" placeholder="Section" maxlength="20">
-          <input [(ngModel)]="scheduleRoom" name="scheduleRoom" placeholder="Room" maxlength="20">
-          <button class="btn" type="button" (click)="addScheduleEntry()">Add</button>
-        </div>
-        <ul class="schedule-list">
-          <li *ngFor="let entry of schedule; let i = index">
-            <span>{{entry.course_code}} - {{entry.section}} ({{entry.room}})</span>
-            <button class="btn danger" type="button" (click)="removeScheduleEntry(i)">Remove</button>
-          </li>
-        </ul>
-      </div>
-
-      <!-- ANGLE CAPTURE UI -->
-      <div class="angle-guide">
-        <div class="angle-label">Current Angle: <b>{{ currentAngleLabel }}</b></div>
-        <button class="btn" type="button" (click)="captureAngle()" [disabled]="!stream || isCapturing || faceAngles[currentAngleIndex].captured">
-          Capture {{ currentAngleLabel }}
-        </button>
-        <button class="btn danger" type="button" (click)="resetAngles()">Reset Angles</button>
-        <div class="angle-progress">
-          <span *ngFor="let angle of faceAngles; let i = index" [class.captured]="angle.captured">
-            {{ angle.label }}<span *ngIf="i < faceAngles.length - 1">, </span>
-          </span>
-        </div>
-      </div>
-    </section>
-  </div>
-  <canvas #canvasEl class="hidden-canvas"></canvas>
+      <canvas #canvasEl class="hidden-canvas"></canvas>
+    </div>
+  </main>
 </div>
