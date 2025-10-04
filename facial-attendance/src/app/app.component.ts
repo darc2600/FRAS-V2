@@ -12,6 +12,11 @@ export class AppComponent {
   title = 'facial-attendance';
   sidebarOpen = false;
 
+  get hideSidebar(): boolean {
+    const currentUrl = window.location.pathname;
+    return currentUrl.includes('/login') || currentUrl.includes('/registration');
+  }
+
   toggleSidebar() {
     this.sidebarOpen = !this.sidebarOpen;
   }

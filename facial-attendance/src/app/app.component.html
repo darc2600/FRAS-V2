@@ -1,6 +1,6 @@
 <div class="app-shell">
-  <app-navbar></app-navbar>
-  <div class="burger-container">
+  <app-navbar *ngIf="!hideSidebar"></app-navbar>
+  <div *ngIf="!hideSidebar" class="burger-container">
     <button class="burger-btn" (click)="toggleSidebar()">
       <span *ngIf="!sidebarOpen">&#9776;</span>
       <span *ngIf="sidebarOpen">&#10005;</span>
