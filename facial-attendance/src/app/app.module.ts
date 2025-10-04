@@ -13,6 +13,8 @@ import { NavbarComponent } from './components/navbar/navbar.component';
 import { AttendanceMonitorComponent } from './attendance-monitor/attendance-monitor.component';
 import { AttendanceLogsComponent } from './attendance-logs/attendance-logs.component';
 import { RoomScheduleComponent } from './room-schedule/room-schedule.component';
+import { RegisterStudentsComponent } from './register-students/register-students.component';
+import { LoginComponent } from './login/login.component';
 import { RegistrationComponent } from './registration/registration.component';
 import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.component';
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
@@ -27,10 +29,12 @@ import { ProfileSidebarComponent } from './components/profile-sidebar/profile-si
     AttendanceMonitorComponent,
     AttendanceLogsComponent,
     RoomScheduleComponent,
-    RegistrationComponent,
+    RegisterStudentsComponent,
     ScheduleUploadComponent,
     RoomScheduleEditorComponent,
     ProfileSidebarComponent
+    ,LoginComponent
+    ,RegistrationComponent
   ],
   imports: [
   BrowserModule,

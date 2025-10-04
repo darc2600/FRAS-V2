@@ -1,13 +1,11 @@
-<div class="registration-container">
-  <h2>Register</h2>
-  <form (ngSubmit)="register()">
+<div class="login-container">
+  <h2>Login</h2>
+  <form (ngSubmit)="login()">
     <label>Username</label>
     <input type="text" [(ngModel)]="username" name="username" required>
     <label>Password</label>
     <input type="password" [(ngModel)]="password" name="password" required>
-    <label>Email</label>
-    <input type="email" [(ngModel)]="email" name="email" required>
-    <button type="submit">Register</button>
+    <button type="submit">Login</button>
     <div class="error" *ngIf="error">{{ error }}</div>
   </form>
 </div>
