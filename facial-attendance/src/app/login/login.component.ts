@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { LoginService } from './login.service';
 
 @Component({
   selector: 'app-login',
@@ -9,14 +10,29 @@ export class LoginComponent {
   username = '';
   password = '';
   error = '';
+  success = '';
+
+  constructor(private loginService: LoginService) {}
 
   login() {
-    if (this.username === 'admin' && this.password === 'admin') {
+    if (this.username && this.password) {
       this.error = '';
-      // Redirect or show success
-      alert('Login successful!');
+      this.success = '';
+      this.loginService.login({
+        username: this.username,
+        password: this.password
+      }).subscribe({
+        next: () => {
+          this.success = 'Login successful!';
+          this.username = '';
+          this.password = '';
+        },
+        error: err => {
+          this.error = err?.error?.message || 'Invalid credentials';
+        }
+      });
     } else {
-      this.error = 'Invalid credentials';
+      this.error = 'Username and password required';
     }
   }
 }

@@ -1,5 +1,9 @@
+.success {
+  color: green;
+  margin-top: 10px;
+}
 .registration-container {
-  max-width: 300px;
+  max-width: 320px;
   margin: 40px auto;
   padding: 20px;
   border: 1px solid #ccc;

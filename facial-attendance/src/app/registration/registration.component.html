@@ -8,6 +8,7 @@
     <label>Email</label>
     <input type="email" [(ngModel)]="email" name="email" required>
     <button type="submit">Register</button>
-    <div class="error" *ngIf="error">{{ error }}</div>
+  <div class="error" *ngIf="error">{{ error }}</div>
+  <div class="success" *ngIf="success">{{ success }}</div>
   </form>
 </div>
