@@ -1,35 +1,39 @@
 
-
-<h2>Room Schedule Viewer</h2>
-<label>
-  Room:
-  <input [(ngModel)]="room" placeholder="e.g. MPO305">
-  <button (click)="loadSchedule()">Load</button>
-</label>
-<p *ngIf="message">{{message}}</p>
-
-<div class="schedule-grid">
-  <table>
-    <thead>
-      <tr>
-        <th>Schedule</th>
-        <th *ngFor="let day of days">{{ day }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let slot of timeSlots; let row = index">
-        <td>{{ slot }}</td>
-        <td *ngFor="let day of days; let col = index">
-          <div class="cell">
-            <ng-container *ngIf="grid[row][col]">
-              <b>{{ grid[row][col].courseCode }}</b><br>
-              <span>{{ grid[row][col].section }}</span><br>
-              <span>{{ grid[row][col].professor }}</span>
-            </ng-container>
-          </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+<div class="room-schedule-viewer-main">
+  <div class="viewer-header">Room Schedule Viewer</div>
+  <div class="viewer-inputs">
+    <div class="viewer-field">
+      <label>Room Number</label>
+      <input [(ngModel)]="room" placeholder="e.g., 305">
+    </div>
+    <div class="viewer-actions">
+      <button (click)="loadSchedule()">LOAD</button>
+    </div>
+  </div>
+  <div *ngIf="message" class="viewer-message">{{message}}</div>
+  <div class="schedule-grid">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th *ngFor="let day of days">{{ day }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let slot of timeSlots; let row = index">
+          <td class="time-label">{{ slot }}</td>
+          <td *ngFor="let day of days; let col = index">
+            <div class="cell">
+              <ng-container *ngIf="grid[row][col]">
+                <b>{{ grid[row][col].courseCode }}</b><br>
+                <span>{{ grid[row][col].section }}</span><br>
+                <span>{{ grid[row][col].professor }}</span>
+              </ng-container>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 

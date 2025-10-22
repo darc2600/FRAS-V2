@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div class="attendance-logs-main">
   <div class="sidebar">
     <!-- You can add a logo or navigation here if needed -->
@@ -67,6 +68,45 @@
           </table>
         </div>
       </div>
+=======
+
+<div class="attendance-logs-main">
+  <h1 class="logs-header">Logs</h1>
+  <div class="top-bar">
+    <label>Date:
+      <select [(ngModel)]="selectedDate">
+        <option *ngFor="let d of availableDates" [value]="d">{{d}}</option>
+      </select>
+    </label>
+    <label>Class:
+      <select [(ngModel)]="selectedClass">
+        <option *ngFor="let c of availableClasses" [value]="c">{{c}}</option>
+      </select>
+    </label>
+    <span class="time-display">{{ currentTime }}</span>
+  </div>
+  <div class="attendance-log-box">
+    <div class="attendance-log-header">
+      Attendance Log - {{ selectedClass || 'XXX' }} <span class="log-date">Date: {{ selectedDate || 'XX-XX-XX' }}</span>
+>>>>>>> bc2d6213784b3446edb8ca79cc6b289a2f7e87b0
     </div>
+    <table class="attendance-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Student No.</th>
+          <th>Status</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let log of logs">
+          <td>{{ log.name }}</td>
+          <td>{{ log.studentNo }}</td>
+          <td>{{ log.status }}</td>
+          <td>{{ log.time }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
