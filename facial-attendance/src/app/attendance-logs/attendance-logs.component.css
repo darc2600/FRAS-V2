@@ -2,15 +2,9 @@
   background: #fff;
   min-height: 100vh;
   font-family: Arial, sans-serif;
-<<<<<<< HEAD
-  padding-left: 0;
-}
-
-=======
   margin-left: 240px;
   padding: 0 32px 32px 32px;
 }
->>>>>>> bc2d6213784b3446edb8ca79cc6b289a2f7e87b0
 .logs-header {
   font-size: 2em;
   margin-bottom: 20px;
@@ -57,16 +51,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-<<<<<<< HEAD
-  margin-bottom: 0;
-=======
->>>>>>> bc2d6213784b3446edb8ca79cc6b289a2f7e87b0
 }
 .log-date {
   font-size: 1em;
   font-weight: normal;
-<<<<<<< HEAD
-=======
 }
 .attendance-table {
   width: 100%;
@@ -85,7 +73,6 @@
 }
 .attendance-table tr:nth-child(even) {
   background: #fafafa;
->>>>>>> bc2d6213784b3446edb8ca79cc6b289a2f7e87b0
 }
 .attendance-table {
   width: 100%;
