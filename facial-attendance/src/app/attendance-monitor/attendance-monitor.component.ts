@@ -1,5 +1,5 @@
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
 import { WebcamImage, WebcamModule } from 'ngx-webcam';
@@ -12,7 +12,7 @@ import { NavbarComponent } from '../components/navbar/navbar.component';
   templateUrl: './attendance-monitor.component.html',
   styleUrls: ['./attendance-monitor.component.css'],
 })
-export class AttendanceMonitorComponent implements OnInit {
+export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   courseCode = '';
   section = '';
   room = '';
@@ -47,12 +47,30 @@ export class AttendanceMonitorComponent implements OnInit {
   lastRecognizedId: string | null = null;
   lastRecognizedTime: number = 0;
 
+  // --- New properties for UI improvements ---
+  isCapturing = false;
+
   constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.updateClock();
     setInterval(() => this.updateClock(), 1000);
     this.fetchRooms();
+
+    // Add keyboard event listener for spacebar
+    document.addEventListener('keydown', this.handleKeyDown);
+  }
+
+  ngOnDestroy() {
+    // Clean up the keyboard event listener
+    document.removeEventListener('keydown', this.handleKeyDown);
+  }
+
+  private handleKeyDown = (event: KeyboardEvent) => {
+    if (event.code === 'Space' && !event.repeat) {
+      event.preventDefault();
+      this.captureAndMarkAttendance();
+    }
   }
 
   fetchRooms() {
@@ -149,7 +167,15 @@ export class AttendanceMonitorComponent implements OnInit {
   }
 
   updateClock() {
-    this.currentTime = new Date().toLocaleTimeString();
+    const now = new Date();
+    const timeString = now.toLocaleTimeString();
+    const dateString = now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    this.currentTime = `${dateString}\n${timeString}`;
   }
 
   public get triggerObservable(): Observable<void> {
@@ -158,6 +184,14 @@ export class AttendanceMonitorComponent implements OnInit {
 
   public triggerSnapshot(): void {
     this.trigger.next();
+  }
+
+  toggleAutoRecognition() {
+    if (this.autoRecognitionActive) {
+      this.stopAutoRecognition();
+    } else {
+      this.startAutoRecognition();
+    }
   }
 
   startAutoRecognition() {
@@ -178,8 +212,13 @@ export class AttendanceMonitorComponent implements OnInit {
 
   public handleImage(webcamImage: WebcamImage): void {
     this.webcamImage = webcamImage;
+    this.isCapturing = false; // Reset capturing status
+
     if (this.autoRecognitionActive) {
       this.autoMarkAttendance();
+    } else {
+      // For manual capture, automatically mark attendance
+      this.performAttendanceRecognition();
     }
   }
 
@@ -206,7 +245,7 @@ export class AttendanceMonitorComponent implements OnInit {
     );
   }
 
-  markAttendance() {
+  performAttendanceRecognition() {
     if (!this.webcamImage) {
       this.message = 'Please capture an image first.';
       return;
@@ -227,6 +266,16 @@ export class AttendanceMonitorComponent implements OnInit {
       },
       err => this.message = 'Error connecting to backend.'
     );
+  }
+
+  captureAndMarkAttendance() {
+    if (!this.courseSection || !this.room) {
+      this.message = 'Please select a room and course-section.';
+      return;
+    }
+
+    this.isCapturing = true;
+    this.triggerSnapshot();
   }
 
   fetchLogs() {

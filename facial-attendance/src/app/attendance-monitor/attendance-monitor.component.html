@@ -1,7 +1,6 @@
-<div class="main-layout">
-  <main class="content-area">
-    <div class="attendance-page">
-      <header class="top-bar">
+<main class="content-area">
+  <div class="attendance-page">
+    <header class="top-bar">
         <div style="display: flex; gap: 1rem; align-items: center;">
           <label>
             Floor:
@@ -30,12 +29,27 @@
           <div class="clock">{{ currentTime }}</div>
           <div class="webcam">
             <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)"></webcam>
-            <button class="capture-button" (click)="triggerSnapshot()">Capture Image</button>
+            <div class="status-indicators">
+              <div class="status-indicator" [class.active]="autoRecognitionActive">
+                <span class="indicator-dot"></span>
+                Auto Recognition Active
+              </div>
+            </div>
           </div>
           <div class="button-group">
-            <button class="mark-btn" (click)="markAttendance()">Mark Attendance</button>
-            <button class="start-btn" (click)="startAutoRecognition()" [disabled]="autoRecognitionActive">Start Auto Recognition</button>
-            <button class="stop-btn" (click)="stopAutoRecognition()" [disabled]="!autoRecognitionActive">Stop Auto Recognition</button>
+            <button (click)="captureAndMarkAttendance()" [disabled]="isCapturing">
+              <span *ngIf="isCapturing">Capturing...</span>
+              <span *ngIf="!isCapturing">
+                Capture & Mark Attendance
+                <small class="space-hint">(Space)</small>
+              </span>
+            </button>
+            <button class="auto-recognition-btn"
+                    [class.running]="autoRecognitionActive"
+                    (click)="toggleAutoRecognition()">
+              <span *ngIf="!autoRecognitionActive">Start Auto Recognition</span>
+              <span *ngIf="autoRecognitionActive">Stop Auto Recognition</span>
+            </button>
           </div>
           <div class="message">{{ message }}</div>
         </div>
@@ -63,4 +77,3 @@
       </div>
     </div>
   </main>
-</div>
