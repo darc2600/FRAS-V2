@@ -1,27 +1,20 @@
-import sqlite3
+from services.db import get_connection
 import os
 import shutil
 from fastapi import UploadFile, HTTPException
 from typing import List
 
-DB_PATH = "attendance.db"
 
 class RegistrationRepository:
     async def register_student(self, student_number: str, last_name: str, first_name: str, email: str, created_at: str, schedule_entries: list, images: List[UploadFile]):
         face_data_path = os.path.join("dataset", student_number)
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             # Upsert student info: update if exists, insert if not
             cursor.execute('''
                 INSERT INTO students (student_number, last_name, first_name, email, face_data_path, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(student_number) DO UPDATE SET
-                    last_name=excluded.last_name,
-                    first_name=excluded.first_name,
-                    email=excluded.email,
-                    face_data_path=excluded.face_data_path,
-                    created_at=excluded.created_at
             ''', (student_number, last_name, first_name, email, face_data_path, created_at))
             conn.commit()
 
@@ -62,6 +55,7 @@ class RegistrationRepository:
             saved_files.append(img_path)
 
         return {"status": "success", "message": "Student registered and images saved.", "image_paths": saved_files}
+
 
 def get_registration_repository():
     return RegistrationRepository()

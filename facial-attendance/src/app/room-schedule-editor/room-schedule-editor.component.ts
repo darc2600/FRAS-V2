@@ -23,15 +23,16 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
   styleUrls: ['./room-schedule-editor.component.css'],
 })
 export class RoomScheduleEditorComponent {
+  addSchedule() {
+    this.message = 'Add button clicked. Implement logic as needed.';
+  }
   room = '';
   message = '';
   days = DAYS;
   timeSlots = TIME_SLOTS;
 
-  // 2D grid: [timeSlot][day]
   grid: ScheduleCell[][] = this.timeSlots.map(() => this.days.map(() => ({})));
 
-  // Input fields for new entry
   courseCode = '';
   section = '';
   professor = '';

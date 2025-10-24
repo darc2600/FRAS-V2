@@ -8,6 +8,11 @@ import { ApiService } from '../api.service';
   styleUrls: ['./attendance-logs.component.css'],
 })
 export class AttendanceLogsComponent implements OnInit {
+  selectedDate: string = '';
+  availableDates: string[] = [];
+  selectedClass: string = '';
+  availableClasses: string[] = [];
+  currentTime: string = '';
   availableFloors: number[] = [];
   selectedFloor: number | null = null;
   allRooms: any[] = [];
@@ -25,6 +30,14 @@ export class AttendanceLogsComponent implements OnInit {
   constructor(private api: ApiService) {}
 
   ngOnInit() {
+    // Sample: populate availableDates and availableClasses
+    this.availableDates = this.getRecentDates(7);
+    this.selectedDate = this.availableDates[0];
+    this.availableClasses = ['CS123-AM1', 'GED101-AM1', 'ED123-AM1'];
+    this.selectedClass = this.availableClasses[0];
+    this.updateClock();
+    setInterval(() => this.updateClock(), 1000);
+
     this.api.getRooms().subscribe(
       (rooms: any[]) => {
         this.allRooms = rooms;
@@ -39,6 +52,19 @@ export class AttendanceLogsComponent implements OnInit {
       },
       err => this.message = 'Error fetching rooms.'
     );
+  }
+  updateClock() {
+    this.currentTime = new Date().toLocaleTimeString();
+  }
+
+  getRecentDates(days: number): string[] {
+    const dates: string[] = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    return dates;
   }
 
   filterRoomsByFloor() {

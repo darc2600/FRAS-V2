@@ -2,9 +2,9 @@
   background: #fff;
   min-height: 100vh;
   font-family: Arial, sans-serif;
-  padding-left: 0;
+  margin-left: 240px;
+  padding: 0 32px 32px 32px;
 }
-
 .logs-header {
   font-size: 2em;
   margin-bottom: 20px;
@@ -51,11 +51,28 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0;
 }
 .log-date {
   font-size: 1em;
   font-weight: normal;
+}
+.attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.05em;
+}
+.attendance-table th, .attendance-table td {
+  border: 1px solid #ccc;
+  padding: 10px 12px;
+  text-align: center;
+}
+.attendance-table th {
+  background: #f4f4f4;
+  color: #333;
+  font-weight: bold;
+}
+.attendance-table tr:nth-child(even) {
+  background: #fafafa;
 }
 .attendance-table {
   width: 100%;
