@@ -17,12 +17,18 @@ class RecognitionRepository:
         try:
             with get_connection() as conn:
                 cursor = conn.cursor()
-                # Lookup students enrolled in the class (by course_code, section, room_id)
+                # Get course_id from course_code
+                cursor.execute('SELECT course_id FROM courses WHERE course_code = ?', (course_code,))
+                course_row = cursor.fetchone()
+                if not course_row:
+                    return RecognitionResponse(status="error", message="Course not found")
+                course_id = course_row[0]
+                # Lookup students enrolled in the class (by course_id, section, room_id)
                 cursor.execute('''
                     SELECT e.student_id FROM enrollments e
                     JOIN classes c ON e.class_id = c.class_id
-                    WHERE c.course_code = ? AND c.section = ? AND c.room_id = ?
-                ''', (course_code, section, room))
+                    WHERE c.course_id = ? AND c.section = ? AND c.room_id = ?
+                ''', (course_id, section, int(room)))
                 student_ids = [row[0] for row in cursor.fetchall()]
                 print(f"[DEBUG] student_ids: {student_ids}")
                 student_faces = {}
@@ -57,8 +63,8 @@ class RecognitionRepository:
                             # Find class_id for this attendance
                             cursor.execute('''
                                 SELECT class_id FROM classes
-                                WHERE course_code = ? AND section = ? AND room_id = ?
-                            ''', (course_code, section, room))
+                                WHERE course_id = ? AND section = ? AND room_id = ?
+                            ''', (course_id, section, int(room)))
                             class_row = cursor.fetchone()
                             if not class_row:
                                 print(f"[DEBUG] No class_id found for course_code={course_code}, section={section}, room={room}")

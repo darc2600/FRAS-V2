@@ -58,7 +58,8 @@ POSTGRES_TABLES_DDL = [
     """,
     """
     CREATE TABLE IF NOT EXISTS courses (
-        course_code VARCHAR(20) PRIMARY KEY,
+        course_id SERIAL PRIMARY KEY,
+        course_code VARCHAR(20) UNIQUE,
         course_name VARCHAR(100),
         units INTEGER,
         department TEXT,
@@ -67,46 +68,90 @@ POSTGRES_TABLES_DDL = [
     );
     """,
     """
-    CREATE TABLE IF NOT EXISTS rooms (
-        room_id VARCHAR(20) PRIMARY KEY,
-        floor_level INTEGER,
-        room_number VARCHAR(10),
-        building_name VARCHAR(50),
+    CREATE TABLE IF NOT EXISTS room_types (
+        room_type_id SERIAL PRIMARY KEY,
+        type_name VARCHAR(50) UNIQUE
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS campuses (
+        campus_id SERIAL PRIMARY KEY,
+        campus_name TEXT UNIQUE NOT NULL,
+        location TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """,
     """
+    CREATE TABLE IF NOT EXISTS buildings (
+        building_id SERIAL PRIMARY KEY,
+        building_name TEXT NOT NULL,
+        campus_id INTEGER NOT NULL REFERENCES campuses(campus_id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS rooms (
+        room_id SERIAL PRIMARY KEY,
+        room_number VARCHAR(20),
+        floor_level INTEGER,
+        campus_id INTEGER NOT NULL REFERENCES campuses(campus_id),
+        building_id INTEGER REFERENCES buildings(building_id),
+        room_type_id INTEGER REFERENCES room_types(room_type_id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS school_terms (
+        term_id SERIAL PRIMARY KEY,
+        school_year VARCHAR(20),
+        term INTEGER,
+        start_date DATE,
+        end_date DATE
+    );
+    """,
+    """
     CREATE TABLE IF NOT EXISTS classes (
-        class_id VARCHAR(20) PRIMARY KEY,
-        course_code VARCHAR(20),
-        room_id VARCHAR(20),
+        class_id SERIAL PRIMARY KEY,
+        course_id INTEGER,
+        room_id INTEGER,
         instructor_id INTEGER,
         section VARCHAR(10),
         day_of_week VARCHAR(10),
         start_time TIME,
         end_time TIME,
+        term_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(course_id) REFERENCES courses(course_id),
+        FOREIGN KEY(room_id) REFERENCES rooms(room_id),
+        FOREIGN KEY(instructor_id) REFERENCES instructors(instructor_id),
+        FOREIGN KEY(term_id) REFERENCES school_terms(term_id)
     );
     """,
     """
     CREATE TABLE IF NOT EXISTS enrollments (
         enrollment_id SERIAL PRIMARY KEY,
         student_id INTEGER,
-        class_id VARCHAR(20),
+        class_id INTEGER,
         enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(student_id) REFERENCES students(student_id),
+        FOREIGN KEY(class_id) REFERENCES classes(class_id)
     );
     """,
     """
     CREATE TABLE IF NOT EXISTS attendance_logs (
         log_id SERIAL PRIMARY KEY,
         student_id INTEGER,
-        class_id VARCHAR(20),
+        class_id INTEGER,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         status VARCHAR(20),
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(student_id) REFERENCES students(student_id),
+        FOREIGN KEY(class_id) REFERENCES classes(class_id)
     );
     """,
 ]

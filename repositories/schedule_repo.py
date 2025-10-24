@@ -38,12 +38,18 @@ class ScheduleRepository:
             return slots
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
+            cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
+            row = cursor.fetchone()
+            if not row:
+                return []
+            room_id = row[0]
             cursor.execute("""
-                SELECT c.course_code, c.section, i.last_name || ', ' || i.first_name as professor, c.day_of_week, c.start_time, c.end_time, c.instructor_id
+                SELECT co.course_code, c.section, i.last_name || ', ' || i.first_name as professor, c.day_of_week, c.start_time, c.end_time, c.instructor_id
                 FROM classes c
+                LEFT JOIN courses co ON c.course_id = co.course_id
                 LEFT JOIN instructors i ON c.instructor_id = i.instructor_id
                 WHERE c.room_id = ?
-            """, (room_code,))
+            """, (room_id,))
             schedule = []
             for row in cursor.fetchall():
                 courseCode, section, professor, day, startTime, endTime, instructorId = row
@@ -125,10 +131,7 @@ class ScheduleRepository:
 
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_code,))
-
-            # Insert room into rooms table if not exists, with floor_level and room_number
-            # Always set or update floor_level and room_number for the room
+            # Get or create room
             import re
             match = re.search(r"(\d+)$", room_code)
             if match:
@@ -137,33 +140,45 @@ class ScheduleRepository:
             else:
                 room_number = None
                 floor_level = None
-            cursor.execute("SELECT 1 FROM rooms WHERE room_id = ?", (room_code,))
-            if not cursor.fetchone():
+            cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
+            row = cursor.fetchone()
+            if not row:
                 cursor.execute(
-                    "INSERT INTO rooms (room_id, floor_level, room_number) VALUES (?, ?, ?)",
-                    (room_code, floor_level, room_number)
+                    "INSERT INTO rooms (floor_level, room_number, campus_id, building_id) VALUES (?, ?, 1, 1)",
+                    (floor_level, room_number)
                 )
+                room_id = cursor.lastrowid
             else:
+                room_id = row[0]
                 cursor.execute(
-                    "UPDATE rooms SET floor_level = ?, room_number = ? WHERE room_id = ?",
-                    (floor_level, room_number, room_code)
+                    "UPDATE rooms SET floor_level = ?, room_number = ?, campus_id = 1, building_id = 1 WHERE room_id = ?",
+                    (floor_level, room_number, room_id)
                 )
+            cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_id,))
 
             for entry in merged:
-                class_id = f"{entry.get('courseCode','')}_{entry.get('section','')}_{room_code}_{entry.get('day','')}"
+                course_code = entry.get('courseCode','')
+                # Get course_id from course_code
+                cursor.execute('SELECT course_id FROM courses WHERE course_code = ?', (course_code,))
+                course_row = cursor.fetchone()
+                if not course_row:
+                    continue  # Skip if course not found
+                course_id = course_row[0]
+                class_id = f"{course_code}_{entry.get('section','')}_{room_code}_{entry.get('day','')}"
                 instructor_id = entry.get('instructorId') or None
                 cursor.execute("""
-                    INSERT INTO classes (class_id, course_code, section, room_id, instructor_id, day_of_week, start_time, end_time)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO classes (class_id, course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     class_id,
-                    entry.get('courseCode',''),
+                    course_id,
                     entry.get('section',''),
-                    room_code,
+                    room_id,
                     instructor_id,
                     entry.get('day',''),
                     entry.get('startTime',''),
-                    entry.get('endTime','')
+                    entry.get('endTime',''),
+                    None  # term_id
                 ))
             conn.commit()
         return ScheduleResponse(schedule=merged)
@@ -171,7 +186,7 @@ class ScheduleRepository:
     async def delete_room_schedule(self, room_code: str):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_code,))
+            cursor.execute("DELETE FROM classes WHERE room_id IN (SELECT room_id FROM rooms WHERE room_number = ?)", (room_code,))
             conn.commit()
         return {"detail": "Room schedule deleted"}
 

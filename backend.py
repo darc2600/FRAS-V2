@@ -11,6 +11,8 @@ DB_PATH = "attendance.db"
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
+        # Enable foreign keys
+        cursor.execute("PRAGMA foreign_keys = ON")
 
         # STUDENTS
         cursor.execute('''
@@ -42,7 +44,8 @@ def init_db():
         # COURSES
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS courses (
-                course_code VARCHAR(20) PRIMARY KEY,
+                course_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                course_code VARCHAR(20) UNIQUE,
                 course_name VARCHAR(100),
                 units INTEGER,
                 department TEXT,
@@ -51,34 +54,83 @@ def init_db():
             )
         ''')
 
+        # ROOM_TYPES
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS room_types (
+                room_type_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_name VARCHAR(50) UNIQUE
+            )
+        ''')
+
+        # CAMPUSES
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS campuses (
+                campus_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campus_name TEXT UNIQUE NOT NULL,
+                location TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # BUILDINGS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS buildings (
+                building_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                building_name TEXT NOT NULL,
+                campus_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(campus_id) REFERENCES campuses(campus_id)
+            )
+        ''')
+
         # ROOMS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS rooms (
-                room_id VARCHAR(20) PRIMARY KEY,
+                room_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room_number VARCHAR(20),
                 floor_level INTEGER,
-                room_number VARCHAR(10),
-                building_name VARCHAR(50),
+                campus_id INTEGER NOT NULL,
+                building_id INTEGER,
+                room_type_id INTEGER,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(campus_id) REFERENCES campuses(campus_id),
+                FOREIGN KEY(building_id) REFERENCES buildings(building_id),
+                FOREIGN KEY(room_type_id) REFERENCES room_types(room_type_id)
+            )
+        ''')
+
+        # SCHOOL_TERMS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS school_terms (
+                term_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                school_year VARCHAR(20),
+                term INTEGER,
+                start_date DATE,
+                end_date DATE
             )
         ''')
 
         # CLASSES
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS classes (
-                class_id VARCHAR(20) PRIMARY KEY,
-                course_code VARCHAR(20),
-                room_id VARCHAR(20),
+                class_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                course_id INTEGER,
+                room_id INTEGER,
                 instructor_id INTEGER,
                 section VARCHAR(10),
                 day_of_week VARCHAR(10),
                 start_time TIME,
                 end_time TIME,
+                term_id INTEGER,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(course_code) REFERENCES courses(course_code),
+                FOREIGN KEY(course_id) REFERENCES courses(course_id),
                 FOREIGN KEY(room_id) REFERENCES rooms(room_id),
-                FOREIGN KEY(instructor_id) REFERENCES instructors(instructor_id)
+                FOREIGN KEY(instructor_id) REFERENCES instructors(instructor_id),
+                FOREIGN KEY(term_id) REFERENCES school_terms(term_id)
             )
         ''')
 
@@ -87,7 +139,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS enrollments (
                 enrollment_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 student_id INTEGER,
-                class_id VARCHAR(20),
+                class_id INTEGER,
                 enrolled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(student_id) REFERENCES students(student_id),
@@ -100,7 +152,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS attendance_logs (
                 log_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 student_id INTEGER,
-                class_id VARCHAR(20),
+                class_id INTEGER,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 status VARCHAR(20),
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -111,7 +163,7 @@ def init_db():
 
         # Triggers to auto-update updated_at on row update
         for table in [
-            'students', 'instructors', 'courses', 'rooms', 'classes', 'enrollments', 'attendance_logs'
+            'students', 'instructors', 'courses', 'room_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes', 'enrollments', 'attendance_logs'
         ]:
             cursor.execute(f'''
                 CREATE TRIGGER IF NOT EXISTS trg_{table}_updated_at
@@ -121,6 +173,22 @@ def init_db():
                     UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
                 END;
             ''')
+
+        # Seed data
+        # Insert default campus
+        cursor.execute("INSERT OR IGNORE INTO campuses (campus_name, location) VALUES (?, ?)", ('Mapúa Makati', 'Makati City'))
+        # Get campus_id
+        cursor.execute("SELECT campus_id FROM campuses WHERE campus_name = ?", ('Mapúa Makati',))
+        campus_id = cursor.fetchone()[0]
+        # Insert default building
+        cursor.execute("INSERT OR IGNORE INTO buildings (building_name, campus_id) VALUES (?, ?)", ('Default Building', campus_id))
+        # Get building_id
+        cursor.execute("SELECT building_id FROM buildings WHERE building_name = ? AND campus_id = ?", ('Default Building', campus_id))
+        building_id = cursor.fetchone()[0]
+        # Insert room types
+        cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Lecture',))
+        cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Laboratory',))
+        cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Cisco',))
 
         conn.commit()
 
@@ -140,21 +208,20 @@ class RoomService:
     def get_rooms(self):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM rooms")
-            rows = cursor.fetchall()
-            return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
-    def get_courses(self, room_id):
+            cursor.execute("SELECT room_number FROM rooms")
+            return [row[0] for row in cursor.fetchall()]
+    def get_courses(self, room_number):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM classes WHERE room_id = ?", (room_id,))
+            cursor.execute("SELECT DISTINCT co.course_code FROM classes c JOIN courses co ON c.course_id = co.course_id JOIN rooms r ON c.room_id = r.room_id WHERE r.room_number = ?", (room_number,))
             rows = cursor.fetchall()
-            return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
-    def get_sections(self, room_id, course_code):
+            return [{'course_code': row[0]} for row in rows]
+    def get_sections(self, room_number, course_code):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM classes WHERE room_id = ? AND course_code = ?", (room_id, course_code))
+            cursor.execute("SELECT DISTINCT c.section FROM classes c JOIN courses co ON c.course_id = co.course_id JOIN rooms r ON c.room_id = r.room_id WHERE r.room_number = ? AND co.course_code = ?", (room_number, course_code))
             rows = cursor.fetchall()
-            return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
+            return [{'section': row[0]} for row in rows]
 
 def get_room_service():
     return RoomService()
@@ -218,7 +285,8 @@ app.openapi_tags = tags_metadata
 # -----------------------
 
 @app.get("/api/rooms", tags=["Rooms"])
-async def get_rooms(room_service=Depends(get_room_service)):
+async def get_rooms():
+    room_service = RoomService()
     return room_service.get_rooms()
 
 @app.get("/api/rooms/{room_id}/courses", tags=["Rooms"])

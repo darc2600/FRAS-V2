@@ -32,10 +32,16 @@ class RegistrationRepository:
                 course_code = entry.get("course_code")
                 section = entry.get("section")
                 room_id = entry.get("room")
+                # Get course_id from course_code
+                cursor.execute('SELECT course_id FROM courses WHERE course_code = ?', (course_code,))
+                course_row = cursor.fetchone()
+                if not course_row:
+                    continue  # Skip if course not found
+                course_id = course_row[0]
                 # Lookup class_id from classes
                 cursor.execute('''
-                    SELECT class_id FROM classes WHERE course_code = ? AND section = ? AND room_id = ?
-                ''', (course_code, section, room_id))
+                    SELECT class_id FROM classes WHERE course_id = ? AND section = ? AND room_id = ?
+                ''', (course_id, section, int(room_id)))
                 class_row = cursor.fetchone()
                 if class_row:
                     class_id = class_row[0]
