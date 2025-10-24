@@ -32,12 +32,14 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS instructors (
                 instructor_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                instructor_number VARCHAR(20) UNIQUE,
                 last_name TEXT,
                 first_name TEXT,
                 email TEXT,
-                department TEXT,
+                dept_id INTEGER,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(dept_id) REFERENCES departments(dept_id)
             )
         ''')
 
@@ -48,7 +50,19 @@ def init_db():
                 course_code VARCHAR(20) UNIQUE,
                 course_name VARCHAR(100),
                 units INTEGER,
-                department TEXT,
+                dept_id INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(dept_id) REFERENCES departments(dept_id)
+            )
+        ''')
+
+        # DEPARTMENTS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS departments (
+                dept_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dept_code VARCHAR(20) UNIQUE,
+                dept_name TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -81,7 +95,8 @@ def init_db():
                 campus_id INTEGER NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(campus_id) REFERENCES campuses(campus_id)
+                FOREIGN KEY(campus_id) REFERENCES campuses(campus_id),
+                UNIQUE(building_name, campus_id)
             )
         ''')
 
@@ -163,7 +178,7 @@ def init_db():
 
         # Triggers to auto-update updated_at on row update
         for table in [
-            'students', 'instructors', 'courses', 'room_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes', 'enrollments', 'attendance_logs'
+            'students', 'instructors', 'courses', 'departments', 'room_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes', 'enrollments', 'attendance_logs'
         ]:
             cursor.execute(f'''
                 CREATE TRIGGER IF NOT EXISTS trg_{table}_updated_at
@@ -173,22 +188,6 @@ def init_db():
                     UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
                 END;
             ''')
-
-        # Seed data
-        # Insert default campus
-        cursor.execute("INSERT OR IGNORE INTO campuses (campus_name, location) VALUES (?, ?)", ('Mapúa Makati', 'Makati City'))
-        # Get campus_id
-        cursor.execute("SELECT campus_id FROM campuses WHERE campus_name = ?", ('Mapúa Makati',))
-        campus_id = cursor.fetchone()[0]
-        # Insert default building
-        cursor.execute("INSERT OR IGNORE INTO buildings (building_name, campus_id) VALUES (?, ?)", ('Default Building', campus_id))
-        # Get building_id
-        cursor.execute("SELECT building_id FROM buildings WHERE building_name = ? AND campus_id = ?", ('Default Building', campus_id))
-        building_id = cursor.fetchone()[0]
-        # Insert room types
-        cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Lecture',))
-        cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Laboratory',))
-        cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Cisco',))
 
         conn.commit()
 

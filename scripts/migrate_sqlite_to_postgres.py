@@ -48,6 +48,7 @@ POSTGRES_TABLES_DDL = [
     """
     CREATE TABLE IF NOT EXISTS instructors (
         instructor_id SERIAL PRIMARY KEY,
+        instructor_number VARCHAR(20) UNIQUE,
         last_name TEXT,
         first_name TEXT,
         email TEXT,

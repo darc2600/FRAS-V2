@@ -3,13 +3,13 @@ import sqlite3
 DB_PATH = "attendance.db"
 
 class InstructorRepository:
-    def add_instructor(self, last_name, first_name, email, department):
+    def add_instructor(self, instructor_number, last_name, first_name, email, department):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO instructors (last_name, first_name, email, department)
-                VALUES (?, ?, ?, ?)
-            ''', (last_name, first_name, email, department))
+                INSERT INTO instructors (instructor_number, last_name, first_name, email, department)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (instructor_number, last_name, first_name, email, department))
             conn.commit()
             return cursor.lastrowid
 
