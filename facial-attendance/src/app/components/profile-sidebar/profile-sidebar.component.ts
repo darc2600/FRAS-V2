@@ -1,4 +1,5 @@
 import { Component, Input } from '@angular/core';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-profile-sidebar',
@@ -7,4 +8,11 @@ import { Component, Input } from '@angular/core';
 })
 export class ProfileSidebarComponent {
   @Input() isOpen: boolean = false;
+
+  constructor(private router: Router) {}
+
+  signOut() {
+    // Add any sign-out logic here (e.g., clear tokens)
+    this.router.navigate(['/login']);
+  }
 }

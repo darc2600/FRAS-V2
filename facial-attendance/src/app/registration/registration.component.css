@@ -2,13 +2,25 @@
   color: green;
   margin-top: 10px;
 }
+body, html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+.registration-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
 .registration-container {
   max-width: 320px;
-  margin: 40px auto;
+  width: 100%;
   padding: 20px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 label {
   display: block;

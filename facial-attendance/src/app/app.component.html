@@ -7,7 +7,7 @@
     </button>
     <div class="burger-label"></div>
   </div>
-  <app-profile-sidebar [isOpen]="sidebarOpen"></app-profile-sidebar>
+  <app-profile-sidebar *ngIf="!hideSidebar" [isOpen]="sidebarOpen"></app-profile-sidebar>
   <div class="app-content">
     <router-outlet></router-outlet>
   </div>
