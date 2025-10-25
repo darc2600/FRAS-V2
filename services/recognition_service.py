@@ -6,8 +6,8 @@ class RecognitionService:
     def __init__(self, repo: RecognitionRepository):
         self.repo = repo
 
-    async def recognize_face(self, file: UploadFile, course_code: str, section: str, room: str) -> RecognitionResponse:
-        return await self.repo.recognize_face(file, course_code, section, room)
+    async def recognize_face(self, file: UploadFile, class_id: int) -> RecognitionResponse:
+        return await self.repo.recognize_face(file, class_id)
 
 def get_recognition_service(repo: RecognitionRepository = Depends(get_recognition_repository)):
     return RecognitionService(repo)

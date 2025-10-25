@@ -38,7 +38,7 @@
     <div style="margin: 16px 0;">
       <label for="roomSelect">Room:</label>
       <select id="roomSelect" [(ngModel)]="selectedRoom" (change)="onRoomChange()">
-        <option *ngFor="let room of availableRooms" [value]="room">{{ room }}</option>
+        <option *ngFor="let room of availableRooms" [ngValue]="room">{{ room.room_number }}</option>
       </select>
 
       <label for="courseSectionSelect" style="margin-left: 16px;">Course-Section:</label>
