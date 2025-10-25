@@ -19,20 +19,34 @@ export class ApiService {
     return this.http.post(`${this.backendUrl}/api/recognize`, formData);
   }
 
-  getAttendance(courseCode: string, section: string, room: string) {
-    return this.http.get<any>(`${this.backendUrl}/api/attendance?course_code=${courseCode}&section=${section}&room=${room}`);
+  getAttendance(courseCode: string, section: string, room?: string, startDate?: string, endDate?: string) {
+    let url = `${this.backendUrl}/api/attendance?course_code=${courseCode}&section=${section}`;
+    if (room) {
+      url += `&room=${room}`;
+    }
+    if (startDate) {
+      url += `&start_date=${startDate}`;
+    }
+    if (endDate) {
+      url += `&end_date=${endDate}`;
+    }
+    return this.http.get<any>(url);
   }
 
   getRooms(): Observable<any[]> {
     return this.http.get<any[]>(`${this.backendUrl}/api/rooms`);
   }
 
-  getCourses(roomId: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses`);
+  getFloors(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.backendUrl}/api/floors`);
   }
 
-  getSections(roomId: string, courseCode: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses/${courseCode}/sections`);
+  getRoomsByFloor(floorLevel: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/floors/${floorLevel}/rooms`);
+  }
+
+  getCoursesSectionsByRoom(roomId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses-sections`);
   }
 
   getRoomSchedule(roomId: string): Observable<any> {
@@ -41,6 +55,18 @@ export class ApiService {
 
   updateRoomSchedule(roomId: string, data: any): Observable<any> {
     return this.http.post<any>(`${this.backendUrl}/api/schedule/${roomId}`, data);
+  }
+
+  deleteRoomSchedule(roomId: string): Observable<any> {
+    return this.http.delete<any>(`${this.backendUrl}/api/schedule/${roomId}`);
+  }
+
+  getCourses(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/courses`);
+  }
+
+  getInstructors(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.backendUrl}/api/instructors`);
   }
 
   registerStudent(formData: FormData): Observable<any> {

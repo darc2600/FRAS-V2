@@ -1,12 +1,12 @@
 import os
 import shutil
-import sqlite3
 from fastapi import UploadFile
 from deepface import DeepFace
 from datetime import datetime
 from models.recognition import RecognitionResponse
+from services.db import get_connection
+from services.s3_utils import download_student_folder
 
-DB_PATH = "attendance.db"
 
 class RecognitionRepository:
     async def recognize_face(self, file: UploadFile, course_code: str, section: str, room: str) -> RecognitionResponse:
@@ -15,14 +15,20 @@ class RecognitionRepository:
             shutil.copyfileobj(file.file, buffer)
         recognized_id = None
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            with get_connection() as conn:
                 cursor = conn.cursor()
-                # Lookup students enrolled in the class (by course_code, section, room_id)
+                # Get course_id from course_code
+                cursor.execute('SELECT course_id FROM courses WHERE course_code = ?', (course_code,))
+                course_row = cursor.fetchone()
+                if not course_row:
+                    return RecognitionResponse(status="error", message="Course not found")
+                course_id = course_row[0]
+                # Lookup students enrolled in the class (by course_id, section, room_id)
                 cursor.execute('''
                     SELECT e.student_id FROM enrollments e
                     JOIN classes c ON e.class_id = c.class_id
-                    WHERE c.course_code = ? AND c.section = ? AND c.room_id = ?
-                ''', (course_code, section, room))
+                    WHERE c.course_id = ? AND c.section = ? AND c.room_id = ?
+                ''', (course_id, section, int(room)))
                 student_ids = [row[0] for row in cursor.fetchall()]
                 print(f"[DEBUG] student_ids: {student_ids}")
                 student_faces = {}
@@ -34,10 +40,19 @@ class RecognitionRepository:
                         continue
                     student_number = row[0]
                     student_folder = os.path.join("dataset", str(student_number))
-                    if os.path.isdir(student_folder):
-                        images = [os.path.join(student_folder, img) for img in os.listdir(student_folder) if img.lower().endswith(".jpg")]
-                        if images:
-                            student_faces[student_id] = images[0]
+                    # If local folder missing, try to download from S3 into a temp dir
+                    if not os.path.isdir(student_folder):
+                        tmpdir = os.path.join("/tmp", f"dataset_{student_number}") if os.name != 'nt' else os.path.join("C:\\Windows\\Temp", f"dataset_{student_number}")
+                        os.makedirs(tmpdir, exist_ok=True)
+                        try:
+                            download_student_folder('fras-data', f'dataset/{student_number}/', tmpdir)
+                            images = [os.path.join(tmpdir, img) for img in os.listdir(tmpdir) if img.lower().endswith('.jpg')]
+                        except Exception:
+                            images = []
+                    else:
+                        images = [os.path.join(student_folder, img) for img in os.listdir(student_folder) if img.lower().endswith('.jpg')]
+                    if images:
+                        student_faces[student_id] = images[0]
                 print(f"[DEBUG] student_faces: {student_faces}")
                 for student_id, img_path in student_faces.items():
                     try:
@@ -48,8 +63,8 @@ class RecognitionRepository:
                             # Find class_id for this attendance
                             cursor.execute('''
                                 SELECT class_id FROM classes
-                                WHERE course_code = ? AND section = ? AND room_id = ?
-                            ''', (course_code, section, room))
+                                WHERE course_id = ? AND section = ? AND room_id = ?
+                            ''', (course_id, section, int(room)))
                             class_row = cursor.fetchone()
                             if not class_row:
                                 print(f"[DEBUG] No class_id found for course_code={course_code}, section={section}, room={room}")
@@ -98,11 +113,15 @@ class RecognitionRepository:
                         print(f"[DEBUG] Exception for {student_id}: {e}")
                         continue
         finally:
-            os.remove(temp_path)
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
         if recognized_id:
             return RecognitionResponse(status="success", student_id=str(recognized_id))
         else:
             return RecognitionResponse(status="failed", message="No match found")
+
 
 def get_recognition_repository():
     return RecognitionRepository()

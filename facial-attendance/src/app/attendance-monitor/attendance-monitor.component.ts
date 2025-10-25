@@ -1,5 +1,5 @@
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subject, Observable } from 'rxjs';
 import { WebcamImage, WebcamModule } from 'ngx-webcam';
@@ -12,22 +12,14 @@ import { NavbarComponent } from '../components/navbar/navbar.component';
   templateUrl: './attendance-monitor.component.html',
   styleUrls: ['./attendance-monitor.component.css'],
 })
-export class AttendanceMonitorComponent implements OnInit {
+export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   courseCode = '';
   section = '';
   room = '';
-  availableCourses: string[] = [];
-  availableSections: string[] = [];
   availableRooms: string[] = [];
   allRooms: any[] = [];
   availableFloors: number[] = [];
   selectedFloor: number | null = null;
-  // Room type for clarity
-  private getRoomLabel(room: any): string {
-    if (!room) return '';
-    if (typeof room === 'string') return room;
-    return room.room_id || room.id || room.name || '';
-  }
   currentTime = '';
   message = '';
   webcamImage: WebcamImage | null = null;
@@ -35,11 +27,8 @@ export class AttendanceMonitorComponent implements OnInit {
   private trigger: Subject<void> = new Subject<void>();
 
   // --- New properties for improved UX ---
-  roomSearch = '';
-  filteredRooms: string[] = [];
   courseSection = '';
   availableCourseSections: string[] = [];
-  showRoomDropdown = false;
 
   // --- Auto recognition properties ---
   autoRecognitionActive = false;
@@ -47,75 +36,72 @@ export class AttendanceMonitorComponent implements OnInit {
   lastRecognizedId: string | null = null;
   lastRecognizedTime: number = 0;
 
+  // --- New properties for UI improvements ---
+  isCapturing = false;
+
   constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.updateClock();
     setInterval(() => this.updateClock(), 1000);
-    this.fetchRooms();
+    this.fetchFloors();
+
+    // Add keyboard event listener for spacebar
+    document.addEventListener('keydown', this.handleKeyDown);
   }
 
-  fetchRooms() {
-    this.api.getRooms().subscribe(
-      (rooms: any[]) => {
-        this.allRooms = rooms;
-        // If rooms have floor_level, extract unique floors
-        this.availableFloors = Array.from(new Set(rooms.map(r => r.floor_level).filter(f => f != null))).sort((a, b) => a - b);
+  ngOnDestroy() {
+    // Clean up the keyboard event listener
+    document.removeEventListener('keydown', this.handleKeyDown);
+  }
+
+  private handleKeyDown = (event: KeyboardEvent) => {
+    if (event.code === 'Space' && !event.repeat) {
+      event.preventDefault();
+      this.captureAndMarkAttendance();
+    }
+  }
+
+  fetchFloors() {
+    this.api.getFloors().subscribe(
+      (floors: number[]) => {
+        this.availableFloors = floors;
         if (this.availableFloors.length > 0) {
           this.selectedFloor = this.availableFloors[0];
-          this.filterRoomsByFloor();
-        } else {
-          this.availableRooms = rooms.map(r => r.room_id || r.id || r.name);
-          this.filteredRooms = this.availableRooms;
+          this.onFloorChange();
         }
       },
-      err => this.message = 'Error fetching rooms.'
+      err => this.message = 'Error fetching floors.'
     );
   }
 
-  filterRoomsByFloor() {
+  onFloorChange() {
     if (this.selectedFloor == null) {
       this.availableRooms = [];
-      this.filteredRooms = [];
-      return;
-    }
-    const roomsOnFloor = this.allRooms.filter(r => r.floor_level === this.selectedFloor).map(r => r.room_id);
-    this.availableRooms = roomsOnFloor;
-    this.filteredRooms = roomsOnFloor;
-    if (roomsOnFloor.length > 0) {
-      this.room = roomsOnFloor[0];
-      this.fetchCourseSections();
-    } else {
       this.room = '';
       this.availableCourseSections = [];
       this.courseSection = '';
-    }
-  }
-
-  onRoomSearchChange() {
-    if (!this.roomSearch) {
-      this.filteredRooms = this.availableRooms;
-      this.showRoomDropdown = false;
       return;
     }
-    // Simple client-side filter
-    this.filteredRooms = this.availableRooms.filter(r =>
-      this.getRoomLabel(r).toLowerCase().includes(this.roomSearch.toLowerCase())
+    this.fetchRoomsByFloor();
+  }
+
+  fetchRoomsByFloor() {
+    this.api.getRoomsByFloor(this.selectedFloor!).subscribe(
+      (rooms: any[]) => {
+        this.allRooms = rooms; // Store the full room objects
+        this.availableRooms = rooms.map(r => r.room_number);
+        if (this.availableRooms.length > 0) {
+          this.room = this.availableRooms[0];
+          this.fetchCourseSections();
+        } else {
+          this.room = '';
+          this.availableCourseSections = [];
+          this.courseSection = '';
+        }
+      },
+      err => this.message = 'Error fetching rooms for floor.'
     );
-    this.showRoomDropdown = true;
-  }
-
-  selectRoom(room: string) {
-    this.room = room;
-    this.roomSearch = room;
-    this.showRoomDropdown = false;
-    this.fetchCourseSections();
-  }
-
-  onRoomInputBlur() {
-    setTimeout(() => {
-      this.showRoomDropdown = false;
-    }, 200);
   }
 
   onRoomChange() {
@@ -128,28 +114,47 @@ export class AttendanceMonitorComponent implements OnInit {
       this.courseSection = '';
       return;
     }
-    this.api.getRoomSchedule(this.room).subscribe(
-      (result: any) => {
-        if (result && Array.isArray(result.schedule)) {
-          const pairs = result.schedule.map((cls: any) => `${cls.course_code || cls.courseCode} - ${cls.section}`);
-          this.availableCourseSections = Array.from(new Set(pairs));
-          this.courseSection = this.availableCourseSections[0] || '';
-        } else {
-          this.availableCourseSections = [];
-          this.courseSection = '';
-        }
+    
+    // Find the room_id for the selected room
+    const selectedRoom = this.allRooms.find(r => r.room_number === this.room);
+    console.log('Selected room:', this.room, 'Found room object:', selectedRoom);
+    if (!selectedRoom) {
+      this.availableCourseSections = [];
+      this.courseSection = '';
+      return;
+    }
+    
+    console.log('Fetching course sections for room_id:', selectedRoom.room_id);
+    this.api.getCoursesSectionsByRoom(selectedRoom.room_id).subscribe(
+      (coursesSections: any[]) => {
+        this.availableCourseSections = coursesSections.map(cs => cs.course_section);
+        console.log('Available course sections:', this.availableCourseSections);
+        this.courseSection = this.availableCourseSections[0] || '';
+        console.log('Selected course section:', this.courseSection);
         this.fetchLogs();
       },
-      err => this.message = 'Error fetching course-sections.'
+      err => {
+        console.error('Error fetching course-sections:', err);
+        this.message = 'Error fetching course-sections.';
+      }
     );
   }
 
   onCourseSectionChange() {
+    console.log('Course section changed to:', this.courseSection);
     this.fetchLogs();
   }
 
   updateClock() {
-    this.currentTime = new Date().toLocaleTimeString();
+    const now = new Date();
+    const timeString = now.toLocaleTimeString();
+    const dateString = now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    this.currentTime = `${dateString}\n${timeString}`;
   }
 
   public get triggerObservable(): Observable<void> {
@@ -158,6 +163,14 @@ export class AttendanceMonitorComponent implements OnInit {
 
   public triggerSnapshot(): void {
     this.trigger.next();
+  }
+
+  toggleAutoRecognition() {
+    if (this.autoRecognitionActive) {
+      this.stopAutoRecognition();
+    } else {
+      this.startAutoRecognition();
+    }
   }
 
   startAutoRecognition() {
@@ -178,14 +191,19 @@ export class AttendanceMonitorComponent implements OnInit {
 
   public handleImage(webcamImage: WebcamImage): void {
     this.webcamImage = webcamImage;
+    this.isCapturing = false; // Reset capturing status
+
     if (this.autoRecognitionActive) {
       this.autoMarkAttendance();
+    } else {
+      // For manual capture, automatically mark attendance
+      this.performAttendanceRecognition();
     }
   }
 
   autoMarkAttendance() {
     if (!this.webcamImage || !this.courseSection || !this.room) return;
-    const [courseCode, section] = this.courseSection.split(' - ');
+    const [courseCode, section] = this.courseSection.split('-');
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
     this.api.recognizeFace(file, courseCode, section, this.room).subscribe(
@@ -206,7 +224,7 @@ export class AttendanceMonitorComponent implements OnInit {
     );
   }
 
-  markAttendance() {
+  performAttendanceRecognition() {
     if (!this.webcamImage) {
       this.message = 'Please capture an image first.';
       return;
@@ -215,7 +233,7 @@ export class AttendanceMonitorComponent implements OnInit {
       this.message = 'Please select a room and course-section.';
       return;
     }
-    const [courseCode, section] = this.courseSection.split(' - ');
+    const [courseCode, section] = this.courseSection.split('-');
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
     this.api.recognizeFace(file, courseCode, section, this.room).subscribe(
@@ -229,13 +247,27 @@ export class AttendanceMonitorComponent implements OnInit {
     );
   }
 
-  fetchLogs() {
+  captureAndMarkAttendance() {
     if (!this.courseSection || !this.room) {
+      this.message = 'Please select a room and course-section.';
+      return;
+    }
+
+    this.isCapturing = true;
+    this.triggerSnapshot();
+  }
+
+  fetchLogs() {
+    if (!this.courseSection) {
       this.attendanceLogs = [];
       return;
     }
-    const [courseCode, section] = this.courseSection.split(' - ');
-    this.api.getAttendance(courseCode, section, this.room).subscribe(
+    const [courseCode, section] = this.courseSection.split('-');
+    // Get today's date for filtering attendance to current day
+    const today = new Date().toISOString().split('T')[0];
+    console.log('Fetching logs for:', courseCode, section, today);
+    // For now, don't filter by room to show all attendance for the course-section
+    this.api.getAttendance(courseCode, section, undefined, today, today).subscribe(
       res => {
         this.attendanceLogs = (res.attendance || []).map((log: any) => ({
           studentId: log[0],
@@ -243,15 +275,19 @@ export class AttendanceMonitorComponent implements OnInit {
           time: log[2],
           status: log[3] || 'Unknown'
         }));
+        console.log('Attendance logs loaded:', this.attendanceLogs.length, 'records');
       },
-      err => this.message = 'Error fetching logs.'
+      err => {
+        console.error('Error fetching logs:', err);
+        this.message = 'Error fetching logs.';
+      }
     );
   }
 
   getStatusClass(status: string) {
-    if (status === 'Present') return 'present';
-    if (status === 'Late') return 'late';
-    if (status === 'Absent') return 'absent';
+    if (status.toLowerCase() === 'present') return 'present';
+    if (status.toLowerCase() === 'late') return 'late';
+    if (status.toLowerCase() === 'absent') return 'absent';
     return '';
   }
 

@@ -9,6 +9,8 @@ def get_attendance(
     course_code: str = Query(...),
     section: str = Query(...),
     room: str = Query(None),
+    start_date: str = Query(None),
+    end_date: str = Query(None),
     service: AttendanceService = Depends(get_attendance_service)
 ):
-    return service.get_attendance(course_code, section, room)
+    return service.get_attendance(course_code, section, room, start_date, end_date)

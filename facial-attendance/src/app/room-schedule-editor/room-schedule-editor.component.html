@@ -1,55 +1,141 @@
-<h2>Room Schedule Grid Editor</h2>
-<label>
-  Room:
-  <input [(ngModel)]="room" placeholder="e.g. MPO305">
-  <button (click)="loadSchedule()">Load</button>
-  <button (click)="deleteSchedule()" style="margin-left:8px;">Delete Schedule</button>
-</label>
-<p *ngIf="message">{{message}}</p>
 
-<!-- Input fields for new entry -->
-<div class="inputs">
-  <label>
-    Course:
-    <input [(ngModel)]="courseCode" placeholder="Course Code">
-  </label>
-  <label>
-    Section:
-    <input [(ngModel)]="section" placeholder="Section">
-  </label>
-  <label>
-    Professor:
-    <input [(ngModel)]="professor" placeholder="Professor">
-  </label>
-</div>
-
-<div class="schedule-grid">
-  <table>
-    <thead>
-      <tr>
-        <th>Schedule</th>
-        <th *ngFor="let day of days">{{ day }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let slot of timeSlots; let row = index">
-        <td>{{ slot }}</td>
-        <td *ngFor="let day of days; let col = index">
-          <div class="cell">
-            <ng-container *ngIf="grid[row][col]?.courseCode">
-              <b>{{ grid[row][col].courseCode }}</b><br>
-              <span>{{ grid[row][col].section }}</span><br>
-              <span>{{ grid[row][col].professor }}</span>
-              <button (click)="clearCell(row, col); $event.stopPropagation()">✕</button>
-            </ng-container>
-            <ng-container *ngIf="!grid[row][col]?.courseCode">
-              <span class="add" (click)="fillCell(row, col)">+</span>
-            </ng-container>
+<div class="room-schedule-editor-main">
+  <div class="editor-header">Scheduler Editor</div>
+  <div class="editor-inputs">
+    <div class="editor-field">
+      <label>Room Number</label>
+      <input [(ngModel)]="room" placeholder="e.g., 305">
+    </div>
+    <div class="editor-field">
+      <label>Course Code</label>
+      <div class="course-input-container">
+        <input [(ngModel)]="courseCode"
+               (input)="onCourseInputChange()"
+               (focus)="onCourseInputChange()"
+               (blur)="hideSuggestions()"
+               placeholder="Search courses..."
+               autocomplete="off">
+        <div class="suggestions-dropdown" *ngIf="showCourseSuggestions">
+          <div class="suggestion-item"
+               *ngFor="let course of filteredCourses"
+               (mousedown)="selectCourse(course)">
+            <strong>{{ course.code }}</strong> - {{ course.name }}
           </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+        </div>
+      </div>
+    </div>
+    <div class="editor-field">
+      <label>Section</label>
+      <input [(ngModel)]="section" placeholder="e.g., AM1">
+    </div>
+    <div class="editor-field">
+      <label>Professor</label>
+      <div class="professor-input-container">
+        <input [(ngModel)]="professor"
+               (input)="onProfessorInputChange()"
+               (focus)="onProfessorInputChange()"
+               (blur)="hideSuggestions()"
+               placeholder="Search instructors..."
+               autocomplete="off">
+        <div class="suggestions-dropdown" *ngIf="showInstructorSuggestions">
+          <div class="suggestion-item"
+               *ngFor="let instructor of filteredInstructors"
+               (mousedown)="selectInstructor(instructor)">
+            {{ instructor }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="editor-actions">
+    <button (click)="loadSchedule()" [disabled]="isLoading" class="load-btn">
+      <span *ngIf="isLoading">LOADING...</span>
+      <span *ngIf="!isLoading">📂 LOAD</span>
+    </button>
+    <button (click)="undoLastAction()" [disabled]="actionHistory.length === 0" class="edit-btn">
+      ↩️ UNDO
+    </button>
+    <button (click)="revertChanges()" [disabled]="actionHistory.length === 0" class="edit-btn">
+      🔄 REVERT
+    </button>
+    <button (click)="openDeleteModal()" class="delete-btn">
+      🗑️ DELETE
+    </button>
+    <button (click)="saveSchedule()" [disabled]="isSaving" class="save-btn">
+      <span *ngIf="isSaving">� SAVING...</span>
+      <span *ngIf="!isSaving">💾 SAVE</span>
+    </button>
+  </div>
+  <div *ngIf="message" class="editor-message" [class.success]="messageType === 'success'" [class.error]="messageType === 'error'">{{message}}</div>
+  <div class="schedule-grid">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th *ngFor="let day of days">{{ day }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let slot of timeSlots; let row = index">
+          <td class="time-label">{{ slot }}</td>
+          <td *ngFor="let day of days; let col = index">
+            <div class="cell" [class.filled]="grid[row][col]?.courseCode">
+              <ng-container *ngIf="grid[row][col]?.courseCode">
+                <div class="cell-content">
+                  <b>{{ grid[row][col].courseCode }}</b><br>
+                  <span>{{ grid[row][col].section }}</span><br>
+                  <span>{{ grid[row][col].professor }}</span>
+                </div>
+                <button class="cell-clear" (click)="clearCell(row, col); $event.stopPropagation()" title="Remove this entry">✕</button>
+              </ng-container>
+              <ng-container *ngIf="!grid[row][col]?.courseCode">
+                <button class="cell-add" (click)="fillCell(row, col)" title="Add schedule entry">+</button>
+              </ng-container>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<button (click)="saveSchedule()" style="margin-top:16px;">Save Schedule</button>
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>⚠️ Delete Room Schedule</h3>
+      <button class="modal-close" (click)="closeDeleteModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="warning-text">
+        You are about to <strong>permanently delete</strong> the entire schedule for <strong>Room {{ room }}</strong>.
+      </p>
+      <p class="warning-text">
+        This action cannot be undone. All schedule entries for this room will be removed.
+      </p>
+
+      <div class="confirmation-input">
+        <label>Type "DELETE" to confirm:</label>
+        <input
+          type="text"
+          [(ngModel)]="deleteConfirmationText"
+          placeholder="Type DELETE here"
+          (keyup.enter)="confirmDeleteSchedule()"
+          maxlength="6">
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="cancel-btn" (click)="closeDeleteModal()">Cancel</button>
+      <button
+        class="confirm-delete-btn"
+        (click)="confirmDeleteSchedule()"
+        [disabled]="deleteConfirmationText !== 'DELETE' || isDeleting">
+        <span *ngIf="isDeleting">DELETING...</span>
+        <span *ngIf="!isDeleting">🗑️ Delete Schedule</span>
+      </button>
+    </div>
+  </div>
+</div>

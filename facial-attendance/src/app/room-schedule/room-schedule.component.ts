@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ApiService } from '../api.service';
 
 const TIME_SLOTS = [
   "07:00AM - 08:10AM", "08:10AM - 09:20AM", "09:20AM - 10:30AM", "10:30AM - 11:40AM",
@@ -21,18 +21,23 @@ export class RoomScheduleComponent implements OnInit {
   timeSlots = TIME_SLOTS;
   grid: any[][] = this.timeSlots.map(() => this.days.map(() => null));
   message = '';
+  isLoading = false;
 
-  constructor(private http: HttpClient) {}
+  constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.loadSchedule();
   }
 
   loadSchedule() {
-  if (!this.room) return;
-  this.http.get<any>(`http://127.0.0.1:8000/api/schedule/${this.room}`)
-      .subscribe({
-        next: (data) => {
+  if (!this.room) {
+    this.message = 'Please enter a room number.';
+    return;
+  }
+  this.isLoading = true;
+  this.message = 'Loading schedule...';
+  this.api.getRoomSchedule(this.room).subscribe({
+    next: (data: any) => {
           this.grid = this.timeSlots.map(() => this.days.map(() => null));
           const scheduleList = (data && data.schedule) ? data.schedule : [];
           scheduleList.forEach((entry: any) => {
@@ -48,11 +53,14 @@ export class RoomScheduleComponent implements OnInit {
               };
             }
           });
-          this.message = scheduleList.length ? '' : 'No schedule found for this room.';
+          this.message = scheduleList.length ? `Showing schedule with ${scheduleList.length} entries.` : 'No schedule found for this room.';
+          this.isLoading = false;
         },
-        error: () => {
+        error: (error) => {
+          console.error('Error loading schedule:', error);
           this.grid = this.timeSlots.map(() => this.days.map(() => null));
-          this.message = 'Room schedule not found.';
+          this.message = 'Failed to load schedule. Please try again.';
+          this.isLoading = false;
         }
       });
   }

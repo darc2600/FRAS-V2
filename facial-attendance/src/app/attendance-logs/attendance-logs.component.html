@@ -1,66 +1,130 @@
-<div class="attendance-logs-main">
-  <div class="sidebar">
-    <!-- You can add a logo or navigation here if needed -->
-    <div class="logo mb-3">
-      <!-- Example: <img src="assets/logo.png" alt="Logo" width="60"> -->
+<main class="content-area">
+  <div class="attendance-page">
+    <header class="page-header">
+      <!-- <h2 class="logs-header">Attendance Logs</h2> -->
+    </header>
 
-  <div style="margin-left:240px;">
-    <div class="container py-4">
-      <h2 class="logs-header mb-4">Attendance Logs</h2>
-      <div class="top-bar row g-3 align-items-end mb-3">
-        <div class="col-md-3">
-          <label>Floor:</label>
-          <select class="form-select" [(ngModel)]="selectedFloor" (change)="filterRoomsByFloor()">
-            <option *ngFor="let f of availableFloors" [value]="f">Floor {{f}}</option>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label>Room:</label>
-          <input type="text" class="form-control" [(ngModel)]="roomSearch" (input)="onRoomSearchChange()" (focus)="showRoomDropdown = true" (blur)="onRoomInputBlur()" placeholder="Search room..." autocomplete="off" />
-          <ul *ngIf="showRoomDropdown && filteredRooms.length > 0" class="dropdown-list">
-            <li *ngFor="let r of filteredRooms" (mousedown)="selectRoom(r)">{{r}}</li>
-          </ul>
-        </div>
-        <div class="col-md-4">
-          <label>Course-Section:</label>
-          <select class="form-select" [(ngModel)]="courseSection" (change)="onCourseSectionChange()">
-            <option *ngFor="let cs of availableCourseSections" [value]="cs">{{cs}}</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <button class="btn btn-primary w-100" (click)="fetchLogs()" [disabled]="loading">Fetch Logs</button>
+    <div class="top-bar">
+      <!-- <div class="col-md-2">
+        <label>Floor:</label>
+        <select class="form-select" [(ngModel)]="selectedFloor" (change)="onFloorChange()">
+          <option *ngFor="let f of availableFloors" [value]="f">Floor {{f}}</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label>Room (Optional):</label>
+        <select class="form-select" [(ngModel)]="room" (change)="onRoomChange()">
+          <option value="">All rooms</option>
+          <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
+        </select>
+      </div> -->
+      <div class="field">
+        <label>Course Code:</label>
+        <div class="course-input-container">
+          <input type="text" [(ngModel)]="courseCode"
+                 (input)="onCourseInputChange()"
+                 (focus)="onCourseInputChange()"
+                 (blur)="hideSuggestions()"
+                 placeholder="Start typing to search courses..."
+                 autocomplete="off">
+          <div class="suggestions-dropdown" *ngIf="showCourseSuggestions">
+            <div class="suggestion-item"
+                 *ngFor="let course of filteredCourses"
+                 (mousedown)="selectCourse(course)">
+              <strong>{{ course.code }}</strong> - {{ course.name }}
+            </div>
+          </div>
         </div>
       </div>
-      <div *ngIf="loading" class="text-center my-3">
-        <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+      <div class="field">
+        <label>Section:</label>
+        <select [(ngModel)]="section" (change)="onSectionChange()" [disabled]="availableSections.length === 0">
+          <option value="">Select section...</option>
+          <option *ngFor="let s of availableSections" [value]="s">{{s}}</option>
+        </select>
       </div>
-      <div *ngIf="message && !loading" class="alert alert-info">{{message}}</div>
-      <div *ngIf="logs.length" class="attendance-log-box card mt-3">
-        <div class="card-body p-0">
-          <table class="attendance-table table table-striped mb-0">
-            <thead class="table-dark">
+      <div class="field">
+        <label>&nbsp;</label>
+        <div class="date-mode-toggle">
+          <button 
+            class="mode-btn" 
+            [class.active]="!isDateRangeMode"
+            (click)="toggleDateMode()"
+            [disabled]="isDateRangeMode">
+            Single Date
+          </button>
+          <button 
+            class="mode-btn" 
+            [class.active]="isDateRangeMode"
+            (click)="toggleDateMode()"
+            [disabled]="!isDateRangeMode">
+            Date Range
+          </button>
+        </div>
+      </div>
+      <div class="field" *ngIf="!isDateRangeMode">
+        <label>Date:</label>
+        <input type="date" [(ngModel)]="selectedDate">
+      </div>
+      <div class="field" *ngIf="isDateRangeMode">
+        <label>Start Date:</label>
+        <input type="date" [(ngModel)]="startDate">
+      </div>
+      <div class="field" *ngIf="isDateRangeMode">
+        <label>End Date:</label>
+        <input type="date" [(ngModel)]="endDate">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="fetch-btn" (click)="fetchLogs()" [disabled]="loading || !courseCode || !section">
+          <span *ngIf="!loading">Search Logs</span>
+          <span *ngIf="loading">Searching...</span>
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="loading" class="loading-container">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <div style="margin-top: 10px;">Loading attendance records...</div>
+    </div>
+
+    <div *ngIf="message && !loading" class="message-container">
+      {{message}}
+    </div>
+
+    <div *ngIf="logs.length" class="attendance-log-box">
+      <div class="attendance-log-header">
+        <span>Attendance Records</span>
+        <span class="log-date" *ngIf="!isDateRangeMode">{{ selectedDate | date:'mediumDate' }}</span>
+        <span class="log-date" *ngIf="isDateRangeMode">{{ startDate | date:'mediumDate' }} - {{ endDate | date:'mediumDate' }}</span>
+      </div>
+      <div *ngFor="let date of objectKeys(groupedLogs)" class="date-section">
+        <h4 class="date-header">{{ date | date:'fullDate' }}</h4>
+        <div class="table-container">
+          <table class="attendance-table">
+            <thead>
               <tr>
                 <th>#</th>
-                <th>Student ID</th>
+                <th>Student Number</th>
                 <th>Name</th>
-                <th>Date</th>
                 <th>Time</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let log of logs; let i = index">
+              <tr *ngFor="let log of groupedLogs[date]; let i = index">
                 <td>{{i + 1}}</td>
-                <td>{{log.studentId}}</td>
-                <td>{{log.studentName}}</td>
-                <td>{{ formatDateTime(log.time).split(' ')[0] }}</td>
+                <td>{{log.studentNumber}}</td>
+                <td>{{log.studentName || log.name}}</td>
                 <td>{{ formatDateTime(log.time).split(' ')[1] + ' ' + formatDateTime(log.time).split(' ')[2] }}</td>
                 <td>
                   <span [ngClass]="{
-                    'badge bg-success': log.status === 'Present',
-                    'badge bg-warning text-dark': log.status === 'Late',
-                    'badge bg-danger': log.status === 'Absent'
-                  }">{{ log.status }}</span>
+                    'status-present': log.status === 'present',
+                    'status-late': log.status === 'late',
+                    'status-absent': log.status === 'absent'
+                  }">{{ log.status | titlecase }}</span>
                 </td>
               </tr>
             </tbody>
@@ -69,4 +133,4 @@
       </div>
     </div>
   </div>
-</div>
+</main>

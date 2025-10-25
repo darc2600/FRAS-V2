@@ -1,71 +1,78 @@
-<!-- DEBUG OUTPUT FOR TROUBLESHOOTING -->
-<div style="background: #fff3cd; color: #856404; padding: 0.5rem; margin-bottom: 1rem; font-size: 0.9em;">
-  <div><b>availableFloors:</b> {{ availableFloors | json }}</div>
-  <div><b>selectedFloor:</b> {{ selectedFloor }}</div>
-  <div><b>availableRooms:</b> {{ availableRooms | json }}</div>
-  <div><b>filteredRooms:</b> {{ filteredRooms | json }}</div>
-  <div><b>availableCourseSections:</b> {{ availableCourseSections | json }}</div>
-</div>
-Sample Angular (HTML layout sketch)
-<div class="attendance-page">
-  <!-- Top Bar -->
-  <!-- <app-navbar></app-navbar> -->
-  <header class="top-bar">
-    <h1 style="display: flex; gap: 1rem; align-items: center;">
-      <label>
-        Floor:
-        <select [(ngModel)]="selectedFloor" (change)="filterRoomsByFloor()">
-          <option *ngFor="let f of availableFloors" [value]="f">{{f}}</option>
-        </select>
-      </label>
-      <label style="position: relative;">
-        Room:
-        <input type="text" [(ngModel)]="roomSearch" (input)="onRoomSearchChange()" (focus)="showRoomDropdown = true" (blur)="onRoomInputBlur()" placeholder="Search room..." style="width: 120px;" autocomplete="off" />
-        <ul *ngIf="showRoomDropdown && filteredRooms.length > 0" class="dropdown-list">
-          <li *ngFor="let r of filteredRooms" (mousedown)="selectRoom(r)">{{r}}</li>
-        </ul>
-      </label>
-      <label>
-        Course-Section:
-        <select [(ngModel)]="courseSection" (change)="onCourseSectionChange()">
-          <option *ngFor="let cs of availableCourseSections" [value]="cs">{{cs}}</option>
-        </select>
-      </label>
-    </h1>
-  </header>
+<main class="content-area">
+  <div class="attendance-page">
+    <header class="top-bar">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <label>
+            Floor:
+            <select [(ngModel)]="selectedFloor" (change)="onFloorChange()">
+              <option *ngFor="let f of availableFloors" [value]="f">{{f}}</option>
+            </select>
+          </label>
+          <label>
+            Room:
+            <select [(ngModel)]="room" (change)="onRoomChange()">
+              <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
+            </select>
+          </label>
+          <label>
+            Course-Section:
+            <select [(ngModel)]="courseSection" (change)="onCourseSectionChange()">
+              <option *ngFor="let cs of availableCourseSections" [value]="cs">{{cs}}</option>
+            </select>
+          </label>
+        </div>
+      </header>
+      
+      <div class="main-content">
+        <div class="left-panel">
+          <div class="clock">{{ currentTime }}</div>
+          <div class="webcam">
+            <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)"></webcam>
+            <div class="status-indicators">
+              <div class="status-indicator" [class.active]="autoRecognitionActive">
+                <span class="indicator-dot"></span>
+                Auto Recognition Active
+              </div>
+            </div>
+          </div>
+          <div class="button-group">
+            <button (click)="captureAndMarkAttendance()" [disabled]="isCapturing">
+              <span *ngIf="isCapturing">Capturing...</span>
+              <span *ngIf="!isCapturing">
+                Capture & Mark Attendance
+                <small class="space-hint">(Space)</small>
+              </span>
+            </button>
+            <button class="auto-recognition-btn"
+                    [class.running]="autoRecognitionActive"
+                    (click)="toggleAutoRecognition()">
+              <span *ngIf="!autoRecognitionActive">Start Auto Recognition</span>
+              <span *ngIf="autoRecognitionActive">Stop Auto Recognition</span>
+            </button>
+          </div>
+          <div class="message">{{ message }}</div>
+        </div>
 
-  <div class="main-content">
-    <!-- Left Panel -->
-    <div class="left-panel">
-      <div class="clock">{{ currentTime }}</div>
-      <div class="webcam">
-        <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)"></webcam>
-        <button (click)="triggerSnapshot()">Capture Image</button>
+        <div class="right-panel">
+          <h2>Attendance Log</h2>
+          <div class="attendance-table">
+            <table>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+              <tr *ngFor="let log of attendanceLogs">
+                <td>{{ log.studentId }}</td>
+                <td>{{ log.studentName }}</td>
+                <td>{{ log.time | date:'hh:mm:ss a' }}</td>
+                <td [ngClass]="getStatusClass(log.status)">{{ log.status }}</td>
+              </tr>
+            </table>
+            <div *ngIf="attendanceLogs.length === 0">No attendance records yet.</div>
+          </div>
+        </div>
       </div>
-      <button (click)="markAttendance()">Mark Attendance</button>
-      <button (click)="startAutoRecognition()" [disabled]="autoRecognitionActive">Start Auto Recognition</button>
-      <button (click)="stopAutoRecognition()" [disabled]="!autoRecognitionActive">Stop Auto Recognition</button>
-      <div class="message">{{ message }}</div>
     </div>
-
-    <!-- Right Panel -->
-    <div class="right-panel">
-      <h2>Attendance Log</h2>
-      <table>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Time</th>
-          <th>Status</th>
-        </tr>
-        <tr *ngFor="let log of attendanceLogs">
-          <td>{{ log.studentId }}</td>
-          <td>{{ log.studentName }}</td>
-          <td>{{ log.time | date:'hh:mm:ss a' }}</td>
-          <td [ngClass]="getStatusClass(log.status)">{{ log.status }}</td>
-        </tr>
-      </table>
-      <div *ngIf="attendanceLogs.length === 0">No attendance records yet.</div>
-    </div>
-  </div>
-</div>
+  </main>
