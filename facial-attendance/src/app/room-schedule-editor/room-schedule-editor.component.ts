@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../api.service';
@@ -30,7 +30,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
   templateUrl: './room-schedule-editor.component.html',
   styleUrls: ['./room-schedule-editor.component.css'],
 })
-export class RoomScheduleEditorComponent {
+export class RoomScheduleEditorComponent implements OnInit {
   room = '';
   message = '';
   isLoading = false;
@@ -47,12 +47,96 @@ export class RoomScheduleEditorComponent {
   section = '';
   professor = '';
 
+  // Validation data
+  validCourses: any[] = []; // {code: string, name: string}
+  validInstructors: string[] = [];
+  filteredInstructors: string[] = [];
+  filteredCourses: any[] = [];
+  showInstructorSuggestions = false;
+  showCourseSuggestions = false;
+
   // Delete modal properties
   showDeleteModal = false;
   deleteConfirmationText = '';
   isDeleting = false;
 
   constructor(private api: ApiService) {}
+
+  ngOnInit() {
+    this.loadValidationData();
+  }
+
+  loadValidationData() {
+    // Load valid courses
+    this.api.getCourses().subscribe({
+      next: (courses: any[]) => {
+        this.validCourses = courses;
+      },
+      error: (error) => {
+        console.error('Error loading courses:', error);
+      }
+    });
+
+    // Load valid instructors
+    this.api.getInstructors().subscribe({
+      next: (instructors: string[]) => {
+        this.validInstructors = instructors;
+      },
+      error: (error) => {
+        console.error('Error loading instructors:', error);
+      }
+    });
+  }
+
+  onProfessorInputChange() {
+    if (this.professor.trim().length === 0) {
+      this.filteredInstructors = [];
+      this.showInstructorSuggestions = false;
+      return;
+    }
+
+    const searchTerm = this.professor.trim().toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ');
+    this.filteredInstructors = this.validInstructors.filter(instructor => {
+      const normalizedInstructor = instructor.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ');
+      return normalizedInstructor.includes(searchTerm);
+    }).slice(0, 10); // Limit to 10 suggestions
+
+    this.showInstructorSuggestions = this.filteredInstructors.length > 0;
+  }
+
+  onCourseInputChange() {
+    if (this.courseCode.trim().length === 0) {
+      this.filteredCourses = [];
+      this.showCourseSuggestions = false;
+      return;
+    }
+
+    const searchTerm = this.courseCode.trim().toLowerCase();
+    this.filteredCourses = this.validCourses.filter(course =>
+      course.code.toLowerCase().includes(searchTerm) ||
+      course.name.toLowerCase().includes(searchTerm)
+    ).slice(0, 10); // Limit to 10 suggestions
+
+    this.showCourseSuggestions = this.filteredCourses.length > 0;
+  }
+
+  selectInstructor(instructor: string) {
+    this.professor = instructor;
+    this.showInstructorSuggestions = false;
+  }
+
+  selectCourse(course: any) {
+    this.courseCode = course.code;
+    this.showCourseSuggestions = false;
+  }
+
+  hideSuggestions() {
+    // Hide suggestions after a short delay to allow clicks
+    setTimeout(() => {
+      this.showInstructorSuggestions = false;
+      this.showCourseSuggestions = false;
+    }, 150);
+  }
 
   loadSchedule() {
     if (!this.room) {
@@ -116,6 +200,30 @@ export class RoomScheduleEditorComponent {
     // Basic validation
     if (this.courseCode.trim().length === 0 || this.section.trim().length === 0 || this.professor.trim().length === 0) {
       this.message = 'All fields must be filled out.';
+      this.messageType = 'error';
+      return;
+    }
+
+    // Validate course code
+    const courseCodeUpper = this.courseCode.trim().toUpperCase();
+    const validCourseCodes = this.validCourses.map(c => c.code.toUpperCase());
+    if (!validCourseCodes.includes(courseCodeUpper)) {
+      this.message = `Invalid course code: ${courseCodeUpper}. Please select a valid course.`;
+      this.messageType = 'error';
+      return;
+    }
+
+    // Validate professor name (flexible matching)
+    const professorTrimmed = this.professor.trim();
+    const normalizedInput = professorTrimmed.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ');
+    
+    const isValidProfessor = this.validInstructors.some(instructor => {
+      const normalizedInstructor = instructor.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ');
+      return normalizedInstructor.includes(normalizedInput) || normalizedInput.includes(normalizedInstructor);
+    });
+
+    if (!isValidProfessor) {
+      this.message = `Invalid professor name: ${professorTrimmed}. Please select from the suggestions or enter a valid instructor name.`;
       this.messageType = 'error';
       return;
     }

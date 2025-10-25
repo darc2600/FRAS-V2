@@ -336,6 +336,25 @@ async def update_room_schedule(room_id: str, request: Request, schedule_service=
 async def delete_room_schedule(room_id: str, schedule_service=Depends(get_schedule_service)):
     return await schedule_service.delete_room_schedule(room_id)
 
+# --- Course and Instructor Data Endpoints ---
+@app.get("/api/courses", tags=["Courses"])
+async def get_courses():
+    """Get all available course codes"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT course_code, course_name FROM courses ORDER BY course_code")
+        courses = cursor.fetchall()
+        return [{"code": course[0], "name": course[1]} for course in courses]
+
+@app.get("/api/instructors", tags=["Instructors"])  
+async def get_instructors():
+    """Get all available instructors in 'Last, First' format"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT last_name, first_name FROM instructors ORDER BY last_name, first_name")
+        instructors = cursor.fetchall()
+        return [f"{inst[0]}, {inst[1]}" for inst in instructors]
+
 # --- Debug Endpoint ---
 @app.get("/api/routes", tags=["Debug"])
 async def list_routes():

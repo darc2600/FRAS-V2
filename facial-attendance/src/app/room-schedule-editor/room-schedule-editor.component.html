@@ -8,7 +8,21 @@
     </div>
     <div class="editor-field">
       <label>Course Code</label>
-      <input [(ngModel)]="courseCode" placeholder="e.g., IT123L">
+      <div class="course-input-container">
+        <input [(ngModel)]="courseCode"
+               (input)="onCourseInputChange()"
+               (focus)="onCourseInputChange()"
+               (blur)="hideSuggestions()"
+               placeholder="Start typing to search courses..."
+               autocomplete="off">
+        <div class="suggestions-dropdown" *ngIf="showCourseSuggestions">
+          <div class="suggestion-item"
+               *ngFor="let course of filteredCourses"
+               (mousedown)="selectCourse(course)">
+            <strong>{{ course.code }}</strong> - {{ course.name }}
+          </div>
+        </div>
+      </div>
     </div>
     <div class="editor-field">
       <label>Section</label>
@@ -16,7 +30,21 @@
     </div>
     <div class="editor-field">
       <label>Professor</label>
-      <input [(ngModel)]="professor" placeholder="e.g., Lastname">
+      <div class="professor-input-container">
+        <input [(ngModel)]="professor"
+               (input)="onProfessorInputChange()"
+               (focus)="onProfessorInputChange()"
+               (blur)="hideSuggestions()"
+               placeholder="Start typing to search professors..."
+               autocomplete="off">
+        <div class="suggestions-dropdown" *ngIf="showInstructorSuggestions">
+          <div class="suggestion-item"
+               *ngFor="let instructor of filteredInstructors"
+               (mousedown)="selectInstructor(instructor)">
+            {{ instructor }}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

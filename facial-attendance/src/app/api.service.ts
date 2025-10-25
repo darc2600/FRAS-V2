@@ -51,6 +51,14 @@ export class ApiService {
     return this.http.delete<any>(`${this.backendUrl}/api/schedule/${roomId}`);
   }
 
+  getCourses(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/courses`);
+  }
+
+  getInstructors(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.backendUrl}/api/instructors`);
+  }
+
   registerStudent(formData: FormData): Observable<any> {
     return this.http.post(`${this.backendUrl}/api/register`, formData);
   }
