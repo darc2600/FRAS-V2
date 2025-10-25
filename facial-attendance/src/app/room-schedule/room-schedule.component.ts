@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ApiService } from '../api.service';
 
 const TIME_SLOTS = [
   "07:00AM - 08:10AM", "08:10AM - 09:20AM", "09:20AM - 10:30AM", "10:30AM - 11:40AM",
@@ -22,7 +22,7 @@ export class RoomScheduleComponent implements OnInit {
   grid: any[][] = this.timeSlots.map(() => this.days.map(() => null));
   message = '';
 
-  constructor(private http: HttpClient) {}
+  constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.loadSchedule();
@@ -30,9 +30,8 @@ export class RoomScheduleComponent implements OnInit {
 
   loadSchedule() {
   if (!this.room) return;
-  this.http.get<any>(`http://127.0.0.1:8000/api/schedule/${this.room}`)
-      .subscribe({
-        next: (data) => {
+  this.api.getRoomSchedule(this.room).subscribe({
+    next: (data: any) => {
           this.grid = this.timeSlots.map(() => this.days.map(() => null));
           const scheduleList = (data && data.schedule) ? data.schedule : [];
           scheduleList.forEach((entry: any) => {

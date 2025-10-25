@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ApiService } from '../api.service';
 
 interface ScheduleCell {
   courseCode?: string;
@@ -37,12 +37,11 @@ export class RoomScheduleEditorComponent {
   section = '';
   professor = '';
 
-  constructor(private http: HttpClient) {}
+  constructor(private api: ApiService) {}
 
   loadSchedule() {
     if (!this.room) return;
-  this.http.get<any>(`http://127.0.0.1:8000/api/schedule/${this.room}`)
-      .subscribe(data => {
+    this.api.getRoomSchedule(this.room).subscribe((data: any) => {
         // Reset grid
         this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
         // Fill grid with loaded data
@@ -120,10 +119,9 @@ export class RoomScheduleEditorComponent {
       }
     }
     console.log('Saving schedule:', schedule);
-  this.http.post(`http://127.0.0.1:8000/api/schedule/${this.room}`, schedule)
-      .subscribe({
-        next: () => this.message = 'Schedule saved!',
-        error: () => this.message = 'Failed to save schedule.'
-      });
+    this.api.updateRoomSchedule(this.room, schedule).subscribe({
+      next: () => this.message = 'Schedule saved!',
+      error: () => this.message = 'Failed to save schedule.'
+    });
   }
 }
