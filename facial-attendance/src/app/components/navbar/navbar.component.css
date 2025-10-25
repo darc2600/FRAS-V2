@@ -19,13 +19,21 @@ body {
 }
 
 .sidebar-logo {
-  margin: 32px 0 24px 0;
-  width: 100%;
+  margin: 32px 12px 24px 12px;
+  width: calc(100% - 24px);
   text-align: center;
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .sidebar-logo img {
-  height: 48px;
+  max-width: 100%;
+  height: auto;
+  max-height: 60px;
+  background: white;
+  border-radius: 4px;
 }
 
 .sidebar-links {
