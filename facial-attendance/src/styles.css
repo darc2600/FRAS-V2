@@ -1,3 +1,14 @@
+/* Define Ionic / app font variables so components that reference
+   --ion-font-family inherit a project-safe font stack */
+:root {
+  --ion-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Apply the variable as the default font for the app */
+body {
+  font-family: var(--ion-font-family);
+}
+
 /* You can add global styles to this file, and also import other style files */
 
 /* Status color coding for attendance */
