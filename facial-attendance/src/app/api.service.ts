@@ -27,12 +27,16 @@ export class ApiService {
     return this.http.get<any[]>(`${this.backendUrl}/api/rooms`);
   }
 
-  getCourses(roomId: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses`);
+  getFloors(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.backendUrl}/api/floors`);
   }
 
-  getSections(roomId: string, courseCode: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses/${courseCode}/sections`);
+  getRoomsByFloor(floorLevel: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/floors/${floorLevel}/rooms`);
+  }
+
+  getCoursesSectionsByRoom(roomId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/rooms/${roomId}/courses-sections`);
   }
 
   getRoomSchedule(roomId: string): Observable<any> {

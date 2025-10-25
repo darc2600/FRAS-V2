@@ -16,18 +16,10 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   courseCode = '';
   section = '';
   room = '';
-  availableCourses: string[] = [];
-  availableSections: string[] = [];
   availableRooms: string[] = [];
   allRooms: any[] = [];
   availableFloors: number[] = [];
   selectedFloor: number | null = null;
-  // Room type for clarity
-  private getRoomLabel(room: any): string {
-    if (!room) return '';
-    if (typeof room === 'string') return room;
-    return room.room_id || room.id || room.name || '';
-  }
   currentTime = '';
   message = '';
   webcamImage: WebcamImage | null = null;
@@ -35,11 +27,8 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   private trigger: Subject<void> = new Subject<void>();
 
   // --- New properties for improved UX ---
-  roomSearch = '';
-  filteredRooms: string[] = [];
   courseSection = '';
   availableCourseSections: string[] = [];
-  showRoomDropdown = false;
 
   // --- Auto recognition properties ---
   autoRecognitionActive = false;
@@ -55,7 +44,7 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.updateClock();
     setInterval(() => this.updateClock(), 1000);
-    this.fetchRooms();
+    this.fetchFloors();
 
     // Add keyboard event listener for spacebar
     document.addEventListener('keydown', this.handleKeyDown);
@@ -73,67 +62,46 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
     }
   }
 
-  fetchRooms() {
-    this.api.getRooms().subscribe(
-      (rooms: any[]) => {
-        this.allRooms = rooms;
-        // If rooms have floor_level, extract unique floors
-        this.availableFloors = Array.from(new Set(rooms.map(r => r.floor_level).filter(f => f != null))).sort((a, b) => a - b);
+  fetchFloors() {
+    this.api.getFloors().subscribe(
+      (floors: number[]) => {
+        this.availableFloors = floors;
         if (this.availableFloors.length > 0) {
           this.selectedFloor = this.availableFloors[0];
-          this.filterRoomsByFloor();
-        } else {
-          this.availableRooms = rooms.map(r => r.room_id || r.id || r.name);
-          this.filteredRooms = this.availableRooms;
+          this.onFloorChange();
         }
       },
-      err => this.message = 'Error fetching rooms.'
+      err => this.message = 'Error fetching floors.'
     );
   }
 
-  filterRoomsByFloor() {
+  onFloorChange() {
     if (this.selectedFloor == null) {
       this.availableRooms = [];
-      this.filteredRooms = [];
-      return;
-    }
-    const roomsOnFloor = this.allRooms.filter(r => r.floor_level === this.selectedFloor).map(r => r.room_id);
-    this.availableRooms = roomsOnFloor;
-    this.filteredRooms = roomsOnFloor;
-    if (roomsOnFloor.length > 0) {
-      this.room = roomsOnFloor[0];
-      this.fetchCourseSections();
-    } else {
       this.room = '';
       this.availableCourseSections = [];
       this.courseSection = '';
-    }
-  }
-
-  onRoomSearchChange() {
-    if (!this.roomSearch) {
-      this.filteredRooms = this.availableRooms;
-      this.showRoomDropdown = false;
       return;
     }
-    // Simple client-side filter
-    this.filteredRooms = this.availableRooms.filter(r =>
-      this.getRoomLabel(r).toLowerCase().includes(this.roomSearch.toLowerCase())
+    this.fetchRoomsByFloor();
+  }
+
+  fetchRoomsByFloor() {
+    this.api.getRoomsByFloor(this.selectedFloor!).subscribe(
+      (rooms: any[]) => {
+        this.allRooms = rooms; // Store the full room objects
+        this.availableRooms = rooms.map(r => r.room_number);
+        if (this.availableRooms.length > 0) {
+          this.room = this.availableRooms[0];
+          this.fetchCourseSections();
+        } else {
+          this.room = '';
+          this.availableCourseSections = [];
+          this.courseSection = '';
+        }
+      },
+      err => this.message = 'Error fetching rooms for floor.'
     );
-    this.showRoomDropdown = true;
-  }
-
-  selectRoom(room: string) {
-    this.room = room;
-    this.roomSearch = room;
-    this.showRoomDropdown = false;
-    this.fetchCourseSections();
-  }
-
-  onRoomInputBlur() {
-    setTimeout(() => {
-      this.showRoomDropdown = false;
-    }, 200);
   }
 
   onRoomChange() {
@@ -146,16 +114,19 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
       this.courseSection = '';
       return;
     }
-    this.api.getRoomSchedule(this.room).subscribe(
-      (result: any) => {
-        if (result && Array.isArray(result.schedule)) {
-          const pairs = result.schedule.map((cls: any) => `${cls.course_code || cls.courseCode} - ${cls.section}`);
-          this.availableCourseSections = Array.from(new Set(pairs));
-          this.courseSection = this.availableCourseSections[0] || '';
-        } else {
-          this.availableCourseSections = [];
-          this.courseSection = '';
-        }
+    
+    // Find the room_id for the selected room
+    const selectedRoom = this.allRooms.find(r => r.room_number === this.room);
+    if (!selectedRoom) {
+      this.availableCourseSections = [];
+      this.courseSection = '';
+      return;
+    }
+    
+    this.api.getCoursesSectionsByRoom(selectedRoom.room_id).subscribe(
+      (coursesSections: any[]) => {
+        this.availableCourseSections = coursesSections.map(cs => cs.course_section);
+        this.courseSection = this.availableCourseSections[0] || '';
         this.fetchLogs();
       },
       err => this.message = 'Error fetching course-sections.'

@@ -203,28 +203,6 @@ init_db()
 # Service Classes & Dependency Providers
 # -----------------------
 
-class RoomService:
-    def get_rooms(self):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT room_number FROM rooms")
-            return [row[0] for row in cursor.fetchall()]
-    def get_courses(self, room_number):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT co.course_code FROM classes c JOIN courses co ON c.course_id = co.course_id JOIN rooms r ON c.room_id = r.room_id WHERE r.room_number = ?", (room_number,))
-            rows = cursor.fetchall()
-            return [{'course_code': row[0]} for row in rows]
-    def get_sections(self, room_number, course_code):
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT c.section FROM classes c JOIN courses co ON c.course_id = co.course_id JOIN rooms r ON c.room_id = r.room_id WHERE r.room_number = ? AND co.course_code = ?", (room_number, course_code))
-            rows = cursor.fetchall()
-            return [{'section': row[0]} for row in rows]
-
-def get_room_service():
-    return RoomService()
-
 # Dummy response models for FastAPI (replace with your actual Pydantic models if available)
 class AttendanceResponse(dict): pass
 class RecognitionResponse(dict): pass
@@ -243,6 +221,9 @@ from services.recognition_service import RecognitionService, get_recognition_ser
 
 # Use the real RegistrationService from services/registration_service.py
 from services.registration_service import RegistrationService, get_registration_service
+
+# Use the real RoomService from services/room_service.py
+from services.room_service import RoomService, get_room_service
 
 class CaptureService:
     async def capture_image(self, file, course_code, section, student_id):
@@ -284,8 +265,7 @@ app.openapi_tags = tags_metadata
 # -----------------------
 
 @app.get("/api/rooms", tags=["Rooms"])
-async def get_rooms():
-    room_service = RoomService()
+async def get_rooms(room_service=Depends(get_room_service)):
     return room_service.get_rooms()
 
 @app.get("/api/rooms/{room_id}/courses", tags=["Rooms"])
@@ -295,6 +275,22 @@ async def get_courses(room_id: str, room_service=Depends(get_room_service)):
 @app.get("/api/rooms/{room_id}/courses/{course_code}/sections", tags=["Rooms"])
 async def get_sections(room_id: str, course_code: str, room_service=Depends(get_room_service)):
     return room_service.get_sections(room_id, course_code)
+
+# --- Floor and Room Selection Endpoints ---
+@app.get("/api/floors", tags=["Rooms"])
+async def get_floor_levels(room_service=Depends(get_room_service)):
+    """Get all unique floor levels"""
+    return room_service.get_floor_levels()
+
+@app.get("/api/floors/{floor_level}/rooms", tags=["Rooms"])
+async def get_rooms_by_floor(floor_level: int, room_service=Depends(get_room_service)):
+    """Get all rooms on a specific floor level"""
+    return room_service.get_rooms_by_floor(floor_level)
+
+@app.get("/api/rooms/{room_id}/courses-sections", tags=["Rooms"])
+async def get_courses_sections_by_room(room_id: int, room_service=Depends(get_room_service)):
+    """Get all courses and sections for a specific room"""
+    return room_service.get_courses_sections_by_room(room_id)
 
 # --- Attendance Endpoint ---
 @app.get("/api/attendance", response_model=None, tags=["Attendance"])

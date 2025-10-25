@@ -4,16 +4,15 @@
         <div style="display: flex; gap: 1rem; align-items: center;">
           <label>
             Floor:
-            <select [(ngModel)]="selectedFloor" (change)="filterRoomsByFloor()">
+            <select [(ngModel)]="selectedFloor" (change)="onFloorChange()">
               <option *ngFor="let f of availableFloors" [value]="f">{{f}}</option>
             </select>
           </label>
-          <label style="position: relative;">
+          <label>
             Room:
-            <input type="text" [(ngModel)]="roomSearch" (input)="onRoomSearchChange()" (focus)="showRoomDropdown = true" (blur)="onRoomInputBlur()" placeholder="Search room..." style="width: 120px;" autocomplete="off" />
-            <ul *ngIf="showRoomDropdown && filteredRooms.length > 0" class="dropdown-list">
-              <li *ngFor="let r of filteredRooms" (mousedown)="selectRoom(r)">{{r}}</li>
-            </ul>
+            <select [(ngModel)]="room" (change)="onRoomChange()">
+              <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
+            </select>
           </label>
           <label>
             Course-Section:
