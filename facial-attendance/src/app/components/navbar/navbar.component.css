@@ -50,7 +50,7 @@ body {
   min-width: 200px;
   max-width: 200px;
   padding: 16px 24px;
-  color: #FFD700;
+  color: #fff;
   text-decoration: none;
   font-weight: bold;
   font-size: 18px;
@@ -62,8 +62,8 @@ body {
 
 .sidebar-links a.active,
 .sidebar-links a:hover {
-  background: #bb5d00;
-  color: #fff;
+  background: #fff;
+  color: #FFD700;
   z-index: 1;
   position: relative;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
