@@ -257,6 +257,12 @@ export class RegistrationComponent implements OnInit, OnDestroy {
   defaultTarget = 10;
 
   form: any;
+  // Simple registration fields (used by the lightweight registration page)
+  username = '';
+  password = '';
+  email = '';
+  error = '';
+  success = '';
   // For schedule entry
   scheduleCourseCode = '';
   scheduleSection = '';
@@ -286,6 +292,29 @@ export class RegistrationComponent implements OnInit, OnDestroy {
       email: ['', [Validators.email, Validators.maxLength(100)]],
       imageCount: [this.defaultTarget, [Validators.required, Validators.min(1), Validators.max(50)]],
     });
+  }
+
+  // Simple JSON registration used by the lightweight page
+  register() {
+    this.error = '';
+    this.success = '';
+    if (!this.username || !this.password || !this.email) {
+      this.error = 'All fields are required';
+      return;
+    }
+    this.subs.add(
+      this.regSvc.register({ username: this.username, password: this.password, email: this.email }).subscribe({
+        next: () => {
+          this.success = 'Registration successful!';
+          this.username = '';
+          this.password = '';
+          this.email = '';
+        },
+        error: err => {
+          this.error = err?.error?.message || 'Registration failed.';
+        }
+      })
+    );
   }
 
   async ngOnInit() {
