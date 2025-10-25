@@ -6,8 +6,8 @@ class AttendanceService:
     def __init__(self, repo: AttendanceRepository):
         self.repo = repo
 
-    def get_attendance(self, course_code: str, section: str, room: str = None) -> AttendanceResponse:
-        records = self.repo.fetch_attendance(course_code, section, room)
+    def get_attendance(self, course_code: str, section: str, room: str = None, start_date: str = None, end_date: str = None) -> AttendanceResponse:
+        records = self.repo.fetch_attendance(course_code, section, room, start_date, end_date)
         # Convert student_id (first element) to string in each record
         fixed_records = []
         for rec in records:

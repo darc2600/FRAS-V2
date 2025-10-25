@@ -1,28 +1,27 @@
-<div class="attendance-logs-main">
-  <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2 class="logs-header">Attendance Logs</h2>
-      <div class="small text-muted">{{ currentTime }}</div>
-    </div>
+<main class="content-area">
+  <div class="attendance-page">
+    <header class="page-header">
+      <!-- <h2 class="logs-header">Attendance Logs</h2> -->
+    </header>
 
-    <div class="top-bar row g-3 align-items-end mb-3">
-      <div class="col-md-2">
+    <div class="top-bar">
+      <!-- <div class="col-md-2">
         <label>Floor:</label>
         <select class="form-select" [(ngModel)]="selectedFloor" (change)="onFloorChange()">
           <option *ngFor="let f of availableFloors" [value]="f">Floor {{f}}</option>
         </select>
       </div>
       <div class="col-md-2">
-        <label>Room:</label>
+        <label>Room (Optional):</label>
         <select class="form-select" [(ngModel)]="room" (change)="onRoomChange()">
-          <option value="">Select room...</option>
+          <option value="">All rooms</option>
           <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
         </select>
-      </div>
-      <div class="col-md-3">
+      </div> -->
+      <div class="field">
         <label>Course Code:</label>
         <div class="course-input-container">
-          <input type="text" class="form-control" [(ngModel)]="courseCode"
+          <input type="text" [(ngModel)]="courseCode"
                  (input)="onCourseInputChange()"
                  (focus)="onCourseInputChange()"
                  (blur)="hideSuggestions()"
@@ -37,58 +36,77 @@
           </div>
         </div>
       </div>
-      <div class="col-md-2">
+      <div class="field">
         <label>Section:</label>
-        <select class="form-select" [(ngModel)]="section" [disabled]="availableSections.length === 0">
+        <select [(ngModel)]="section" (change)="onSectionChange()" [disabled]="availableSections.length === 0">
           <option value="">Select section...</option>
           <option *ngFor="let s of availableSections" [value]="s">{{s}}</option>
         </select>
       </div>
-      <div class="col-md-2">
-        <label>Date:</label>
-        <input type="date" class="form-control" [(ngModel)]="selectedDate">
+      <div class="field">
+        <label>Start Date:</label>
+        <input type="date" [(ngModel)]="startDate">
       </div>
-      <div class="col-md-1">
-        <button class="btn btn-primary w-100" (click)="fetchLogs()" [disabled]="loading">Fetch</button>
+      <div class="field">
+        <label>End Date:</label>
+        <input type="date" [(ngModel)]="endDate">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="fetch-btn" (click)="fetchLogs()" [disabled]="loading || !courseCode || !section">
+          <span *ngIf="!loading">Search Logs</span>
+          <span *ngIf="loading">Searching...</span>
+        </button>
       </div>
     </div>
 
-    <div *ngIf="loading" class="text-center my-3">
-      <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+    <div *ngIf="loading" class="loading-container">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <div style="margin-top: 10px;">Loading attendance records...</div>
     </div>
-    <div *ngIf="message && !loading" class="alert alert-info">{{message}}</div>
 
-    <div *ngIf="logs.length" class="attendance-log-box card mt-3">
-      <div class="card-body p-0">
-        <table class="attendance-table table table-striped mb-0">
-          <thead class="table-dark">
-            <tr>
-              <th>#</th>
-              <th>Student ID</th>
-              <th>Name</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let log of logs; let i = index">
-              <td>{{i + 1}}</td>
-              <td>{{log.studentId || log.studentNo}}</td>
-              <td>{{log.studentName || log.name}}</td>
-              <td>{{ formatDateTime(log.time).split(' ')[0] }}</td>
-              <td>{{ formatDateTime(log.time).split(' ')[1] + ' ' + formatDateTime(log.time).split(' ')[2] }}</td>
-              <td>
-                <span [ngClass]="{
-                  'badge bg-success': log.status === 'Present',
-                  'badge bg-warning text-dark': log.status === 'Late',
-                  'badge bg-danger': log.status === 'Absent'
-                }">{{ log.status }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <div *ngIf="message && !loading" class="message-container">
+      {{message}}
+    </div>
+
+    <div *ngIf="logs.length" class="attendance-log-box">
+      <div class="attendance-log-header">
+        <span>Attendance Records</span>
+        <span class="log-date">{{ startDate | date:'mediumDate' }} - {{ endDate | date:'mediumDate' }}</span>
+      </div>
+      <div *ngFor="let date of objectKeys(groupedLogs)" class="date-section">
+        <h4 class="date-header">{{ date | date:'fullDate' }}</h4>
+        <div class="table-container">
+          <table class="attendance-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let log of groupedLogs[date]; let i = index">
+                <td>{{i + 1}}</td>
+                <td>{{log.studentId || log.studentNo}}</td>
+                <td>{{log.studentName || log.name}}</td>
+                <td>{{ formatDateTime(log.time).split(' ')[1] + ' ' + formatDateTime(log.time).split(' ')[2] }}</td>
+                <td>
+                  <span [ngClass]="{
+                    'status-present': log.status === 'Present',
+                    'status-late': log.status === 'Late',
+                    'status-absent': log.status === 'Absent'
+                  }">{{ log.status }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
-</div>
+</main>

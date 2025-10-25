@@ -19,8 +19,18 @@ export class ApiService {
     return this.http.post(`${this.backendUrl}/api/recognize`, formData);
   }
 
-  getAttendance(courseCode: string, section: string, room: string) {
-    return this.http.get<any>(`${this.backendUrl}/api/attendance?course_code=${courseCode}&section=${section}&room=${room}`);
+  getAttendance(courseCode: string, section: string, room?: string, startDate?: string, endDate?: string) {
+    let url = `${this.backendUrl}/api/attendance?course_code=${courseCode}&section=${section}`;
+    if (room) {
+      url += `&room=${room}`;
+    }
+    if (startDate) {
+      url += `&start_date=${startDate}`;
+    }
+    if (endDate) {
+      url += `&end_date=${endDate}`;
+    }
+    return this.http.get<any>(url);
   }
 
   getRooms(): Observable<any[]> {

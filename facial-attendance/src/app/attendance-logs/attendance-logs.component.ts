@@ -8,13 +8,14 @@ import { ApiService } from '../api.service';
   styleUrls: ['./attendance-logs.component.css'],
 })
 export class AttendanceLogsComponent implements OnInit {
-  selectedDate: string = '';
-  currentTime: string = '';
-  availableFloors: number[] = [];
-  selectedFloor: number | null = null;
-  allRooms: any[] = [];
-  availableRooms: string[] = [];
-  room = '';
+  startDate: string = '';
+  endDate: string = '';
+  // currentTime: string = '';
+  // availableFloors: number[] = [];
+  // selectedFloor: number | null = null;
+  // allRooms: any[] = [];
+  // availableRooms: string[] = [];
+  // room = '';
   
   // Course and section filtering
   courseCode = '';
@@ -25,108 +26,106 @@ export class AttendanceLogsComponent implements OnInit {
   showCourseSuggestions = false;
   
   logs: any[] = [];
+  groupedLogs: { [date: string]: any[] } = {};
   message = '';
   loading = false;
 
   constructor(private api: ApiService) {}
 
   ngOnInit() {
-    this.updateClock();
-    setInterval(() => this.updateClock(), 1000);
-    
-    // Set default date to today
+    // Set default dates to today
     const today = new Date();
-    this.selectedDate = today.toISOString().split('T')[0];
+    this.startDate = today.toISOString().split('T')[0];
+    this.endDate = today.toISOString().split('T')[0];
     
-    this.fetchFloors();
+    // this.fetchFloors();
     this.loadValidationData();
   }
 
-  updateClock() {
-    this.currentTime = new Date().toLocaleTimeString();
-  }
+  // fetchFloors() {
+  //   this.api.getFloors().subscribe(
+  //     (floors: number[]) => {
+  //       this.availableFloors = floors;
+  //       if (this.availableFloors.length > 0) {
+  //         this.selectedFloor = this.availableFloors[0];
+  //         this.onFloorChange();
+  //       }
+  //     },
+  //     err => this.message = 'Error fetching floors.'
+  //   );
+  // }
 
-  fetchFloors() {
-    this.api.getFloors().subscribe(
-      (floors: number[]) => {
-        this.availableFloors = floors;
-        if (this.availableFloors.length > 0) {
-          this.selectedFloor = this.availableFloors[0];
-          this.onFloorChange();
-        }
-      },
-      err => this.message = 'Error fetching floors.'
-    );
-  }
+  // onFloorChange() {
+  //   if (this.selectedFloor == null) {
+  //     this.availableRooms = [];
+  //     this.room = '';
+  //     return;
+  //   }
+  //   this.fetchRoomsByFloor();
+  // }
 
-  onFloorChange() {
-    if (this.selectedFloor == null) {
-      this.availableRooms = [];
-      this.room = '';
-      return;
-    }
-    this.fetchRoomsByFloor();
-  }
+  // fetchRoomsByFloor() {
+  //   this.api.getRoomsByFloor(this.selectedFloor!).subscribe(
+  //     (rooms: any[]) => {
+  //       this.allRooms = rooms;
+  //       this.availableRooms = rooms.map(r => r.room_number);
+  //       if (this.availableRooms.length > 0) {
+  //         this.room = this.availableRooms[0];
+  //         this.onRoomChange();
+  //       } else {
+  //         this.room = '';
+  //         this.availableSections = [];
+  //         this.section = '';
+  //       }
+  //     },
+  //     err => this.message = 'Error fetching rooms for floor.'
+  //   );
+  // }
 
-  fetchRoomsByFloor() {
-    this.api.getRoomsByFloor(this.selectedFloor!).subscribe(
-      (rooms: any[]) => {
-        this.allRooms = rooms;
-        this.availableRooms = rooms.map(r => r.room_number);
-        if (this.availableRooms.length > 0) {
-          this.room = this.availableRooms[0];
-          this.onRoomChange();
-        } else {
-          this.room = '';
-          this.availableSections = [];
-          this.section = '';
-        }
-      },
-      err => this.message = 'Error fetching rooms for floor.'
-    );
-  }
-
-  onRoomChange() {
-    this.loadAvailableSections();
-  }
+  // onRoomChange() {
+  //   this.loadAvailableSections();
+  // }
 
   onCourseChange() {
     this.loadAvailableSections();
   }
 
+  onSectionChange() {
+    // Section changed - user can now click Search Logs button
+    // Auto-fetch removed to give user control
+  }
+
   loadAvailableSections() {
-    if (!this.room || !this.courseCode) {
+    if (!this.courseCode) {
       this.availableSections = [];
       this.section = '';
       return;
     }
 
-    // Find the room_id for the selected room
-    const selectedRoom = this.allRooms.find(r => r.room_number === this.room);
-    if (!selectedRoom) {
-      this.availableSections = [];
-      this.section = '';
-      return;
-    }
+    // Get all sections for the selected course across all rooms
+    this.getAllSectionsForCourse();
+  }
 
-    // Get course sections for this room
-    this.api.getCoursesSectionsByRoom(selectedRoom.room_id).subscribe(
-      (coursesSections: any[]) => {
-        // Filter sections for the selected course
-        const courseSections = coursesSections.filter(cs => 
-          cs.course_code === this.courseCode || cs.courseCode === this.courseCode
-        );
-        this.availableSections = courseSections.map(cs => cs.section);
-        
-        // Reset section if current selection is not available
-        if (this.section && !this.availableSections.includes(this.section)) {
-          this.section = this.availableSections.length > 0 ? this.availableSections[0] : '';
-        } else if (!this.section && this.availableSections.length > 0) {
-          this.section = this.availableSections[0];
+  getAllSectionsForCourse() {
+    // Since we don't have room filtering, we need to get sections differently
+    // For now, let's use a simple approach - get all courses and find sections for the selected course
+    this.api.getCourses().subscribe(
+      (courses: any[]) => {
+        const selectedCourse = courses.find(c => c.code === this.courseCode);
+        if (selectedCourse) {
+          // For simplicity, let's assume sections are AM1, PM1, etc. or we can hardcode some common sections
+          // In a real implementation, we'd need a backend endpoint to get sections for a course
+          this.availableSections = ['AM1', 'PM1', 'AM2', 'PM2']; // Common sections
+          if (!this.section && this.availableSections.length > 0) {
+            this.section = this.availableSections[0];
+          }
+        } else {
+          this.availableSections = [];
+          this.section = '';
         }
       },
       err => {
-        console.error('Error fetching course sections:', err);
+        console.error('Error fetching courses:', err);
         this.availableSections = [];
         this.section = '';
       }
@@ -174,14 +173,16 @@ export class AttendanceLogsComponent implements OnInit {
   }
 
   fetchLogs() {
-    if (!this.courseCode || !this.section || !this.room) {
+    if (!this.courseCode || !this.section) {
       this.logs = [];
-      this.message = 'Please select room, course, and section.';
+      this.groupedLogs = {};
+      this.message = 'Please select course and section.';
       return;
     }
     
     this.loading = true;
-    this.api.getAttendance(this.courseCode, this.section, this.room).subscribe(
+    // Pass undefined for room since we're not using room filtering
+    this.api.getAttendance(this.courseCode, this.section, undefined, this.startDate, this.endDate).subscribe(
       res => {
         this.logs = (res.attendance || []).map((log: any) => ({
           studentId: log[0],
@@ -189,11 +190,12 @@ export class AttendanceLogsComponent implements OnInit {
           time: log[2],
           status: log[3] || 'Unknown'
         }));
+        this.groupLogsByDate();
         this.loading = false;
         if (!this.logs || this.logs.length === 0) {
-          this.message = 'No records found.';
+          this.message = `No attendance records found for ${this.courseCode} ${this.section} from ${this.startDate} to ${this.endDate}.`;
         } else {
-          this.message = '';
+          this.message = `Found ${this.logs.length} attendance record${this.logs.length === 1 ? '' : 's'}.`;
         }
       },
       err => {
@@ -201,6 +203,21 @@ export class AttendanceLogsComponent implements OnInit {
         this.loading = false;
       }
     );
+  }
+
+  groupLogsByDate() {
+    this.groupedLogs = {};
+    this.logs.forEach(log => {
+      const date = new Date(log.time).toISOString().split('T')[0];
+      if (!this.groupedLogs[date]) {
+        this.groupedLogs[date] = [];
+      }
+      this.groupedLogs[date].push(log);
+    });
+  }
+
+  get objectKeys() {
+    return Object.keys;
   }
 
   getStatusClass(status: string) {

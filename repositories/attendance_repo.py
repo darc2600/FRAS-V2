@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 
 class AttendanceRepository:
-    def fetch_attendance(self, course_code: str, section: str, room: str = None) -> List[Tuple[str, str, str]]:
+    def fetch_attendance(self, course_code: str, section: str, room: str = None, start_date: str = None, end_date: str = None) -> List[Tuple[str, str, str]]:
         with get_connection() as conn:
             cursor = conn.cursor()
             # Get course_id from course_code
@@ -31,7 +31,10 @@ class AttendanceRepository:
                 SELECT a.student_id, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, a.status FROM attendance_logs a
                 LEFT JOIN students s ON a.student_id = s.student_id
                 WHERE a.class_id = ?
-            """, (class_id,))
+                AND (? IS NULL OR DATE(a.timestamp) >= DATE(?))
+                AND (? IS NULL OR DATE(a.timestamp) <= DATE(?))
+                ORDER BY a.timestamp
+            """, (class_id, start_date, start_date, end_date, end_date))
             return cursor.fetchall()
 
 
