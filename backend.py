@@ -332,6 +332,10 @@ async def get_room_schedule(room_id: str, schedule_service=Depends(get_schedule_
 async def update_room_schedule(room_id: str, request: Request, schedule_service=Depends(get_schedule_service)):
     return await schedule_service.update_room_schedule(room_id, request)
 
+@app.delete("/api/schedule/{room_id}", tags=["Schedule"])
+async def delete_room_schedule(room_id: str, schedule_service=Depends(get_schedule_service)):
+    return await schedule_service.delete_room_schedule(room_id)
+
 # --- Debug Endpoint ---
 @app.get("/api/routes", tags=["Debug"])
 async def list_routes():

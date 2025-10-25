@@ -209,18 +209,24 @@ export class RoomScheduleEditorComponent {
     }
 
     this.isDeleting = true;
-    // For now, just clear the grid since DELETE isn't supported in backend
-    this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
-    this.originalGrid = JSON.parse(JSON.stringify(this.grid));
-    this.actionHistory = [];
-
-    // Here you would call the API to delete the schedule
-    // this.api.deleteRoomSchedule(this.room).subscribe(...)
-
-    this.message = `Schedule for Room ${this.room} has been deleted.`;
-    this.messageType = 'success';
-    this.closeDeleteModal();
-    this.isDeleting = false;
+    this.api.deleteRoomSchedule(this.room).subscribe({
+      next: (response) => {
+        // Clear the grid after successful deletion
+        this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
+        this.originalGrid = JSON.parse(JSON.stringify(this.grid));
+        this.actionHistory = [];
+        
+        this.message = `Schedule for Room ${this.room} has been deleted.`;
+        this.messageType = 'success';
+        this.closeDeleteModal();
+        this.isDeleting = false;
+      },
+      error: (error) => {
+        this.message = 'Failed to delete schedule.';
+        this.messageType = 'error';
+        this.isDeleting = false;
+      }
+    });
   }
 
   saveSchedule() {
