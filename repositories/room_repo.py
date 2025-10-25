@@ -42,7 +42,7 @@ class RoomRepository:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT DISTINCT co.course_code, c.section
+                SELECT DISTINCT c.class_id, co.course_code, c.section
                 FROM classes c
                 JOIN courses co ON c.course_id = co.course_id
                 WHERE c.room_id = ?
@@ -50,7 +50,7 @@ class RoomRepository:
             """, (room_id,))
             rows = cursor.fetchall()
             return [
-                {"course_section": f"{row[0]}-{row[1]}", "course_code": row[0], "section": row[1]}
+                {"course_section": f"{row[1]}-{row[2]}", "course_code": row[1], "section": row[2], "class_id": row[0]}
                 for row in rows
             ]
 

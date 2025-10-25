@@ -10,12 +10,10 @@ export class ApiService {
 
   constructor(private http: HttpClient) {}
 
-  recognizeFace(file: File, courseCode: string, section: string, room: string): Observable<any> {
+  recognizeFace(file: File, classId: number): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('course_code', courseCode);
-    formData.append('section', section);
-    formData.append('room', room);
+    formData.append('class_id', classId.toString());
     return this.http.post(`${this.backendUrl}/api/recognize`, formData);
   }
 

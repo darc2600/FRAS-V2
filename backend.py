@@ -299,8 +299,8 @@ async def get_attendance(course_code: str, section: str, room: str = None, start
 
 # --- Recognition Endpoint ---
 @app.post("/api/recognize", response_model=None, tags=["Recognition"])
-async def recognize_face(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), room: str = Form(...), recognition_service=Depends(get_recognition_service)):
-    return await recognition_service.recognize_face(file, course_code, section, room)
+async def recognize_face(file: UploadFile = File(...), class_id: int = Form(...), recognition_service=Depends(get_recognition_service)):
+    return await recognition_service.recognize_face(file, class_id)
 
 # --- Registration Endpoint ---
 @app.post("/api/register", response_model=None, tags=["Registration"])

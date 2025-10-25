@@ -29,6 +29,8 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   // --- New properties for improved UX ---
   courseSection = '';
   availableCourseSections: string[] = [];
+  availableCourseSectionObjects: any[] = [];
+  selectedClassId: number | null = null;
 
   // --- Auto recognition properties ---
   autoRecognitionActive = false;
@@ -127,10 +129,12 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
     console.log('Fetching course sections for room_id:', selectedRoom.room_id);
     this.api.getCoursesSectionsByRoom(selectedRoom.room_id).subscribe(
       (coursesSections: any[]) => {
+        this.availableCourseSectionObjects = coursesSections;
         this.availableCourseSections = coursesSections.map(cs => cs.course_section);
         console.log('Available course sections:', this.availableCourseSections);
         this.courseSection = this.availableCourseSections[0] || '';
         console.log('Selected course section:', this.courseSection);
+        this.updateSelectedClassId();
         this.fetchLogs();
       },
       err => {
@@ -141,8 +145,16 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   }
 
   onCourseSectionChange() {
-    console.log('Course section changed to:', this.courseSection);
+    console.log('onCourseSectionChange: Course section changed to:', this.courseSection);
+    this.updateSelectedClassId();
+    console.log('onCourseSectionChange: Updated classId to:', this.selectedClassId);
     this.fetchLogs();
+  }
+
+  updateSelectedClassId() {
+    const selectedObject = this.availableCourseSectionObjects.find(cs => cs.course_section === this.courseSection);
+    this.selectedClassId = selectedObject ? selectedObject.class_id : null;
+    console.log('Selected class_id:', this.selectedClassId);
   }
 
   updateClock() {
@@ -202,48 +214,68 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   }
 
   autoMarkAttendance() {
-    if (!this.webcamImage || !this.courseSection || !this.room) return;
-    const [courseCode, section] = this.courseSection.split('-');
+    if (!this.webcamImage || !this.selectedClassId) {
+      console.log('autoMarkAttendance: Missing webcam image or classId');
+      return;
+    }
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-    this.api.recognizeFace(file, courseCode, section, this.room).subscribe(
+    console.log('autoMarkAttendance: Calling recognize API with classId:', this.selectedClassId);
+    this.api.recognizeFace(file, this.selectedClassId).subscribe(
       res => {
+        console.log('autoMarkAttendance: API response:', res);
         if (res.status === 'success') {
           // Avoid duplicate marking within 10 seconds
           if (this.lastRecognizedId !== res.student_id || Date.now() - this.lastRecognizedTime > 10000) {
-            this.message = `Attendance marked for ${res.student_id}`;
+            this.message = `Attendance marked for ${res.student_name || 'Unknown'}: ${res.attendance_status || 'Unknown'}`;
             this.lastRecognizedId = res.student_id;
             this.lastRecognizedTime = Date.now();
+            console.log('autoMarkAttendance: Calling fetchLogs after successful recognition');
             this.fetchLogs();
+          } else {
+            console.log('autoMarkAttendance: Duplicate recognition, skipping');
           }
         } else {
+          console.log('autoMarkAttendance: Recognition failed:', res.message);
           this.message = res.message;
         }
       },
-      err => this.message = 'Error connecting to backend.'
+      err => {
+        console.log('autoMarkAttendance: API error:', err);
+        this.message = 'Error connecting to backend.';
+      }
     );
   }
 
   performAttendanceRecognition() {
     if (!this.webcamImage) {
+      console.log('performAttendanceRecognition: No webcam image');
       this.message = 'Please capture an image first.';
       return;
     }
-    if (!this.courseSection || !this.room) {
+    if (!this.selectedClassId) {
+      console.log('performAttendanceRecognition: No classId selected');
       this.message = 'Please select a room and course-section.';
       return;
     }
-    const [courseCode, section] = this.courseSection.split('-');
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-    this.api.recognizeFace(file, courseCode, section, this.room).subscribe(
+    console.log('performAttendanceRecognition: Calling recognize API with classId:', this.selectedClassId);
+    this.api.recognizeFace(file, this.selectedClassId).subscribe(
       res => {
+        console.log('performAttendanceRecognition: API response:', res);
         this.message = res.status === 'success'
-          ? `Attendance marked for ${res.student_id}`
+          ? `Attendance marked for ${res.student_name || 'Unknown'}: ${res.attendance_status || 'Unknown'}`
           : res.message;
-        this.fetchLogs();
+        if (res.status === 'success') {
+          console.log('performAttendanceRecognition: Calling fetchLogs after successful recognition');
+          this.fetchLogs();
+        }
       },
-      err => this.message = 'Error connecting to backend.'
+      err => {
+        console.log('performAttendanceRecognition: API error:', err);
+        this.message = 'Error connecting to backend.';
+      }
     );
   }
 
@@ -259,26 +291,28 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
 
   fetchLogs() {
     if (!this.courseSection) {
+      console.log('fetchLogs: No courseSection selected');
       this.attendanceLogs = [];
       return;
     }
     const [courseCode, section] = this.courseSection.split('-');
-    // Get today's date for filtering attendance to current day
-    const today = new Date().toISOString().split('T')[0];
-    console.log('Fetching logs for:', courseCode, section, today);
-    // For now, don't filter by room to show all attendance for the course-section
+    // Get today's date in local timezone (not UTC)
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
+    console.log('fetchLogs: Fetching logs for:', courseCode, section, 'date:', today, 'class_id:', this.selectedClassId);
+    
     this.api.getAttendance(courseCode, section, undefined, today, today).subscribe(
       res => {
+        console.log('fetchLogs: API response:', res);
         this.attendanceLogs = (res.attendance || []).map((log: any) => ({
           studentId: log[0],
           studentName: log[1],
           time: log[2],
           status: log[3] || 'Unknown'
         }));
-        console.log('Attendance logs loaded:', this.attendanceLogs.length, 'records');
+        console.log('fetchLogs: Loaded', this.attendanceLogs.length, 'records');
       },
       err => {
-        console.error('Error fetching logs:', err);
+        console.error('fetchLogs: Error fetching logs:', err);
         this.message = 'Error fetching logs.';
       }
     );

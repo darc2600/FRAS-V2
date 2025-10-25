@@ -7,9 +7,7 @@ router = APIRouter()
 @router.post("/api/recognize", response_model=RecognitionResponse)
 async def recognize_face(
     file: UploadFile = File(...),
-    course_code: str = Form(...),
-    section: str = Form(...),
-    room: str = Form(...),
+    class_id: int = Form(...),
     service: RecognitionService = Depends(get_recognition_service)
 ):
-    return await service.recognize_face(file, course_code, section, room)
+    return await service.recognize_face(file, class_id)
