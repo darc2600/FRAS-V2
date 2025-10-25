@@ -76,4 +76,8 @@ export class ApiService {
   captureImage(formData: FormData): Observable<any> {
     return this.http.post(`${this.backendUrl}/api/capture`, formData);
   }
+
+  getStudentByNumber(studentNumber: string): Observable<any> {
+    return this.http.get(`${this.backendUrl}/api/students/${studentNumber}`);
+  }
 }
