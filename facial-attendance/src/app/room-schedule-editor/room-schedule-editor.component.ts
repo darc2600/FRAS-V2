@@ -28,6 +28,9 @@ export class RoomScheduleEditorComponent {
   }
   room = '';
   message = '';
+  isLoading = false;
+  isSaving = false;
+  messageType: 'error' | 'success' | 'info' = 'info';
   days = DAYS;
   timeSlots = TIME_SLOTS;
 
@@ -40,8 +43,15 @@ export class RoomScheduleEditorComponent {
   constructor(private api: ApiService) {}
 
   loadSchedule() {
-    if (!this.room) return;
-    this.api.getRoomSchedule(this.room).subscribe((data: any) => {
+    if (!this.room) {
+      this.message = 'Please enter a room number.';
+      this.messageType = 'error';
+      return;
+    }
+    this.isLoading = true;
+    this.message = '';
+    this.api.getRoomSchedule(this.room).subscribe({
+      next: (data: any) => {
         // Reset grid
         this.grid = this.timeSlots.map(() => this.days.map(() => ({})));
         // Fill grid with loaded data
@@ -68,23 +78,42 @@ export class RoomScheduleEditorComponent {
             }
           }
         });
-        console.log('Loaded schedule:', data);
-      });
+        this.message = scheduleList.length > 0 ? `Loaded ${scheduleList.length} schedule entries.` : 'No schedule found for this room.';
+        this.messageType = scheduleList.length > 0 ? 'success' : 'info';
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading schedule:', error);
+        this.message = 'Failed to load schedule. Please try again.';
+        this.messageType = 'error';
+        this.isLoading = false;
+      }
+    });
   }
 
   fillCell(row: number, col: number) {
     if (!this.courseCode || !this.section || !this.professor) {
-      this.message = 'Please enter Course, Section, and Professor first.';
+      this.message = 'Please enter Course Code, Section, and Professor first.';
+      this.messageType = 'error';
       return;
     }
+
+    // Basic validation
+    if (this.courseCode.trim().length === 0 || this.section.trim().length === 0 || this.professor.trim().length === 0) {
+      this.message = 'All fields must be filled out.';
+      this.messageType = 'error';
+      return;
+    }
+
     console.log('Filling cell:', row, col, this.courseCode, this.section, this.professor);
     this.grid[row][col] = {
-      courseCode: this.courseCode,
-      section: this.section,
-      professor: this.professor,
+      courseCode: this.courseCode.trim().toUpperCase(),
+      section: this.section.trim().toUpperCase(),
+      professor: this.professor.trim(),
       room: this.room
     };
-    this.message = '';
+    this.message = `Added ${this.courseCode.trim().toUpperCase()}-${this.section.trim().toUpperCase()} to ${this.days[col]} ${this.timeSlots[row]}`;
+    this.messageType = 'success';
   }
 
   clearCell(row: number, col: number) {
@@ -118,10 +147,28 @@ export class RoomScheduleEditorComponent {
         }
       }
     }
+
+    if (schedule.length === 0) {
+      this.message = 'No schedule entries to save.';
+      return;
+    }
+
     console.log('Saving schedule:', schedule);
+    this.isSaving = true;
+    this.message = 'Saving schedule...';
+
     this.api.updateRoomSchedule(this.room, schedule).subscribe({
-      next: () => this.message = 'Schedule saved!',
-      error: () => this.message = 'Failed to save schedule.'
+      next: () => {
+        this.message = `Schedule saved successfully! (${schedule.length} entries)`;
+        this.messageType = 'success';
+        this.isSaving = false;
+      },
+      error: (error) => {
+        console.error('Error saving schedule:', error);
+        this.message = 'Failed to save schedule. Please try again.';
+        this.messageType = 'error';
+        this.isSaving = false;
+      }
     });
   }
 }

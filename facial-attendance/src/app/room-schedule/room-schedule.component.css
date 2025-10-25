@@ -55,8 +55,13 @@
   cursor: pointer;
   transition: background 0.2s;
 }
-.viewer-actions button:hover {
+.viewer-actions button:hover:not(:disabled) {
   background: #a85c5c;
+}
+.viewer-actions button:disabled {
+  background: #ccc;
+  color: #666;
+  cursor: not-allowed;
 }
 .viewer-message {
   color: #a85c5c;
@@ -107,4 +112,50 @@
 }
 .cell:hover {
   background: #f0e6e6;
+}
+
+.cell.filled {
+  background: #e8f4fd;
+  border: 2px solid #4a90e2;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .schedule-grid th, .schedule-grid td {
+    min-width: 80px;
+    font-size: 0.9em;
+  }
+}
+
+@media (max-width: 768px) {
+  .room-schedule-viewer-main {
+    padding: 16px;
+  }
+  
+  .viewer-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .viewer-field input {
+    min-width: auto;
+  }
+  
+  .schedule-grid {
+    overflow-x: auto;
+  }
+  
+  .schedule-grid table {
+    min-width: 800px;
+  }
+  
+  .time-label {
+    font-size: 0.8em;
+  }
+  
+  .cell {
+    min-height: 40px;
+    padding: 4px;
+    font-size: 0.8em;
+  }
 }

@@ -19,12 +19,15 @@
       <input [(ngModel)]="professor" placeholder="e.g., Lastname">
     </div>
     <div class="editor-actions">
+      <button (click)="loadSchedule()" [disabled]="isLoading">
+        <span *ngIf="isLoading">LOADING...</span>
+        <span *ngIf="!isLoading">LOAD</span>
+      </button>
       <button (click)="addSchedule()">ADD</button>
-      <button (click)="loadSchedule()">LOAD</button>
       <button (click)="deleteSchedule()">DELETE</button>
     </div>
   </div>
-  <div *ngIf="message" class="editor-message">{{message}}</div>
+  <div *ngIf="message" class="editor-message" [class.success]="messageType === 'success'" [class.error]="messageType === 'error'">{{message}}</div>
   <div class="schedule-grid">
     <table>
       <thead>
@@ -37,7 +40,7 @@
         <tr *ngFor="let slot of timeSlots; let row = index">
           <td class="time-label">{{ slot }}</td>
           <td *ngFor="let day of days; let col = index">
-            <div class="cell">
+            <div class="cell" [class.filled]="grid[row][col]?.courseCode">
               <ng-container *ngIf="grid[row][col]?.courseCode">
                 <b>{{ grid[row][col].courseCode }}</b><br>
                 <span>{{ grid[row][col].section }}</span><br>
@@ -53,5 +56,8 @@
       </tbody>
     </table>
   </div>
-  <button class="editor-save-btn" (click)="saveSchedule()">Save Schedule</button>
+  <button class="editor-save-btn" (click)="saveSchedule()" [disabled]="isSaving">
+    <span *ngIf="isSaving">SAVING...</span>
+    <span *ngIf="!isSaving">Save Schedule</span>
+  </button>
 </div>

@@ -7,7 +7,10 @@
       <input [(ngModel)]="room" placeholder="e.g., 305">
     </div>
     <div class="viewer-actions">
-      <button (click)="loadSchedule()">LOAD</button>
+      <button (click)="loadSchedule()" [disabled]="isLoading">
+        <span *ngIf="isLoading">LOADING...</span>
+        <span *ngIf="!isLoading">LOAD</span>
+      </button>
     </div>
   </div>
   <div *ngIf="message" class="viewer-message">{{message}}</div>
@@ -23,7 +26,7 @@
         <tr *ngFor="let slot of timeSlots; let row = index">
           <td class="time-label">{{ slot }}</td>
           <td *ngFor="let day of days; let col = index">
-            <div class="cell">
+            <div class="cell" [class.filled]="grid[row][col]">
               <ng-container *ngIf="grid[row][col]">
                 <b>{{ grid[row][col].courseCode }}</b><br>
                 <span>{{ grid[row][col].section }}</span><br>

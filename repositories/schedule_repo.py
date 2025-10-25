@@ -13,6 +13,19 @@ class ScheduleRepository:
             "04:20PM - 05:30PM", "05:30PM - 06:40PM", "06:40PM - 07:50PM", "07:50PM - 09:00PM"
         ]
         DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        
+        def convert_to_12_hour(time_24h):
+            """Convert 24-hour time (HH:MM) to 12-hour format (HH:MMAM/PM)"""
+            hour, minute = map(int, time_24h.split(':'))
+            if hour == 0:
+                return f"12:{minute:02d}AM"
+            elif hour < 12:
+                return f"{hour:02d}:{minute:02d}AM"
+            elif hour == 12:
+                return f"12:{minute:02d}PM"
+            else:
+                return f"{hour-12:02d}:{minute:02d}PM"
+        
         def time_to_minutes(t):
             import re
             match = re.match(r"(\d{1,2}):(\d{2})(AM|PM)", t)
@@ -24,16 +37,19 @@ class ScheduleRepository:
             if ampm == "AM" and hour == 12:
                 hour = 0
             return hour * 60 + minute
-        def slot_range(start, end):
+        
+        def slot_range(start_24h, end_24h):
+            start_12h = convert_to_12_hour(start_24h)
+            end_12h = convert_to_12_hour(end_24h)
             slots = []
             in_range = False
             for slot in TIME_SLOTS:
                 slot_start, slot_end = slot.split(' - ')
-                if slot_start == start:
+                if slot_start == start_12h:
                     in_range = True
                 if in_range:
                     slots.append(slot)
-                if slot_end == end:
+                if slot_end == end_12h:
                     break
             return slots
         with sqlite3.connect(DB_PATH) as conn:

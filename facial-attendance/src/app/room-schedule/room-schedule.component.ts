@@ -21,6 +21,7 @@ export class RoomScheduleComponent implements OnInit {
   timeSlots = TIME_SLOTS;
   grid: any[][] = this.timeSlots.map(() => this.days.map(() => null));
   message = '';
+  isLoading = false;
 
   constructor(private api: ApiService) {}
 
@@ -29,7 +30,12 @@ export class RoomScheduleComponent implements OnInit {
   }
 
   loadSchedule() {
-  if (!this.room) return;
+  if (!this.room) {
+    this.message = 'Please enter a room number.';
+    return;
+  }
+  this.isLoading = true;
+  this.message = 'Loading schedule...';
   this.api.getRoomSchedule(this.room).subscribe({
     next: (data: any) => {
           this.grid = this.timeSlots.map(() => this.days.map(() => null));
@@ -47,11 +53,14 @@ export class RoomScheduleComponent implements OnInit {
               };
             }
           });
-          this.message = scheduleList.length ? '' : 'No schedule found for this room.';
+          this.message = scheduleList.length ? `Showing schedule with ${scheduleList.length} entries.` : 'No schedule found for this room.';
+          this.isLoading = false;
         },
-        error: () => {
+        error: (error) => {
+          console.error('Error loading schedule:', error);
           this.grid = this.timeSlots.map(() => this.days.map(() => null));
-          this.message = 'Room schedule not found.';
+          this.message = 'Failed to load schedule. Please try again.';
+          this.isLoading = false;
         }
       });
   }
