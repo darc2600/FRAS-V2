@@ -117,23 +117,31 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
     
     // Find the room_id for the selected room
     const selectedRoom = this.allRooms.find(r => r.room_number === this.room);
+    console.log('Selected room:', this.room, 'Found room object:', selectedRoom);
     if (!selectedRoom) {
       this.availableCourseSections = [];
       this.courseSection = '';
       return;
     }
     
+    console.log('Fetching course sections for room_id:', selectedRoom.room_id);
     this.api.getCoursesSectionsByRoom(selectedRoom.room_id).subscribe(
       (coursesSections: any[]) => {
         this.availableCourseSections = coursesSections.map(cs => cs.course_section);
+        console.log('Available course sections:', this.availableCourseSections);
         this.courseSection = this.availableCourseSections[0] || '';
+        console.log('Selected course section:', this.courseSection);
         this.fetchLogs();
       },
-      err => this.message = 'Error fetching course-sections.'
+      err => {
+        console.error('Error fetching course-sections:', err);
+        this.message = 'Error fetching course-sections.';
+      }
     );
   }
 
   onCourseSectionChange() {
+    console.log('Course section changed to:', this.courseSection);
     this.fetchLogs();
   }
 
@@ -195,7 +203,7 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
 
   autoMarkAttendance() {
     if (!this.webcamImage || !this.courseSection || !this.room) return;
-    const [courseCode, section] = this.courseSection.split(' - ');
+    const [courseCode, section] = this.courseSection.split('-');
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
     this.api.recognizeFace(file, courseCode, section, this.room).subscribe(
@@ -225,7 +233,7 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
       this.message = 'Please select a room and course-section.';
       return;
     }
-    const [courseCode, section] = this.courseSection.split(' - ');
+    const [courseCode, section] = this.courseSection.split('-');
     const blob = this.dataURLtoBlob(this.webcamImage.imageAsDataUrl);
     const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
     this.api.recognizeFace(file, courseCode, section, this.room).subscribe(
@@ -250,12 +258,16 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   }
 
   fetchLogs() {
-    if (!this.courseSection || !this.room) {
+    if (!this.courseSection) {
       this.attendanceLogs = [];
       return;
     }
-    const [courseCode, section] = this.courseSection.split(' - ');
-    this.api.getAttendance(courseCode, section, this.room).subscribe(
+    const [courseCode, section] = this.courseSection.split('-');
+    // Get today's date for filtering attendance to current day
+    const today = new Date().toISOString().split('T')[0];
+    console.log('Fetching logs for:', courseCode, section, today);
+    // For now, don't filter by room to show all attendance for the course-section
+    this.api.getAttendance(courseCode, section, undefined, today, today).subscribe(
       res => {
         this.attendanceLogs = (res.attendance || []).map((log: any) => ({
           studentId: log[0],
@@ -263,15 +275,19 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
           time: log[2],
           status: log[3] || 'Unknown'
         }));
+        console.log('Attendance logs loaded:', this.attendanceLogs.length, 'records');
       },
-      err => this.message = 'Error fetching logs.'
+      err => {
+        console.error('Error fetching logs:', err);
+        this.message = 'Error fetching logs.';
+      }
     );
   }
 
   getStatusClass(status: string) {
-    if (status === 'Present') return 'present';
-    if (status === 'Late') return 'late';
-    if (status === 'Absent') return 'absent';
+    if (status.toLowerCase() === 'present') return 'present';
+    if (status.toLowerCase() === 'late') return 'late';
+    if (status.toLowerCase() === 'absent') return 'absent';
     return '';
   }
 

@@ -201,5 +201,71 @@ def seed_database():
         cursor.execute("SELECT COUNT(*) FROM school_terms")
         print(f"✓ School Terms: {cursor.fetchone()[0]}")
 
+        # Add more attendance records for October 25 to test scrolling
+        add_more_attendance_records(cursor)
+        conn.commit()
+        print("Additional attendance records added for testing!")
+
+
+def add_more_attendance_records(cursor):
+    """Add more attendance records for October 25 to test scrolling"""
+    # Get GED101-AM1 class_id
+    cursor.execute("""
+        SELECT c.class_id FROM classes c
+        JOIN courses co ON c.course_id = co.course_id
+        WHERE co.course_code = ? AND c.section = ?
+    """, ('GED101', 'AM1'))
+    class_result = cursor.fetchone()
+    if not class_result:
+        print("GED101-AM1 class not found")
+        return
+    class_id = class_result[0]
+
+    # Get some student IDs
+    cursor.execute("SELECT student_id FROM students LIMIT 20")
+    student_ids = [row[0] for row in cursor.fetchall()]
+
+    if not student_ids:
+        print("No students found")
+        return
+
+    # Add more attendance records for October 25 at different times
+    import random
+    statuses = ['present', 'late', 'absent']
+    base_time = "2025-10-25 "
+
+    # Add records throughout the day
+    times = [
+        "08:00:00", "08:15:00", "08:30:00", "08:45:00", "09:00:00",
+        "09:15:00", "09:30:00", "09:45:00", "10:00:00", "10:15:00",
+        "10:30:00", "10:45:00", "11:00:00", "11:15:00", "11:30:00",
+        "13:00:00", "13:15:00", "13:30:00", "14:00:00", "14:15:00",
+        "14:30:00", "14:45:00", "15:00:00", "15:15:00", "15:30:00",
+        "15:45:00", "16:00:00", "16:15:00", "16:30:00", "16:45:00"
+    ]
+
+    records_added = 0
+    for i, time in enumerate(times):
+        # Use different students for each time slot
+        student_id = student_ids[i % len(student_ids)]
+        status = random.choice(statuses)
+        timestamp = base_time + time
+
+        # Check if record already exists
+        cursor.execute("""
+            SELECT COUNT(*) FROM attendance_logs
+            WHERE student_id = ? AND class_id = ? AND timestamp = ?
+        """, (student_id, class_id, timestamp))
+
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO attendance_logs (student_id, class_id, timestamp, status)
+                VALUES (?, ?, ?, ?)
+            """, (student_id, class_id, timestamp, status))
+            records_added += 1
+
+    print(f"Added {records_added} additional attendance records for October 25")
+
+
 if __name__ == "__main__":
     seed_database()
