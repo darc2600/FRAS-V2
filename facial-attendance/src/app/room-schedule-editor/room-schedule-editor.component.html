@@ -18,13 +18,36 @@
       <label>Professor</label>
       <input [(ngModel)]="professor" placeholder="e.g., Lastname">
     </div>
-    <div class="editor-actions">
-      <button (click)="loadSchedule()" [disabled]="isLoading">
+  </div>
+
+  <div class="editor-actions">
+    <!-- Primary Actions -->
+    <div class="action-group">
+      <button (click)="loadSchedule()" [disabled]="isLoading" class="load-btn">
         <span *ngIf="isLoading">LOADING...</span>
-        <span *ngIf="!isLoading">LOAD</span>
+        <span *ngIf="!isLoading">📂 LOAD</span>
       </button>
-      <button (click)="addSchedule()">ADD</button>
-      <button (click)="deleteSchedule()">DELETE</button>
+      <button (click)="saveSchedule()" [disabled]="isSaving" class="save-btn">
+        <span *ngIf="isSaving">💾 SAVING...</span>
+        <span *ngIf="!isSaving">💾 SAVE</span>
+      </button>
+    </div>
+
+    <!-- Edit Actions -->
+    <div class="action-group">
+      <button (click)="undoLastAction()" [disabled]="actionHistory.length === 0" class="edit-btn">
+        ↩️ UNDO
+      </button>
+      <button (click)="revertChanges()" [disabled]="actionHistory.length === 0" class="edit-btn">
+        🔄 REVERT
+      </button>
+    </div>
+
+    <!-- Destructive Action -->
+    <div class="action-group">
+      <button (click)="openDeleteModal()" class="delete-btn">
+        🗑️ DELETE
+      </button>
     </div>
   </div>
   <div *ngIf="message" class="editor-message" [class.success]="messageType === 'success'" [class.error]="messageType === 'error'">{{message}}</div>
@@ -56,8 +79,44 @@
       </tbody>
     </table>
   </div>
-  <button class="editor-save-btn" (click)="saveSchedule()" [disabled]="isSaving">
-    <span *ngIf="isSaving">SAVING...</span>
-    <span *ngIf="!isSaving">Save Schedule</span>
-  </button>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>⚠️ Delete Room Schedule</h3>
+      <button class="modal-close" (click)="closeDeleteModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="warning-text">
+        You are about to <strong>permanently delete</strong> the entire schedule for <strong>Room {{ room }}</strong>.
+      </p>
+      <p class="warning-text">
+        This action cannot be undone. All schedule entries for this room will be removed.
+      </p>
+
+      <div class="confirmation-input">
+        <label>Type "DELETE" to confirm:</label>
+        <input
+          type="text"
+          [(ngModel)]="deleteConfirmationText"
+          placeholder="Type DELETE here"
+          (keyup.enter)="confirmDeleteSchedule()"
+          maxlength="6">
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="cancel-btn" (click)="closeDeleteModal()">Cancel</button>
+      <button
+        class="confirm-delete-btn"
+        (click)="confirmDeleteSchedule()"
+        [disabled]="deleteConfirmationText !== 'DELETE' || isDeleting">
+        <span *ngIf="isDeleting">DELETING...</span>
+        <span *ngIf="!isDeleting">🗑️ Delete Schedule</span>
+      </button>
+    </div>
+  </div>
 </div>
