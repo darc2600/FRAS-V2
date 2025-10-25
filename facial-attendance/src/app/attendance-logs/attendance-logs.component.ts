@@ -10,6 +10,9 @@ import { ApiService } from '../api.service';
 export class AttendanceLogsComponent implements OnInit {
   startDate: string = '';
   endDate: string = '';
+  selectedDate: string = ''; // For single date mode
+  isDateRangeMode: boolean = false; // Toggle between single date and date range
+  
   // currentTime: string = '';
   // availableFloors: number[] = [];
   // selectedFloor: number | null = null;
@@ -33,8 +36,9 @@ export class AttendanceLogsComponent implements OnInit {
   constructor(private api: ApiService) {}
 
   ngOnInit() {
-    // Set default dates to today
+    // Set default date to today
     const today = new Date();
+    this.selectedDate = today.toISOString().split('T')[0];
     this.startDate = today.toISOString().split('T')[0];
     this.endDate = today.toISOString().split('T')[0];
     
@@ -181,8 +185,19 @@ export class AttendanceLogsComponent implements OnInit {
     }
     
     this.loading = true;
+    
+    // Set dates based on mode
+    let startDate = this.startDate;
+    let endDate = this.endDate;
+    
+    if (!this.isDateRangeMode) {
+      // Single date mode - use selected date for both start and end
+      startDate = this.selectedDate;
+      endDate = this.selectedDate;
+    }
+    
     // Pass undefined for room since we're not using room filtering
-    this.api.getAttendance(this.courseCode, this.section, undefined, this.startDate, this.endDate).subscribe(
+    this.api.getAttendance(this.courseCode, this.section, undefined, startDate, endDate).subscribe(
       res => {
         this.logs = (res.attendance || []).map((log: any) => ({
           studentNumber: log[0],
@@ -193,9 +208,15 @@ export class AttendanceLogsComponent implements OnInit {
         this.groupLogsByDate();
         this.loading = false;
         if (!this.logs || this.logs.length === 0) {
-          this.message = `No attendance records found for ${this.courseCode} ${this.section} from ${this.startDate} to ${this.endDate}.`;
+          const dateRange = this.isDateRangeMode ? 
+            `from ${startDate} to ${endDate}` : 
+            `for ${startDate}`;
+          this.message = `No attendance records found for ${this.courseCode} ${this.section} ${dateRange}.`;
         } else {
-          this.message = `Found ${this.logs.length} attendance record${this.logs.length === 1 ? '' : 's'}.`;
+          const dateRange = this.isDateRangeMode ? 
+            `${startDate} - ${endDate}` : 
+            startDate;
+          this.message = `Found ${this.logs.length} attendance record${this.logs.length === 1 ? '' : 's'} for ${dateRange}.`;
         }
       },
       err => {
@@ -220,11 +241,18 @@ export class AttendanceLogsComponent implements OnInit {
     return Object.keys;
   }
 
-  getStatusClass(status: string) {
-    if (status.toLowerCase() === 'present') return 'present';
-    if (status.toLowerCase() === 'late') return 'late';
-    if (status.toLowerCase() === 'absent') return 'absent';
-    return '';
+  toggleDateMode() {
+    this.isDateRangeMode = !this.isDateRangeMode;
+    // Reset dates when switching modes
+    const today = new Date().toISOString().split('T')[0];
+    if (this.isDateRangeMode) {
+      // Switching to date range - keep current selectedDate as startDate
+      this.startDate = this.selectedDate;
+      this.endDate = this.selectedDate;
+    } else {
+      // Switching to single date - use startDate as selectedDate
+      this.selectedDate = this.startDate;
+    }
   }
 
   formatDateTime(dt: string): string {

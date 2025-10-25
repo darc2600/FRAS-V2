@@ -81,9 +81,37 @@
   border-color: #adb5bd;
 }
 
-.fetch-btn:disabled {
+.date-mode-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-btn {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  background: #f8f9fa;
+  color: #666;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover:not(:disabled) {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.mode-btn.active {
+  background: #a85c5c;
+  color: white;
+  border-color: #a85c5c;
+}
+
+.mode-btn:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
+  cursor: default;
 }
 .loading-container {
   text-align: center;

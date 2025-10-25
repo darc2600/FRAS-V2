@@ -44,10 +44,33 @@
         </select>
       </div>
       <div class="field">
+        <label>&nbsp;</label>
+        <div class="date-mode-toggle">
+          <button 
+            class="mode-btn" 
+            [class.active]="!isDateRangeMode"
+            (click)="toggleDateMode()"
+            [disabled]="isDateRangeMode">
+            Single Date
+          </button>
+          <button 
+            class="mode-btn" 
+            [class.active]="isDateRangeMode"
+            (click)="toggleDateMode()"
+            [disabled]="!isDateRangeMode">
+            Date Range
+          </button>
+        </div>
+      </div>
+      <div class="field" *ngIf="!isDateRangeMode">
+        <label>Date:</label>
+        <input type="date" [(ngModel)]="selectedDate">
+      </div>
+      <div class="field" *ngIf="isDateRangeMode">
         <label>Start Date:</label>
         <input type="date" [(ngModel)]="startDate">
       </div>
-      <div class="field">
+      <div class="field" *ngIf="isDateRangeMode">
         <label>End Date:</label>
         <input type="date" [(ngModel)]="endDate">
       </div>
@@ -74,7 +97,8 @@
     <div *ngIf="logs.length" class="attendance-log-box">
       <div class="attendance-log-header">
         <span>Attendance Records</span>
-        <span class="log-date">{{ startDate | date:'mediumDate' }} - {{ endDate | date:'mediumDate' }}</span>
+        <span class="log-date" *ngIf="!isDateRangeMode">{{ selectedDate | date:'mediumDate' }}</span>
+        <span class="log-date" *ngIf="isDateRangeMode">{{ startDate | date:'mediumDate' }} - {{ endDate | date:'mediumDate' }}</span>
       </div>
       <div *ngFor="let date of objectKeys(groupedLogs)" class="date-section">
         <h4 class="date-header">{{ date | date:'fullDate' }}</h4>
@@ -97,10 +121,10 @@
                 <td>{{ formatDateTime(log.time).split(' ')[1] + ' ' + formatDateTime(log.time).split(' ')[2] }}</td>
                 <td>
                   <span [ngClass]="{
-                    'status-present': log.status === 'Present',
-                    'status-late': log.status === 'Late',
-                    'status-absent': log.status === 'Absent'
-                  }">{{ log.status }}</span>
+                    'status-present': log.status === 'present',
+                    'status-late': log.status === 'late',
+                    'status-absent': log.status === 'absent'
+                  }">{{ log.status | titlecase }}</span>
                 </td>
               </tr>
             </tbody>
