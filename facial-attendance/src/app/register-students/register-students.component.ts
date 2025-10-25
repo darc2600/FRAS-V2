@@ -34,8 +34,7 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
   // For schedule entry
   scheduleCourseCode = '';
   scheduleSection = '';
-  scheduleRoom = '';
-  schedule: { course_code: string; section: string; room: string; class_id?: number }[] = [];
+  schedule: { course_code: string; section: string; room?: string; class_id?: number }[] = [];
 
   // Validation states
   studentValidated = false;
@@ -44,7 +43,6 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
 
   // Course/Section search properties
   availableCourseSections: string[] = [];
-  selectedCourseSection = '';
 
   // Autocomplete properties
   availableCourses: any[] = [];
@@ -219,13 +217,7 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
     }
 
     onCourseSectionSelect(): void {
-      if (this.selectedCourseSection) {
-        const parts = this.selectedCourseSection.split(' - ');
-        if (parts.length >= 2) {
-          this.scheduleCourseCode = parts[0];
-          this.scheduleSection = parts[1].replace('Section ', '');
-        }
-      }
+      // This method is no longer used since we have separate course and section inputs
     }
 
     onCourseInputChange(): void {
@@ -389,11 +381,16 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
           },
           error: (err: any) => {
             console.error('Registration failed:', err);
-            alert('Registration failed. Please try again.');
+            if (err.status === 409) {
+              alert('Registration failed: ' + (err.error?.detail || 'Student with this number is already registered.'));
+            } else {
+              alert('Registration failed. Please try again.');
+            }
             this.submitting = false;
           },
           complete: () => {
             alert('Registration successful!');
+            this.submitting = false;
             this.resetForm();
           }
         })
@@ -418,12 +415,10 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
         this.schedule.push({
           course_code: this.scheduleCourseCode,
           section: this.scheduleSection,
-          room: 'TBD', // Room will be determined by schedule
-          class_id: 1 // This should be looked up from the database
+          // room will be determined by the backend from the class lookup
         });
         this.scheduleCourseCode = '';
         this.scheduleSection = '';
-        this.selectedCourseSection = '';
         this.hideSuggestions();
       }
     }

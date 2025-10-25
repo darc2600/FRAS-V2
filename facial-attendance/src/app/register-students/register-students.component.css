@@ -19,7 +19,7 @@
   position: relative;
   box-shadow: 0 4px 18px rgba(0,0,0,.1);
 }
-video { width: 100%; height: auto; display: block; }
+video { width: 100%; height: auto; display: block; transform: scaleX(-1); }
 
 .camera-section {
   padding: 16px;
