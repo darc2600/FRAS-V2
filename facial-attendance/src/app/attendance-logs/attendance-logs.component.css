@@ -20,7 +20,7 @@
   font-size: 2em;
   margin: 0;
   color: #333;
-  font-family: Arial, sans-serif;
+  font-family: 'Roboto', Arial, sans-serif;
 }
 .top-bar {
   background: #a85c5c;
@@ -29,7 +29,7 @@
   display: flex;
   gap: 1rem;
   align-items: center;
-  font-family: Arial, sans-serif;
+  font-family: 'Roboto', Arial, sans-serif;
   margin-bottom: 10px;
   border-radius: 8px;
   flex-wrap: wrap;

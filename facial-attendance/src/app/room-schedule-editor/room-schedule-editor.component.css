@@ -2,7 +2,7 @@
 .room-schedule-editor-main {
   background: #fff;
   min-height: 100vh;
-  font-family: Arial, sans-serif;
+  font-family: 'Roboto', Arial, sans-serif;
   padding: 32px;
 }
 .editor-header {

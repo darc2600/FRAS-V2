@@ -5,7 +5,7 @@
   left: 0;
   height: 100vh;
   width: 200px;
-  background: #990000; /* Mapua Red */
+  background: #333333; /* Dark Gray */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -22,18 +22,18 @@ body {
   margin: 32px 12px 24px 12px;
   width: calc(100% - 24px);
   text-align: center;
-  background: white;
+  background: transparent;
   border-radius: 8px;
   padding: 12px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  
 }
 
 .sidebar-logo img {
   max-width: 100%;
   height: auto;
   max-height: 60px;
-  background: white;
-  border-radius: 4px;
+  background: transparent;
+  border-radius: 0px;
 }
 
 .sidebar-links {
@@ -49,7 +49,8 @@ body {
 
 .sidebar-links li {
   width: 100%;
-  margin-bottom: 16px;
+  margin-bottom: 5px;
+  margin-top: 5px;
 }
 
 .sidebar-links a {
@@ -58,7 +59,7 @@ body {
   min-width: 200px;
   max-width: 200px;
   padding: 16px 24px;
-  color: #fff;
+  color: #ffffff;
   text-decoration: none;
   font-weight: bold;
   font-size: 18px;
@@ -70,7 +71,7 @@ body {
 
 .sidebar-links a.active,
 .sidebar-links a:hover {
-  background: #fff;
+  background: #990000;
   color: #FFD700;
   z-index: 1;
   position: relative;
