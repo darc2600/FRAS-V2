@@ -27,14 +27,22 @@ class AttendanceRepository:
             if not class_row:
                 return []
             class_id = class_row[0]
-            cursor.execute("""
-                SELECT a.student_id, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, a.status FROM attendance_logs a
-                LEFT JOIN students s ON a.student_id = s.student_id
-                WHERE a.class_id = ?
-                AND (? IS NULL OR DATE(a.timestamp) >= DATE(?))
-                AND (? IS NULL OR DATE(a.timestamp) <= DATE(?))
-                ORDER BY a.timestamp
-            """, (class_id, start_date, start_date, end_date, end_date))
+            if start_date and end_date and start_date.strip() and end_date.strip():
+                cursor.execute("""
+                    SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, a.status FROM attendance_logs a
+                    LEFT JOIN students s ON a.student_id = s.student_id
+                    WHERE a.class_id = ?
+                    AND DATE(a.timestamp) >= DATE(?)
+                    AND DATE(a.timestamp) <= DATE(?)
+                    ORDER BY a.timestamp
+                """, (class_id, start_date, end_date))
+            else:
+                cursor.execute("""
+                    SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, a.status FROM attendance_logs a
+                    LEFT JOIN students s ON a.student_id = s.student_id
+                    WHERE a.class_id = ?
+                    ORDER BY a.timestamp
+                """, (class_id,))
             return cursor.fetchall()
 
 

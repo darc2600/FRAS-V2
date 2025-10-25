@@ -83,7 +83,7 @@
             <thead>
               <tr>
                 <th>#</th>
-                <th>Student ID</th>
+                <th>Student Number</th>
                 <th>Name</th>
                 <th>Time</th>
                 <th>Status</th>
@@ -92,7 +92,7 @@
             <tbody>
               <tr *ngFor="let log of groupedLogs[date]; let i = index">
                 <td>{{i + 1}}</td>
-                <td>{{log.studentId || log.studentNo}}</td>
+                <td>{{log.studentNumber}}</td>
                 <td>{{log.studentName || log.name}}</td>
                 <td>{{ formatDateTime(log.time).split(' ')[1] + ' ' + formatDateTime(log.time).split(' ')[2] }}</td>
                 <td>

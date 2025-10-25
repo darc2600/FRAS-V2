@@ -294,8 +294,8 @@ async def get_courses_sections_by_room(room_id: int, room_service=Depends(get_ro
 
 # --- Attendance Endpoint ---
 @app.get("/api/attendance", response_model=None, tags=["Attendance"])
-async def get_attendance(course_code: str, section: str, room: str = None, attendance_service=Depends(get_attendance_service)):
-    return attendance_service.get_attendance(course_code, section, room)
+async def get_attendance(course_code: str, section: str, room: str = None, start_date: str = None, end_date: str = None, attendance_service=Depends(get_attendance_service)):
+    return attendance_service.get_attendance(course_code, section, room, start_date, end_date)
 
 # --- Recognition Endpoint ---
 @app.post("/api/recognize", response_model=None, tags=["Recognition"])

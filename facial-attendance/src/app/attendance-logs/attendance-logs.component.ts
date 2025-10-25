@@ -185,7 +185,7 @@ export class AttendanceLogsComponent implements OnInit {
     this.api.getAttendance(this.courseCode, this.section, undefined, this.startDate, this.endDate).subscribe(
       res => {
         this.logs = (res.attendance || []).map((log: any) => ({
-          studentId: log[0],
+          studentNumber: log[0],
           studentName: log[1],
           time: log[2],
           status: log[3] || 'Unknown'
@@ -208,7 +208,7 @@ export class AttendanceLogsComponent implements OnInit {
   groupLogsByDate() {
     this.groupedLogs = {};
     this.logs.forEach(log => {
-      const date = new Date(log.time).toISOString().split('T')[0];
+      const date = log.time.split(' ')[0]; // Extract date part directly from timestamp
       if (!this.groupedLogs[date]) {
         this.groupedLogs[date] = [];
       }
