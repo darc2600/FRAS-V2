@@ -9,20 +9,21 @@ import { ApiService } from '../api.service';
 })
 export class AttendanceLogsComponent implements OnInit {
   selectedDate: string = '';
-  availableDates: string[] = [];
-  selectedClass: string = '';
-  availableClasses: string[] = [];
   currentTime: string = '';
   availableFloors: number[] = [];
   selectedFloor: number | null = null;
   allRooms: any[] = [];
   availableRooms: string[] = [];
-  filteredRooms: string[] = [];
-  roomSearch = '';
-  showRoomDropdown = false;
   room = '';
-  availableCourseSections: string[] = [];
-  courseSection = '';
+  
+  // Course and section filtering
+  courseCode = '';
+  section = '';
+  validCourses: any[] = [];
+  availableSections: string[] = []; // Dynamic sections based on course/room
+  filteredCourses: any[] = [];
+  showCourseSuggestions = false;
+  
   logs: any[] = [];
   message = '';
   loading = false;
@@ -30,122 +31,157 @@ export class AttendanceLogsComponent implements OnInit {
   constructor(private api: ApiService) {}
 
   ngOnInit() {
-    // Sample: populate availableDates and availableClasses
-    this.availableDates = this.getRecentDates(7);
-    this.selectedDate = this.availableDates[0];
-    this.availableClasses = ['CS123-AM1', 'GED101-AM1', 'ED123-AM1'];
-    this.selectedClass = this.availableClasses[0];
     this.updateClock();
     setInterval(() => this.updateClock(), 1000);
-
-    this.api.getRooms().subscribe(
-      (rooms: any[]) => {
-        this.allRooms = rooms;
-        this.availableFloors = Array.from(new Set(rooms.map(r => r.floor_level).filter(f => f != null))).sort((a, b) => a - b);
-        if (this.availableFloors.length > 0) {
-          this.selectedFloor = this.availableFloors[0];
-          this.filterRoomsByFloor();
-        } else {
-          this.availableRooms = rooms.map(r => r.room_id || r.id || r.name);
-          this.filteredRooms = this.availableRooms;
-        }
-      },
-      err => this.message = 'Error fetching rooms.'
-    );
+    
+    // Set default date to today
+    const today = new Date();
+    this.selectedDate = today.toISOString().split('T')[0];
+    
+    this.fetchFloors();
+    this.loadValidationData();
   }
+
   updateClock() {
     this.currentTime = new Date().toLocaleTimeString();
   }
 
-  getRecentDates(days: number): string[] {
-    const dates: string[] = [];
-    for (let i = 0; i < days; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      dates.push(d.toISOString().split('T')[0]);
-    }
-    return dates;
+  fetchFloors() {
+    this.api.getFloors().subscribe(
+      (floors: number[]) => {
+        this.availableFloors = floors;
+        if (this.availableFloors.length > 0) {
+          this.selectedFloor = this.availableFloors[0];
+          this.onFloorChange();
+        }
+      },
+      err => this.message = 'Error fetching floors.'
+    );
   }
 
-  filterRoomsByFloor() {
+  onFloorChange() {
     if (this.selectedFloor == null) {
       this.availableRooms = [];
-      this.filteredRooms = [];
-      return;
-    }
-    const roomsOnFloor = this.allRooms.filter(r => r.floor_level === this.selectedFloor).map(r => r.room_id);
-    this.availableRooms = roomsOnFloor;
-    this.filteredRooms = roomsOnFloor;
-    if (roomsOnFloor.length > 0) {
-      this.room = roomsOnFloor[0];
-      this.fetchCourseSections();
-    } else {
       this.room = '';
-      this.availableCourseSections = [];
-      this.courseSection = '';
-    }
-  }
-
-  onRoomSearchChange() {
-    if (!this.roomSearch) {
-      this.filteredRooms = this.availableRooms;
-      this.showRoomDropdown = false;
       return;
     }
-    this.filteredRooms = this.availableRooms.filter(r =>
-      (r || '').toLowerCase().includes(this.roomSearch.toLowerCase())
-    );
-    this.showRoomDropdown = true;
+    this.fetchRoomsByFloor();
   }
 
-  selectRoom(room: string) {
-    this.room = room;
-    this.roomSearch = room;
-    this.showRoomDropdown = false;
-    this.fetchCourseSections();
-  }
-
-  onRoomInputBlur() {
-    setTimeout(() => {
-      this.showRoomDropdown = false;
-    }, 200);
-  }
-
-  fetchCourseSections() {
-    if (!this.room) {
-      this.availableCourseSections = [];
-      this.courseSection = '';
-      return;
-    }
-    this.api.getRoomSchedule(this.room).subscribe(
-      (result: any) => {
-        if (result && Array.isArray(result.schedule)) {
-          const pairs = result.schedule.map((cls: any) => `${cls.course_code || cls.courseCode} - ${cls.section}`);
-          this.availableCourseSections = Array.from(new Set(pairs));
-          this.courseSection = this.availableCourseSections[0] || '';
+  fetchRoomsByFloor() {
+    this.api.getRoomsByFloor(this.selectedFloor!).subscribe(
+      (rooms: any[]) => {
+        this.allRooms = rooms;
+        this.availableRooms = rooms.map(r => r.room_number);
+        if (this.availableRooms.length > 0) {
+          this.room = this.availableRooms[0];
+          this.onRoomChange();
         } else {
-          this.availableCourseSections = [];
-          this.courseSection = '';
+          this.room = '';
+          this.availableSections = [];
+          this.section = '';
         }
-        this.fetchLogs();
       },
-      err => this.message = 'Error fetching course-sections.'
+      err => this.message = 'Error fetching rooms for floor.'
     );
   }
 
-  onCourseSectionChange() {
-    this.fetchLogs();
+  onRoomChange() {
+    this.loadAvailableSections();
+  }
+
+  onCourseChange() {
+    this.loadAvailableSections();
+  }
+
+  loadAvailableSections() {
+    if (!this.room || !this.courseCode) {
+      this.availableSections = [];
+      this.section = '';
+      return;
+    }
+
+    // Find the room_id for the selected room
+    const selectedRoom = this.allRooms.find(r => r.room_number === this.room);
+    if (!selectedRoom) {
+      this.availableSections = [];
+      this.section = '';
+      return;
+    }
+
+    // Get course sections for this room
+    this.api.getCoursesSectionsByRoom(selectedRoom.room_id).subscribe(
+      (coursesSections: any[]) => {
+        // Filter sections for the selected course
+        const courseSections = coursesSections.filter(cs => 
+          cs.course_code === this.courseCode || cs.courseCode === this.courseCode
+        );
+        this.availableSections = courseSections.map(cs => cs.section);
+        
+        // Reset section if current selection is not available
+        if (this.section && !this.availableSections.includes(this.section)) {
+          this.section = this.availableSections.length > 0 ? this.availableSections[0] : '';
+        } else if (!this.section && this.availableSections.length > 0) {
+          this.section = this.availableSections[0];
+        }
+      },
+      err => {
+        console.error('Error fetching course sections:', err);
+        this.availableSections = [];
+        this.section = '';
+      }
+    );
+  }
+
+  loadValidationData() {
+    // Load valid courses
+    this.api.getCourses().subscribe({
+      next: (courses: any[]) => {
+        this.validCourses = courses;
+      },
+      error: (error) => {
+        console.error('Error loading courses:', error);
+      }
+    });
+  }
+
+  onCourseInputChange() {
+    if (this.courseCode.trim().length === 0) {
+      this.filteredCourses = [];
+      this.showCourseSuggestions = false;
+      return;
+    }
+
+    const searchTerm = this.courseCode.trim().toLowerCase();
+    this.filteredCourses = this.validCourses.filter(course =>
+      course.code.toLowerCase().includes(searchTerm) ||
+      course.name.toLowerCase().includes(searchTerm)
+    ).slice(0, 10); // Limit to 10 suggestions
+
+    this.showCourseSuggestions = this.filteredCourses.length > 0;
+  }
+
+  selectCourse(course: any) {
+    this.courseCode = course.code;
+    this.showCourseSuggestions = false;
+    this.onCourseChange();
+  }
+
+  hideSuggestions() {
+    setTimeout(() => {
+      this.showCourseSuggestions = false;
+    }, 150);
   }
 
   fetchLogs() {
-    if (!this.courseSection || !this.room) {
+    if (!this.courseCode || !this.section || !this.room) {
       this.logs = [];
-      this.message = 'Please select room and course-section.';
+      this.message = 'Please select room, course, and section.';
       return;
     }
-    const [courseCode, section] = this.courseSection.split(' - ');
+    
     this.loading = true;
-    this.api.getAttendance(courseCode, section, this.room).subscribe(
+    this.api.getAttendance(this.courseCode, this.section, this.room).subscribe(
       res => {
         this.logs = (res.attendance || []).map((log: any) => ({
           studentId: log[0],
@@ -168,9 +204,9 @@ export class AttendanceLogsComponent implements OnInit {
   }
 
   getStatusClass(status: string) {
-    if (status === 'Present') return 'present';
-    if (status === 'Late') return 'late';
-    if (status === 'Absent') return 'absent';
+    if (status.toLowerCase() === 'present') return 'present';
+    if (status.toLowerCase() === 'late') return 'late';
+    if (status.toLowerCase() === 'absent') return 'absent';
     return '';
   }
 

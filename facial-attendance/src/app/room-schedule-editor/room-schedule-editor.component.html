@@ -13,7 +13,7 @@
                (input)="onCourseInputChange()"
                (focus)="onCourseInputChange()"
                (blur)="hideSuggestions()"
-               placeholder="Start typing to search courses..."
+               placeholder="Search courses..."
                autocomplete="off">
         <div class="suggestions-dropdown" *ngIf="showCourseSuggestions">
           <div class="suggestion-item"
@@ -35,7 +35,7 @@
                (input)="onProfessorInputChange()"
                (focus)="onProfessorInputChange()"
                (blur)="hideSuggestions()"
-               placeholder="Start typing to search professors..."
+               placeholder="Search instructors..."
                autocomplete="off">
         <div class="suggestions-dropdown" *ngIf="showInstructorSuggestions">
           <div class="suggestion-item"

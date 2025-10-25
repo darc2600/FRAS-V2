@@ -8,28 +8,45 @@
     <div class="top-bar row g-3 align-items-end mb-3">
       <div class="col-md-2">
         <label>Floor:</label>
-        <select class="form-select" [(ngModel)]="selectedFloor" (change)="filterRoomsByFloor()">
+        <select class="form-select" [(ngModel)]="selectedFloor" (change)="onFloorChange()">
           <option *ngFor="let f of availableFloors" [value]="f">Floor {{f}}</option>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label>Room:</label>
-        <input type="text" class="form-control" [(ngModel)]="roomSearch" (input)="onRoomSearchChange()" (focus)="showRoomDropdown = true" (blur)="onRoomInputBlur()" placeholder="Search room..." autocomplete="off" />
-        <ul *ngIf="showRoomDropdown && filteredRooms.length > 0" class="dropdown-list">
-          <li *ngFor="let r of filteredRooms" (mousedown)="selectRoom(r)">{{r}}</li>
-        </ul>
+        <select class="form-select" [(ngModel)]="room" (change)="onRoomChange()">
+          <option value="">Select room...</option>
+          <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
+        </select>
       </div>
-      <div class="col-md-4">
-        <label>Course-Section:</label>
-        <select class="form-select" [(ngModel)]="courseSection" (change)="onCourseSectionChange()">
-          <option *ngFor="let cs of availableCourseSections" [value]="cs">{{cs}}</option>
+      <div class="col-md-3">
+        <label>Course Code:</label>
+        <div class="course-input-container">
+          <input type="text" class="form-control" [(ngModel)]="courseCode"
+                 (input)="onCourseInputChange()"
+                 (focus)="onCourseInputChange()"
+                 (blur)="hideSuggestions()"
+                 placeholder="Start typing to search courses..."
+                 autocomplete="off">
+          <div class="suggestions-dropdown" *ngIf="showCourseSuggestions">
+            <div class="suggestion-item"
+                 *ngFor="let course of filteredCourses"
+                 (mousedown)="selectCourse(course)">
+              <strong>{{ course.code }}</strong> - {{ course.name }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label>Section:</label>
+        <select class="form-select" [(ngModel)]="section" [disabled]="availableSections.length === 0">
+          <option value="">Select section...</option>
+          <option *ngFor="let s of availableSections" [value]="s">{{s}}</option>
         </select>
       </div>
       <div class="col-md-2">
         <label>Date:</label>
-        <select class="form-select" [(ngModel)]="selectedDate">
-          <option *ngFor="let d of availableDates" [value]="d">{{d}}</option>
-        </select>
+        <input type="date" class="form-control" [(ngModel)]="selectedDate">
       </div>
       <div class="col-md-1">
         <button class="btn btn-primary w-100" (click)="fetchLogs()" [disabled]="loading">Fetch</button>
