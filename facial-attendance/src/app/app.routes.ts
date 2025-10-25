@@ -11,7 +11,7 @@ import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedul
 
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'webcam', pathMatch: 'full' },
+  { path: '', redirectTo: 'monitor', pathMatch: 'full' },
   { path: 'webcam', component: WebcamCaptureComponent },
   { path: 'monitor', component: AttendanceMonitorComponent },
   { path: 'logs', component: AttendanceLogsComponent },

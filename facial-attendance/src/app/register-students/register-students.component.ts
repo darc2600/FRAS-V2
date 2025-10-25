@@ -4,6 +4,7 @@ import {
 import { FormBuilder, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { RegisterStudentsService } from './register-students.service';
 import { Subscription } from 'rxjs';
+import { HttpEventType } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 
 interface PreviewImage {
@@ -66,20 +67,28 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
     }
 
     captureAngle(): void {
+      if (!this.stream || this.isCapturing || this.faceAngles[this.currentAngleIndex].captured) return;
+
       // Mark current angle as captured
       if (this.currentAngleIndex < this.faceAngles.length) {
         this.faceAngles[this.currentAngleIndex].captured = true;
-        // Move to next angle if available
-        if (this.currentAngleIndex < this.faceAngles.length - 1) {
-          this.currentAngleIndex++;
-        }
+
+        // Actually capture the image
+        this.captureOne().then(() => {
+          // Move to next angle if available
+          if (this.currentAngleIndex < this.faceAngles.length - 1) {
+            this.currentAngleIndex++;
+          }
+        });
       }
-      // Add capture logic here if needed
     }
 
     resetAngles(): void {
       this.faceAngles.forEach(a => a.captured = false);
       this.currentAngleIndex = 0;
+      // Clear all captured images
+      this.previews.forEach(p => URL.revokeObjectURL(p.url));
+      this.previews = [];
     }
 
     removeShot(index: number): void {
@@ -87,9 +96,45 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
     }
 
     submit(): void {
+      if (!this.form.valid || this.previews.length === 0) {
+        alert('Please fill all required fields and capture at least one image.');
+        return;
+      }
+
       this.submitting = true;
-      // Add submit logic here
-      setTimeout(() => { this.submitting = false; }, 1000);
+      this.uploadProgress = 0;
+
+      const formData = new FormData();
+      formData.append('student_id', this.form.value.studentId);
+      formData.append('last_name', this.form.value.lastName);
+      formData.append('first_name', this.form.value.firstName);
+      formData.append('email', this.form.value.email || '');
+      formData.append('schedule', JSON.stringify(this.schedule));
+
+      // Add captured images
+      this.previews.forEach((preview, index) => {
+        formData.append('images', preview.blob, `capture_${index + 1}.jpg`);
+      });
+
+      this.subs.add(
+        this.regSvc.registerStudent(formData).subscribe({
+          next: (event) => {
+            if (event.type === HttpEventType.UploadProgress) {
+              this.uploadProgress = Math.round(100 * event.loaded / (event.total || 1));
+            }
+          },
+          error: (err) => {
+            console.error('Registration failed:', err);
+            alert('Registration failed. Please try again.');
+            this.submitting = false;
+          },
+          complete: () => {
+            alert('Registration successful!');
+            this.submitting = false;
+            this.resetForm();
+          }
+        })
+      );
     }
 
     addScheduleEntry(): void {
@@ -109,7 +154,74 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
       this.schedule.splice(index, 1);
     }
 
-  ngOnInit() {}
-  ngOnDestroy() { this.subs.unsubscribe(); }
-  // ...rest of logic from original component
+  async ngOnInit() {
+    await this.startCamera();
+  }
+
+  ngOnDestroy() {
+    this.stopCamera();
+    this.subs.unsubscribe();
+  }
+
+  async startCamera() {
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      this.videoEl.nativeElement.srcObject = this.stream;
+      await this.videoEl.nativeElement.play();
+    } catch (err) {
+      alert('Unable to access webcam. Please allow camera permissions.');
+      console.error(err);
+    }
+  }
+
+  stopCamera() {
+    this.stream?.getTracks().forEach(t => t.stop());
+    this.stream = undefined;
+  }
+
+  private async snapOnce(): Promise<PreviewImage> {
+    const video = this.videoEl.nativeElement;
+    const canvas = this.canvasEl.nativeElement;
+    const w = video.videoWidth || 1280;
+    const h = video.videoHeight || 720;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(video, 0, 0, w, h);
+    const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b as Blob), 'image/jpeg', 0.92)!);
+    const url = URL.createObjectURL(blob);
+    return { url, blob };
+  }
+
+  async captureOne() {
+    if (!this.stream) return;
+    const shot = await this.snapOnce();
+    this.previews.push(shot);
+  }
+
+  async captureSeries() {
+    if (!this.stream || this.isCapturing) return;
+    this.isCapturing = true;
+    const target = this.form.value.imageCount ?? this.defaultTarget;
+    try {
+      while (this.previews.length < target) {
+        const shot = await this.snapOnce();
+        this.previews.push(shot);
+        await new Promise(r => setTimeout(r, 180));
+      }
+    } finally {
+      this.isCapturing = false;
+    }
+  }
+
+  private resetForm(): void {
+    this.form.reset();
+    this.schedule = [];
+    this.previews.forEach(p => URL.revokeObjectURL(p.url));
+    this.previews = [];
+    this.resetAngles();
+  }
 }
