@@ -80,8 +80,8 @@
         <tr *ngFor="let slot of timeSlots; let row = index">
           <td class="time-label">{{ slot }}</td>
           <td *ngFor="let day of days; let col = index">
-            <div class="cell" [class.filled]="grid[row][col]?.courseCode">
-              <ng-container *ngIf="grid[row][col]?.courseCode">
+            <div class="cell" [class.filled]="grid[row][col].courseCode">
+              <ng-container *ngIf="grid[row][col].courseCode">
                 <div class="cell-content">
                   <b>{{ grid[row][col].courseCode }}</b><br>
                   <span>{{ grid[row][col].section }}</span><br>
