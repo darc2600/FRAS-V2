@@ -6,9 +6,10 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
   align-items: start;
+  margin-bottom: 24px;
 }
 
 .camera .video-wrap {
@@ -19,6 +20,141 @@
   box-shadow: 0 4px 18px rgba(0,0,0,.1);
 }
 video { width: 100%; height: auto; display: block; }
+
+.camera-section {
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.camera-section h3 {
+  margin: 0 0 16px 0;
+  color: #374151;
+}
+
+.camera-section .video-wrap {
+  background: #111;
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 18px rgba(0,0,0,.1);
+  margin-bottom: 16px;
+}
+
+.video-container {
+  position: relative;
+  background: #111;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0,0,0,.1);
+  margin-bottom: 16px;
+}
+
+.angle-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.angle-cue {
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+.angle-text {
+  font-size: 16px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.angle-arrow {
+  width: 40px;
+  height: 40px;
+  position: relative;
+}
+
+.angle-arrow::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Arrow directions */
+.arrow-center::before {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-width: 0;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  background: white;
+}
+
+.arrow-left::before {
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  border-width: 15px 25px 15px 0;
+  border-color: transparent white transparent transparent;
+}
+
+.arrow-right::before {
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  border-width: 15px 0 15px 25px;
+  border-color: transparent transparent transparent white;
+}
+
+.arrow-up::before {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 15px 25px 15px;
+  border-color: transparent transparent white transparent;
+}
+
+.arrow-down::before {
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 25px 15px 0 15px;
+  border-color: white transparent transparent transparent;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
 
 .controls { display: flex; gap: 8px; margin-top: 12px; }
 .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
@@ -55,7 +191,8 @@ input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); 
 }
 .schedule-entry {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  align-items: end;
   margin-bottom: 12px;
 }
 .schedule-list {
@@ -96,4 +233,96 @@ header, .registration-header {
 
 .angle-progress {
   margin-top: 8px;
+}
+
+.angle-progress .captured {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.capture-controls {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.error {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.success {
+  color: #22c55e;
+  font-size: 12px;
+  margin-top: 4px;
+  font-weight: bold;
+}
+
+input[readonly] {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+}
+
+select {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  outline: none;
+  background: white;
+}
+
+.schedule-field {
+  flex: 1;
+  margin-right: 12px;
+}
+
+.schedule-field:last-child {
+  margin-right: 0;
+}
+
+.course-input-container,
+.section-input-container {
+  position: relative;
+}
+
+.suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin-top: 2px;
+}
+
+.suggestion-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s;
+}
+
+.suggestion-item:hover {
+  background-color: #f8f9fa;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.submit-section {
+  text-align: center;
+  padding: 24px 0;
+  border-top: 1px solid #eee;
+  background: #fff;
+  border-radius: 10px;
+  margin-top: 16px;
 }

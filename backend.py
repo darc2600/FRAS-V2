@@ -355,6 +355,25 @@ async def get_instructors():
         instructors = cursor.fetchall()
         return [f"{inst[0]}, {inst[1]}" for inst in instructors]
 
+# --- Student Validation Endpoint ---
+@app.get("/api/students/{student_number}", tags=["Students"])
+async def get_student_by_number(student_number: str):
+    """Get student information by student number for validation"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT student_id, student_number, last_name, first_name, email FROM students WHERE student_number = ?", (student_number,))
+        student = cursor.fetchone()
+        if student:
+            return {
+                "student_id": student[0],
+                "student_number": student[1],
+                "last_name": student[2],
+                "first_name": student[3],
+                "email": student[4]
+            }
+        else:
+            return None
+
 # --- Debug Endpoint ---
 @app.get("/api/routes", tags=["Debug"])
 async def list_routes():
