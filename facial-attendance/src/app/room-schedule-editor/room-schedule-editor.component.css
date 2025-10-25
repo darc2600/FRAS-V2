@@ -44,7 +44,7 @@
 .editor-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 12px;
   align-items: center;
   justify-content: center;
   margin-bottom: 25px;
@@ -52,12 +52,6 @@
   background: #f8f9fa;
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.action-group {
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 
 .load-btn {

@@ -21,34 +21,23 @@
   </div>
 
   <div class="editor-actions">
-    <!-- Primary Actions -->
-    <div class="action-group">
-      <button (click)="loadSchedule()" [disabled]="isLoading" class="load-btn">
-        <span *ngIf="isLoading">LOADING...</span>
-        <span *ngIf="!isLoading">📂 LOAD</span>
-      </button>
-      <button (click)="saveSchedule()" [disabled]="isSaving" class="save-btn">
-        <span *ngIf="isSaving">💾 SAVING...</span>
-        <span *ngIf="!isSaving">💾 SAVE</span>
-      </button>
-    </div>
-
-    <!-- Edit Actions -->
-    <div class="action-group">
-      <button (click)="undoLastAction()" [disabled]="actionHistory.length === 0" class="edit-btn">
-        ↩️ UNDO
-      </button>
-      <button (click)="revertChanges()" [disabled]="actionHistory.length === 0" class="edit-btn">
-        🔄 REVERT
-      </button>
-    </div>
-
-    <!-- Destructive Action -->
-    <div class="action-group">
-      <button (click)="openDeleteModal()" class="delete-btn">
-        🗑️ DELETE
-      </button>
-    </div>
+    <button (click)="loadSchedule()" [disabled]="isLoading" class="load-btn">
+      <span *ngIf="isLoading">LOADING...</span>
+      <span *ngIf="!isLoading">📂 LOAD</span>
+    </button>
+    <button (click)="undoLastAction()" [disabled]="actionHistory.length === 0" class="edit-btn">
+      ↩️ UNDO
+    </button>
+    <button (click)="revertChanges()" [disabled]="actionHistory.length === 0" class="edit-btn">
+      🔄 REVERT
+    </button>
+    <button (click)="openDeleteModal()" class="delete-btn">
+      🗑️ DELETE
+    </button>
+    <button (click)="saveSchedule()" [disabled]="isSaving" class="save-btn">
+      <span *ngIf="isSaving">� SAVING...</span>
+      <span *ngIf="!isSaving">💾 SAVE</span>
+    </button>
   </div>
   <div *ngIf="message" class="editor-message" [class.success]="messageType === 'success'" [class.error]="messageType === 'error'">{{message}}</div>
   <div class="schedule-grid">

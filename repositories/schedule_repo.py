@@ -39,18 +39,20 @@ class ScheduleRepository:
             return hour * 60 + minute
         
         def slot_range(start_24h, end_24h):
-            start_12h = convert_to_12_hour(start_24h)
-            end_12h = convert_to_12_hour(end_24h)
+            # Convert class times to minutes for comparison
+            class_start_min = time_to_minutes(convert_to_12_hour(start_24h))
+            class_end_min = time_to_minutes(convert_to_12_hour(end_24h))
+            
             slots = []
-            in_range = False
             for slot in TIME_SLOTS:
                 slot_start, slot_end = slot.split(' - ')
-                if slot_start == start_12h:
-                    in_range = True
-                if in_range:
+                slot_start_min = time_to_minutes(slot_start)
+                slot_end_min = time_to_minutes(slot_end)
+                
+                # Check if class overlaps with slot
+                if max(class_start_min, slot_start_min) < min(class_end_min, slot_end_min):
                     slots.append(slot)
-                if slot_end == end_12h:
-                    break
+            
             return slots
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
@@ -119,6 +121,19 @@ class ScheduleRepository:
             hour12 = hour if 1 <= hour <= 12 else (hour - 12 if hour > 12 else 12)
             return f"{hour12:02d}:{minute:02d}{ampm}"
 
+        def convert_to_24_hour(time_12h):
+            """Convert 12-hour time (HH:MMAM/PM) to 24-hour format (HH:MM)"""
+            import re
+            match = re.match(r"(\d{1,2}):(\d{2})(AM|PM)", time_12h)
+            if not match:
+                return time_12h  # Return as-is if not matching
+            hour, minute, ampm = int(match.group(1)), int(match.group(2)), match.group(3)
+            if ampm == "PM" and hour != 12:
+                hour += 12
+            if ampm == "AM" and hour == 12:
+                hour = 0
+            return f"{hour:02d}:{minute:02d}"
+
         # Sort and group schedule entries
         schedule_sorted = sorted(schedule, key=lambda x: (
             x.get('courseCode',''), x.get('section',''), x.get('professor',''), x.get('day',''), time_to_minutes(x.get('startTime','00:00AM'))
@@ -145,58 +160,138 @@ class ScheduleRepository:
             else:
                 merged.append(entry.copy())
 
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            # Get or create room
-            import re
-            match = re.search(r"(\d+)$", room_code)
-            if match:
-                room_number = match.group(1)
-                floor_level = int(room_number[0]) if len(room_number) > 0 else None
-            else:
-                room_number = None
-                floor_level = None
-            cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
-            row = cursor.fetchone()
-            if not row:
-                cursor.execute(
-                    "INSERT INTO rooms (floor_level, room_number, campus_id, building_id) VALUES (?, ?, 1, 1)",
-                    (floor_level, room_number)
-                )
-                room_id = cursor.lastrowid
-            else:
-                room_id = row[0]
-                cursor.execute(
-                    "UPDATE rooms SET floor_level = ?, room_number = ?, campus_id = 1, building_id = 1 WHERE room_id = ?",
-                    (floor_level, room_number, room_id)
-                )
-            cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_id,))
+        # Validate all entries before saving
+        validation_errors = []
+        for entry in merged:
+            course_code = entry.get('courseCode', '').strip()
+            section = entry.get('section', '').strip()
+            professor_name = entry.get('professor', '').strip()
+            
+            # Validate course exists
+            if not course_code:
+                validation_errors.append(f"Missing course code in entry: {entry}")
+                continue
+            # Validate section is provided
+            if not section:
+                validation_errors.append(f"Missing section for course '{course_code}'")
+                continue
+            
+        # If there are validation errors, raise an exception
+        if validation_errors:
+            error_message = "Validation errors found:\n" + "\n".join(f"- {error}" for error in validation_errors)
+            raise HTTPException(status_code=400, detail=error_message)
 
-            for entry in merged:
-                course_code = entry.get('courseCode','')
-                # Get course_id from course_code
-                cursor.execute('SELECT course_id FROM courses WHERE course_code = ?', (course_code,))
-                course_row = cursor.fetchone()
-                if not course_row:
-                    continue  # Skip if course not found
-                course_id = course_row[0]
-                class_id = f"{course_code}_{entry.get('section','')}_{room_code}_{entry.get('day','')}"
-                instructor_id = entry.get('instructorId') or None
-                cursor.execute("""
-                    INSERT INTO classes (class_id, course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    class_id,
-                    course_id,
-                    entry.get('section',''),
-                    room_id,
-                    instructor_id,
-                    entry.get('day',''),
-                    entry.get('startTime',''),
-                    entry.get('endTime',''),
-                    None  # term_id
-                ))
-            conn.commit()
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                # Get or create room
+                import re
+                match = re.search(r"(\d+)$", room_code)
+                if match:
+                    room_number = match.group(1)
+                    floor_level = int(room_number[0]) if len(room_number) > 0 else None
+                else:
+                    room_number = None
+                    floor_level = None
+                cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
+                row = cursor.fetchone()
+                if not row:
+                    cursor.execute(
+                        "INSERT INTO rooms (floor_level, room_number, campus_id, building_id) VALUES (?, ?, 1, 1)",
+                        (floor_level, room_number)
+                    )
+                    room_id = cursor.lastrowid
+                else:
+                    room_id = row[0]
+                    cursor.execute(
+                        "UPDATE rooms SET floor_level = ?, room_number = ?, campus_id = 1, building_id = 1 WHERE room_id = ?",
+                        (floor_level, room_number, room_id)
+                    )
+                cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_id,))
+
+                # Validate course and instructor existence (now that we have database connection)
+                course_cache = {}
+                instructor_cache = {}
+                
+                for entry in merged:
+                    course_code = entry.get('courseCode', '').strip()
+                    professor_name = entry.get('professor', '').strip()
+                    
+                    # Check course exists
+                    if course_code not in course_cache:
+                        cursor.execute('SELECT course_id FROM courses WHERE course_code = ?', (course_code,))
+                        course_row = cursor.fetchone()
+                        if not course_row:
+                            validation_errors.append(f"Course code '{course_code}' not found in database")
+                        else:
+                            course_cache[course_code] = course_row[0]
+                    
+                    # Check instructor exists
+                    if professor_name and professor_name not in instructor_cache:
+                        if ', ' in professor_name:
+                            last_name, first_name = professor_name.split(', ', 1)
+                            cursor.execute('SELECT instructor_id FROM instructors WHERE last_name = ? AND first_name = ?', (last_name, first_name))
+                            instructor_row = cursor.fetchone()
+                            if not instructor_row:
+                                validation_errors.append(f"Instructor '{professor_name}' not found in database")
+                            else:
+                                instructor_cache[professor_name] = instructor_row[0]
+                        else:
+                            validation_errors.append(f"Professor name must be in 'Last, First' format: '{professor_name}'")
+                
+                # If there are validation errors, raise an exception
+                if validation_errors:
+                    error_message = "Validation errors found:\n" + "\n".join(f"- {error}" for error in validation_errors)
+                    raise HTTPException(status_code=400, detail=error_message)
+                
+                # Proceed with saving if all validations pass
+                cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_id,))
+
+                for entry in merged:
+                    course_code = entry.get('courseCode', '').strip()
+                    section = entry.get('section', '').strip()
+                    professor_name = entry.get('professor', '').strip()
+                    
+                    # Get course_id (already validated and cached)
+                    course_id = course_cache[course_code]
+                    
+                    # Get instructor_id (already validated and cached)
+                    instructor_id = instructor_cache.get(professor_name)
+                    
+                    cursor.execute("""
+                        INSERT INTO classes (course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        course_id,
+                        section,
+                        room_id,
+                        instructor_id,
+                        entry.get('day',''),
+                        convert_to_24_hour(entry.get('startTime','')),
+                        convert_to_24_hour(entry.get('endTime','')),
+                        1  # term_id - use current term
+                    ))
+                    
+                    cursor.execute("""
+                        INSERT INTO classes (course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        course_id,
+                        section,
+                        room_id,
+                        instructor_id,
+                        entry.get('day',''),
+                        convert_to_24_hour(entry.get('startTime','')),
+                        convert_to_24_hour(entry.get('endTime','')),
+                        1  # term_id - use current term
+                    ))
+                conn.commit()
+        except HTTPException:
+            raise  # Re-raise validation errors
+        except Exception as e:
+            print(f"Database error: {e}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        
         return ScheduleResponse(schedule=merged)
 
     async def delete_room_schedule(self, room_code: str):
