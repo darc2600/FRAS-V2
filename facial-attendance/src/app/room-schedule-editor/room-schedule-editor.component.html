@@ -82,13 +82,15 @@
           <td *ngFor="let day of days; let col = index">
             <div class="cell" [class.filled]="grid[row][col]?.courseCode">
               <ng-container *ngIf="grid[row][col]?.courseCode">
-                <b>{{ grid[row][col].courseCode }}</b><br>
-                <span>{{ grid[row][col].section }}</span><br>
-                <span>{{ grid[row][col].professor }}</span>
-                <button class="cell-clear" (click)="clearCell(row, col); $event.stopPropagation()">✕</button>
+                <div class="cell-content">
+                  <b>{{ grid[row][col].courseCode }}</b><br>
+                  <span>{{ grid[row][col].section }}</span><br>
+                  <span>{{ grid[row][col].professor }}</span>
+                </div>
+                <button class="cell-clear" (click)="clearCell(row, col); $event.stopPropagation()" title="Remove this entry">✕</button>
               </ng-container>
               <ng-container *ngIf="!grid[row][col]?.courseCode">
-                <span class="add" (click)="fillCell(row, col)">+</span>
+                <button class="cell-add" (click)="fillCell(row, col)" title="Add schedule entry">+</button>
               </ng-container>
             </div>
           </td>

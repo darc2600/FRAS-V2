@@ -218,6 +218,10 @@
   border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
   transition: background 0.2s;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .cell:hover {
   background: #f0e6e6;
@@ -226,31 +230,68 @@
 .cell.filled {
   background: #e8f4fd;
   border: 2px solid #4a90e2;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 8px;
 }
 
 .cell.filled:hover {
   background: #d4e8f7;
 }
-.cell .add {
-  color: #aaa;
-  font-size: 22px;
+
+.cell-content {
+  flex: 1;
+  width: 100%;
+}
+
+.cell-add {
+  background: #f0f0f0;
+  color: #666;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
   font-weight: bold;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
+
+.cell-add:hover {
+  background: #e0e0e0;
+  color: #333;
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
 .cell-clear {
-  background: #a85c5c;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #dc3545;
   color: #fff;
   border: none;
   border-radius: 50%;
   width: 24px;
   height: 24px;
-  font-size: 1em;
+  font-size: 14px;
   cursor: pointer;
-  margin-top: 4px;
-  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+
 .cell-clear:hover {
-  background: #8a3f3f;
+  background: #c82333;
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 /* Responsive Design */
@@ -307,6 +348,20 @@
     min-height: 40px;
     padding: 4px;
     font-size: 0.8em;
+  }
+
+  .cell-add {
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+  }
+
+  .cell-clear {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    top: 2px;
+    right: 2px;
   }
 }
 
