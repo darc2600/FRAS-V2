@@ -48,15 +48,15 @@ export class ApiService {
   }
 
   getRoomSchedule(roomId: string): Observable<any> {
-    return this.http.get<any>(`${this.backendUrl}/api/schedule/${roomId}`);
+    return this.http.get<any>(`${this.backendUrl}/api/room-schedule/${roomId}`);
   }
 
   updateRoomSchedule(roomId: string, data: any): Observable<any> {
-    return this.http.post<any>(`${this.backendUrl}/api/schedule/${roomId}`, data);
+    return this.http.post<any>(`${this.backendUrl}/api/room-schedule/${roomId}`, data);
   }
 
   deleteRoomSchedule(roomId: string): Observable<any> {
-    return this.http.delete<any>(`${this.backendUrl}/api/schedule/${roomId}`);
+    return this.http.delete<any>(`${this.backendUrl}/api/room-schedule/${roomId}`);
   }
 
   getCourses(): Observable<any[]> {

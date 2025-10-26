@@ -371,10 +371,15 @@ export class RoomScheduleEditorComponent implements OnInit {
         this.message = `Schedule saved successfully! (${schedule.length} entries)`;
         this.messageType = 'success';
         this.isSaving = false;
+        // Update original grid to reflect saved state
+        this.originalGrid = JSON.parse(JSON.stringify(this.grid));
+        this.actionHistory = [];
       },
       error: (error) => {
         console.error('Error saving schedule:', error);
-        this.message = 'Failed to save schedule. Please try again.';
+        // Show specific error message from backend if available
+        const errorMessage = error.error?.detail || 'Failed to save schedule. Please try again.';
+        this.message = errorMessage;
         this.messageType = 'error';
         this.isSaving = false;
       }

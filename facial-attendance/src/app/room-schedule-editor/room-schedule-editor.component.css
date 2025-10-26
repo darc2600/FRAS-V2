@@ -41,6 +41,12 @@
   border-color: #8a3f3f;
   box-shadow: 0 0 4px rgba(138,63,63,0.2);
 }
+.help-text {
+  font-size: 0.85em;
+  color: #666;
+  font-style: italic;
+  margin-top: 2px;
+}
 .editor-actions {
   display: flex;
   flex-wrap: wrap;

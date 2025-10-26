@@ -7,7 +7,7 @@ class ScheduleService:
         self.repo = repo
 
     async def get_room_schedule(self, room_code: str):
-        schedule = await self.repo.get_room_schedule(room_code)
+        schedule = self.repo.get_room_schedule(room_code)
         return {"schedule": schedule}
 
     async def update_room_schedule(self, room_code: str, request: Request) -> ScheduleResponse:

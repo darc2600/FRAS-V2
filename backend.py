@@ -323,23 +323,21 @@ async def register_student(
 ):
     return await registration_service.register_student(
         student_number, last_name, first_name, email, created_at, schedule, images
-    )
-
-# --- Capture Endpoint ---
+)# --- Capture Endpoint ---
 @app.post("/api/capture", response_model=None, tags=["Capture"])
 async def capture_image(file: UploadFile = File(...), course_code: str = Form(...), section: str = Form(...), student_id: str = Form(...), capture_service=Depends(get_capture_service)):
     return await capture_service.capture_image(file, course_code, section, student_id)
 
 # --- Schedule Endpoints ---
-@app.get("/api/schedule/{room_id}", response_model=None, tags=["Schedule"])
+@app.get("/api/room-schedule/{room_id}", response_model=None, tags=["Schedule"])
 async def get_room_schedule(room_id: str, schedule_service=Depends(get_schedule_service)):
     return await schedule_service.get_room_schedule(room_id)
 
-@app.post("/api/schedule/{room_id}", response_model=None, tags=["Schedule"])
+@app.post("/api/room-schedule/{room_id}", response_model=None, tags=["Schedule"])
 async def update_room_schedule(room_id: str, request: Request, schedule_service=Depends(get_schedule_service)):
     return await schedule_service.update_room_schedule(room_id, request)
 
-@app.delete("/api/schedule/{room_id}", tags=["Schedule"])
+@app.delete("/api/room-schedule/{room_id}", tags=["Schedule"])
 async def delete_room_schedule(room_id: str, schedule_service=Depends(get_schedule_service)):
     return await schedule_service.delete_room_schedule(room_id)
 

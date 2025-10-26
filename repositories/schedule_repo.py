@@ -6,7 +6,7 @@ from models.schedule import ScheduleResponse
 DB_PATH = "attendance.db"
 
 class ScheduleRepository:
-    async def get_room_schedule(self, room_code: str):
+    def get_room_schedule(self, room_code: str):
         TIME_SLOTS = [
             "07:00AM - 08:10AM", "08:10AM - 09:20AM", "09:20AM - 10:30AM", "10:30AM - 11:40AM",
             "11:40AM - 12:50PM", "12:50PM - 02:00PM", "02:00PM - 03:10PM", "03:10PM - 04:20PM",
@@ -184,6 +184,9 @@ class ScheduleRepository:
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 cursor = conn.cursor()
+                # Start transaction
+                cursor.execute("BEGIN TRANSACTION")
+                
                 # Get or create room
                 import re
                 match = re.search(r"(\d+)$", room_code)
@@ -207,9 +210,8 @@ class ScheduleRepository:
                         "UPDATE rooms SET floor_level = ?, room_number = ?, campus_id = 1, building_id = 1 WHERE room_id = ?",
                         (floor_level, room_number, room_id)
                     )
-                cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_id,))
 
-                # Validate course and instructor existence (now that we have database connection)
+                # Validate course and instructor existence
                 course_cache = {}
                 instructor_cache = {}
                 
@@ -239,53 +241,50 @@ class ScheduleRepository:
                         else:
                             validation_errors.append(f"Professor name must be in 'Last, First' format: '{professor_name}'")
                 
-                # If there are validation errors, raise an exception
+                # If there are validation errors, rollback and raise an exception
                 if validation_errors:
+                    cursor.execute("ROLLBACK")
                     error_message = "Validation errors found:\n" + "\n".join(f"- {error}" for error in validation_errors)
                     raise HTTPException(status_code=400, detail=error_message)
                 
-                # Proceed with saving if all validations pass
-                cursor.execute("DELETE FROM classes WHERE room_id = ?", (room_id,))
-
+                # Insert schedule entries - don't delete existing ones, just add new ones
                 for entry in merged:
                     course_code = entry.get('courseCode', '').strip()
                     section = entry.get('section', '').strip()
                     professor_name = entry.get('professor', '').strip()
                     
-                    # Get course_id (already validated and cached)
                     course_id = course_cache[course_code]
-                    
-                    # Get instructor_id (already validated and cached)
                     instructor_id = instructor_cache.get(professor_name)
                     
+                    # Check if this exact schedule entry already exists to avoid duplicates
                     cursor.execute("""
-                        INSERT INTO classes (course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        SELECT class_id FROM classes 
+                        WHERE course_id = ? AND section = ? AND instructor_id = ? 
+                        AND room_id = ? AND day_of_week = ? AND start_time = ? AND end_time = ?
                     """, (
-                        course_id,
-                        section,
-                        room_id,
-                        instructor_id,
+                        course_id, section, instructor_id, room_id,
                         entry.get('day',''),
                         convert_to_24_hour(entry.get('startTime','')),
-                        convert_to_24_hour(entry.get('endTime','')),
-                        1  # term_id - use current term
+                        convert_to_24_hour(entry.get('endTime',''))
                     ))
                     
-                    cursor.execute("""
-                        INSERT INTO classes (course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        course_id,
-                        section,
-                        room_id,
-                        instructor_id,
-                        entry.get('day',''),
-                        convert_to_24_hour(entry.get('startTime','')),
-                        convert_to_24_hour(entry.get('endTime','')),
-                        1  # term_id - use current term
-                    ))
-                conn.commit()
+                    if cursor.fetchone() is None:
+                        # Schedule entry doesn't exist, create it
+                        cursor.execute("""
+                            INSERT INTO classes (course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            course_id,
+                            section,
+                            room_id,
+                            instructor_id,
+                            entry.get('day',''),
+                            convert_to_24_hour(entry.get('startTime','')),
+                            convert_to_24_hour(entry.get('endTime','')),
+                            1  # term_id - use current term
+                        ))
+                
+                cursor.execute("COMMIT")
         except HTTPException:
             raise  # Re-raise validation errors
         except Exception as e:
