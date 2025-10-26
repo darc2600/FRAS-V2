@@ -310,7 +310,7 @@ export class RegistrationComponent implements OnInit, OnDestroy {
           this.password = '';
           this.email = '';
         },
-        error: err => {
+        error: (err: any) => {
           this.error = err?.error?.message || 'Registration failed.';
         }
       })
