@@ -321,6 +321,13 @@ async def get_attendance(course_code: str, section: str, room: str = None, start
 async def recognize_face(file: UploadFile = File(...), class_id: int = Form(...), recognition_service=Depends(get_recognition_service)):
     return await recognition_service.recognize_face(file, class_id)
 
+# --- User Registration Endpoint ---
+@app.post("/api/user/register", response_model=None, tags=["User"])
+async def register_user(user_data: dict):
+    # Simple user registration - just return success for now
+    # In a real app, this would create user accounts
+    return {"message": "User registration successful"}
+
 # --- Registration Endpoint ---
 @app.post("/api/register", response_model=None, tags=["Registration"])
 async def register_student(
