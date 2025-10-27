@@ -7,7 +7,7 @@ import { LoginService } from './login.service';
   styleUrls: ['./login.component.css']
 })
 export class LoginComponent {
-  username = '';
+  email = '';
   password = '';
   error = '';
   success = '';
@@ -15,16 +15,16 @@ export class LoginComponent {
   constructor(private loginService: LoginService) {}
 
   login() {
-    if (this.username && this.password) {
+    if (this.email && this.password) {
       this.error = '';
       this.success = '';
       this.loginService.login({
-        username: this.username,
+        email: this.email,
         password: this.password
       }).subscribe({
         next: () => {
           this.success = 'Login successful!';
-          this.username = '';
+          this.email = '';
           this.password = '';
         },
         error: err => {
@@ -32,7 +32,7 @@ export class LoginComponent {
         }
       });
     } else {
-      this.error = 'Username and password required';
+      this.error = 'Email and password required';
     }
   }
 }

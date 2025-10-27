@@ -43,6 +43,17 @@ def init_db():
             )
         ''')
 
+        # USERS (for application authentication) this LOGIN
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         # COURSES
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS courses (
@@ -178,7 +189,7 @@ def init_db():
 
         # Triggers to auto-update updated_at on row update
         for table in [
-            'students', 'instructors', 'courses', 'departments', 'room_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes', 'enrollments', 'attendance_logs'
+            'students', 'instructors', 'courses', 'departments', 'room_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes', 'enrollments', 'attendance_logs', 'users'
         ]:
             cursor.execute(f'''
                 CREATE TRIGGER IF NOT EXISTS trg_{table}_updated_at
@@ -237,6 +248,14 @@ from services.schedule_service import ScheduleService, get_schedule_service
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Include auth router (login endpoint) Try catch, Bot Suggested LOGIN
+try:
+    from api.auth import router as auth_router
+    app.include_router(auth_router)
+except Exception as e:
+    # Import errors should not prevent the app from starting in development; log for visibility
+    print(f"Warning: could not include auth router: {e}")
 
 # Enable CORS for Angular frontend
 app.add_middleware(

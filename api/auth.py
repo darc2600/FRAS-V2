@@ -4,12 +4,16 @@ from pydantic import BaseModel
 import sqlite3
 import secrets
 from typing import Optional
+import importlib
 
 # Optional imports for secure password hashing / verification
+# not sure how this works but bot suggested it
 try:
-	from passlib.hash import bcrypt
+	_pb = importlib.import_module("passlib.hash")
+	bcrypt = getattr(_pb, "bcrypt")
 	_HAS_BCRYPT = True
 except Exception:
+	bcrypt = None
 	_HAS_BCRYPT = False
 
 DB_PATH = "attendance.db"
@@ -18,7 +22,7 @@ router = APIRouter()
 
 
 class LoginRequest(BaseModel):
-	username: str
+	email: str
 	password: str
 
 
@@ -30,16 +34,17 @@ def _ensure_users_table():
 			"""
 			CREATE TABLE IF NOT EXISTS users (
 				user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-				username TEXT UNIQUE NOT NULL,
+				email TEXT UNIQUE NOT NULL,
 				password TEXT NOT NULL,
-				created_at TEXT DEFAULT (datetime('now'))
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
 			"""
 		)
 		conn.commit()
 
 
-def _seed_test_user(username: str = "admin", password: str = "admin"):
+def _seed_test_user(email: str = "testuser@example.com", password: str = "testpass"):
 	"""Insert a test user if it doesn't already exist.
 
 	This stores the password in plaintext unless passlib/bcrypt is available,
@@ -49,21 +54,21 @@ def _seed_test_user(username: str = "admin", password: str = "admin"):
 	_ensure_users_table()
 	with sqlite3.connect(DB_PATH) as conn:
 		cur = conn.cursor()
-		cur.execute("SELECT COUNT(*) FROM users WHERE username = ?", (username,))
+		cur.execute("SELECT COUNT(*) FROM users WHERE email = ?", (email,))
 		if cur.fetchone()[0] == 0:
 			if _HAS_BCRYPT:
 				stored = bcrypt.hash(password)
 			else:
 				stored = password
-			cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, stored))
+			cur.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, stored))
 			conn.commit()
 
 
-def _get_user_password(username: str) -> Optional[str]:
+def _get_user_password(email: str) -> Optional[str]:
 	_ensure_users_table()
 	with sqlite3.connect(DB_PATH) as conn:
 		cur = conn.cursor()
-		cur.execute("SELECT password FROM users WHERE username = ?", (username,))
+		cur.execute("SELECT password FROM users WHERE email = ?", (email,))
 		row = cur.fetchone()
 		return row[0] if row else None
 
@@ -72,14 +77,14 @@ def _get_user_password(username: str) -> Optional[str]:
 async def login(payload: LoginRequest):
 	"""Simple login endpoint for development/testing.
 
-	Request JSON: { "username": "...", "password": "..." }
+	Request JSON: { "email": "...", "password": "..." }
 
-	Response on success: { "status": "ok", "username": "...", "token": "..." }
+	Response on success: { "status": "ok", "email": "...", "token": "..." }
 	"""
 	# Ensure table and a test user exist (safe no-op if already present)
 	_seed_test_user()
 
-	stored = _get_user_password(payload.username)
+	stored = _get_user_password(payload.email)
 	if stored is None:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
@@ -101,5 +106,5 @@ async def login(payload: LoginRequest):
 	# For production replace this with a signed JWT and proper session handling.
 	token = secrets.token_urlsafe(24)
 
-	# Return username key (frontend expects `username`) — username field is used as the username/identifier
-	return {"status": "ok", "username": payload.username, "token": token}
+	# Return email key (frontend expects `email`) — email field is used as the identifier
+	return {"status": "ok", "email": payload.email, "token": token}

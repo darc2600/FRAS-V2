@@ -8,7 +8,8 @@ export class LoginService {
 
   constructor(private http: HttpClient) {}
 
-  login(data: { username: string; password: string }): Observable<any> {
+  // Accepts an email + password and forwards it to the backend
+  login(data: { email: string; password: string }): Observable<any> {
     return this.http.post(this.apiUrl, data);
   }
 }
