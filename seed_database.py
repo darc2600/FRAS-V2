@@ -250,7 +250,9 @@ def add_more_attendance_records(cursor):
 
     # Add more attendance records for October 25 at different times
     import random
-    statuses = ['present', 'late', 'absent']
+    # Map status strings to status_ids
+    status_map = {'present': 1, 'absent': 2, 'late': 3, 'excused': 4}
+    statuses = ['present', 'late', 'absent']  # Remove 'excused' from random selection for testing
     base_time = "2025-10-25 "
 
     # Add records throughout the day
@@ -277,10 +279,11 @@ def add_more_attendance_records(cursor):
         """, (student_id, class_id, timestamp))
 
         if cursor.fetchone()[0] == 0:
+            status_id = status_map[status]
             cursor.execute("""
-                INSERT INTO attendance_logs (student_id, class_id, timestamp, status)
+                INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id)
                 VALUES (?, ?, ?, ?)
-            """, (student_id, class_id, timestamp, status))
+            """, (student_id, class_id, timestamp, status_id))
             records_added += 1
 
     print(f"Added {records_added} additional attendance records for October 25")
