@@ -25,6 +25,12 @@ def seed_database():
         cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Laboratory',))
         cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Cisco',))
 
+        # Insert attendance status types
+        cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('present', 'Present', 'Student was present for the class'))
+        cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('absent', 'Absent', 'Student was absent from the class'))
+        cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('late', 'Late', 'Student arrived late to the class'))
+        cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('excused', 'Excused Absence', 'Student had an approved absence'))
+
         # Insert school terms for 2024-2025 (only if they don't already exist)
         school_terms = [
             ('2024-2025', 1, '2024-08-01', '2024-10-31'),

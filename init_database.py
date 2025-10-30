@@ -84,9 +84,20 @@ def init_database():
 
         # ROOM_TYPES
         cursor.execute('''
-            CREATE TABLE room_types (
+            CREATE TABLE IF NOT EXISTS room_types (
                 room_type_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 type_name VARCHAR(50) UNIQUE
+            )
+        ''')
+
+        # ATTENDANCE_STATUS_TYPES
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS attendance_status_types (
+                status_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                status_code VARCHAR(20) UNIQUE NOT NULL,
+                status_name VARCHAR(50) NOT NULL,
+                description TEXT,
+                is_active BOOLEAN DEFAULT 1
             )
         ''')
 
@@ -178,22 +189,24 @@ def init_database():
 
         # ATTENDANCE_LOGS
         cursor.execute('''
-            CREATE TABLE attendance_logs (
+            CREATE TABLE IF NOT EXISTS attendance_logs (
                 log_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 student_id INTEGER,
                 class_id INTEGER,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                status VARCHAR(20),
+                status_id INTEGER,
+                notes TEXT,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(student_id) REFERENCES students(student_id),
-                FOREIGN KEY(class_id) REFERENCES classes(class_id)
+                FOREIGN KEY(class_id) REFERENCES classes(class_id),
+                FOREIGN KEY(status_id) REFERENCES attendance_status_types(status_id)
             )
         ''')
 
         # Triggers to auto-update updated_at on row update
         tables_to_trigger = [
             'students', 'instructors', 'courses', 'departments', 'room_types',
-            'campuses', 'buildings', 'rooms', 'school_terms', 'classes',
+            'attendance_status_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes',
             'enrollments', 'attendance_logs'
         ]
 
@@ -225,6 +238,7 @@ def create_indexes():
             "CREATE INDEX IF NOT EXISTS idx_classes_room_day_time ON classes(room_id, day_of_week, start_time);",
             "CREATE INDEX IF NOT EXISTS idx_attendance_logs_class_date ON attendance_logs(class_id, DATE(timestamp));",
             "CREATE INDEX IF NOT EXISTS idx_attendance_logs_student_date ON attendance_logs(student_id, DATE(timestamp));",
+            "CREATE INDEX IF NOT EXISTS idx_attendance_logs_status ON attendance_logs(status_id);",
             "CREATE INDEX IF NOT EXISTS idx_courses_code ON courses(course_code);",
             "CREATE INDEX IF NOT EXISTS idx_instructors_number ON instructors(instructor_number);"
         ]
