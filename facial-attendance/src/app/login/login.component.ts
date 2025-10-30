@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 import { LoginService } from './login.service';
 
 @Component({
@@ -7,32 +8,49 @@ import { LoginService } from './login.service';
   styleUrls: ['./login.component.css']
 })
 export class LoginComponent {
-  username = '';
+  email = '';
   password = '';
+  showPassword = false;
   error = '';
   success = '';
 
-  constructor(private loginService: LoginService) {}
+  constructor(private loginService: LoginService, private router: Router) {}
 
   login() {
-    if (this.username && this.password) {
+    if (this.email && this.password) {
       this.error = '';
       this.success = '';
       this.loginService.login({
-        username: this.username,
+        email: this.email,
         password: this.password
       }).subscribe({
-        next: () => {
+        next: (res: any) => {
           this.success = 'Login successful!';
-          this.username = '';
+          // persist token/email for later API calls
+          try {
+            if (res?.token) {
+              localStorage.setItem('authToken', res.token);
+            }
+            const returnedEmail = res?.email ?? this.email;
+            localStorage.setItem('authEmail', returnedEmail);
+          } catch (e) {
+            // ignore storage errors
+          }
+          this.email = '';
           this.password = '';
+          // navigate to webcam capture page
+          this.router.navigate(['/webcam']);
         },
         error: err => {
           this.error = err?.error?.message || 'Invalid credentials';
         }
       });
     } else {
-      this.error = 'Username and password required';
+      this.error = 'Email and password required';
     }
+  }
+
+  togglePasswordVisibility() {
+    this.showPassword = !this.showPassword;
   }
 }
