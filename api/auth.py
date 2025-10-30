@@ -20,6 +20,10 @@ DB_PATH = "attendance.db"
 
 router = APIRouter()
 
+# Hardcoded test credential (development only)
+TEST_EMAIL = "testuser@example.com"
+TEST_PASSWORD = "testpass"
+
 
 class LoginRequest(BaseModel):
 	email: str
@@ -81,6 +85,11 @@ async def login(payload: LoginRequest):
 
 	Response on success: { "status": "ok", "email": "...", "token": "..." }
 	"""
+	# Quick dev path: accept a hardcoded test credential without DB dependency
+	if payload.email == TEST_EMAIL and payload.password == TEST_PASSWORD:
+		token = secrets.token_urlsafe(24)
+		return {"status": "ok", "email": payload.email, "token": token}
+
 	# Ensure table and a test user exist (safe no-op if already present)
 	_seed_test_user()
 
