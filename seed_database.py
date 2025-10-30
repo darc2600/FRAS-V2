@@ -45,18 +45,31 @@ def seed_database():
         cursor.execute("INSERT OR IGNORE INTO departments (dept_code, dept_name) VALUES (?, ?)", ('MATH', 'Mathematics'))
         cursor.execute("INSERT OR IGNORE INTO departments (dept_code, dept_name) VALUES (?, ?)", ('PHYS', 'Physics'))
 
-        # Insert another building
-        cursor.execute("INSERT OR IGNORE INTO buildings (building_name, campus_id) VALUES (?, ?)", ('Another Building', campus_id))
-        cursor.execute("SELECT building_id FROM buildings WHERE building_name = ? AND campus_id = ?", ('Another Building', campus_id))
-        building_id2 = cursor.fetchone()[0]
-
-        # Get IDs
+        # Get department IDs for course insertion
         cursor.execute("SELECT dept_id FROM departments WHERE dept_code = ?", ('GED',))
         ged_dept_id = cursor.fetchone()[0]
         cursor.execute("SELECT dept_id FROM departments WHERE dept_code = ?", ('CS',))
         cs_dept_id = cursor.fetchone()[0]
         cursor.execute("SELECT dept_id FROM departments WHERE dept_code = ?", ('SOIT',))
         soit_dept_id = cursor.fetchone()[0]
+
+        # Insert sample courses
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('GED101', 'Understanding the Self', 3, ged_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('GED102', 'Readings in Philippine History', 3, ged_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('GED107', 'The Contemporary World', 3, ged_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('CS101', 'Computer Programming 1', 3, cs_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('CS102', 'Computer Programming 2', 3, cs_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('IT119', 'Platform Technologies', 3, soit_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('CS143-8', 'Object Oriented Programming', 3, cs_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('IT135-8', 'Web Systems and Technologies', 3, soit_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO courses (course_code, course_name, units, dept_id) VALUES (?, ?, ?, ?)", ('IT166-1', 'Information Assurance and Security', 3, soit_dept_id))
+
+        # Insert another building
+        cursor.execute("INSERT OR IGNORE INTO buildings (building_name, campus_id) VALUES (?, ?)", ('Another Building', campus_id))
+        cursor.execute("SELECT building_id FROM buildings WHERE building_name = ? AND campus_id = ?", ('Another Building', campus_id))
+        building_id2 = cursor.fetchone()[0]
+
+        # Get remaining department IDs
         cursor.execute("SELECT dept_id FROM departments WHERE dept_code = ?", ('MATH',))
         math_dept_id = cursor.fetchone()[0]
         cursor.execute("SELECT dept_id FROM departments WHERE dept_code = ?", ('PHYS',))
