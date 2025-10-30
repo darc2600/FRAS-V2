@@ -92,11 +92,21 @@ class RecognitionRepository:
                             
                             delta = (now - class_start).total_seconds() / 60.0
                             if 0 <= delta <= 30:
-                                status = "Present"
+                                status_name = "Present"
                                 print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= 30 mins)")
                             else:
-                                status = "Late"
+                                status_name = "Late"
                                 print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start (> 30 mins)")
+                            
+                            # Get status_id from attendance_status_types table
+                            cursor.execute('''
+                                SELECT status_id FROM attendance_status_types WHERE status_name = ?
+                            ''', (status_name,))
+                            status_row = cursor.fetchone()
+                            if not status_row:
+                                print(f"[DEBUG] No status_id found for status_name={status_name}")
+                                continue
+                            status_id = status_row[0]
                             
                             # Get student name for response
                             cursor.execute('''
@@ -113,16 +123,16 @@ class RecognitionRepository:
                             
                             if cursor.fetchone() is None:
                                 cursor.execute("""
-                                    INSERT INTO attendance_logs (student_id, class_id, timestamp, status)
+                                    INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id)
                                     VALUES (?, ?, ?, ?)
-                                """, (student_id, class_id, timestamp, status))
+                                """, (student_id, class_id, timestamp, status_id))
                                 conn.commit()
                                 print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id}")
                             
                             # Set recognized variables (always, even if attendance was already logged)
                             recognized_id = student_id
                             recognized_name = student_name
-                            recognized_status = status
+                            recognized_status = status_name
                             print(f"[DEBUG] Set recognized variables: id={recognized_id}, name={recognized_name}, status={recognized_status}")
                             break
                     except Exception as e:

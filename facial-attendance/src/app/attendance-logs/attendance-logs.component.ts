@@ -5,7 +5,7 @@ import { ApiService } from '../api.service';
 @Component({
   selector: 'app-attendance-logs',
   templateUrl: './attendance-logs.component.html',
-  styleUrls: ['./attendance-logs.component.css'],
+  styleUrls: ['./attendance-logs.component.css', '../shared/status-styles.css'],
 })
 export class AttendanceLogsComponent implements OnInit {
   startDate: string = '';
@@ -203,7 +203,7 @@ export class AttendanceLogsComponent implements OnInit {
           studentNumber: log[0],
           studentName: log[1],
           time: log[2],
-          status: log[3] || 'Unknown'
+          status: (log[3] || 'Unknown').toLowerCase()
         }));
         this.groupLogsByDate();
         this.loading = false;

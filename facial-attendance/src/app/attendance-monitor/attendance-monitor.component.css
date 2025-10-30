@@ -403,12 +403,14 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  margin: 0 auto;
 }
 
 td, th {
-  padding: 8px 6px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
+  padding: 12px 8px;
+  text-align: center;
+  border-bottom: 1px solid #e0e0e0;
+  vertical-align: middle;
 }
 
 th {
@@ -416,18 +418,13 @@ th {
   font-weight: 600;
   position: sticky;
   top: 0;
+  text-align: center;
 }
 
-.present {
-  color: green;
-}
-
-.late {
-  color: orange;
-}
-
-.absent {
-  color: red;
+/* Ensure status badges are perfectly centered in table cells */
+.status-cell {
+  text-align: center;
+  vertical-align: middle;
 }
 
 .message {

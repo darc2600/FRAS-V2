@@ -5,10 +5,19 @@ class AttendanceLogRepository:
     def add_log(self, student_id, class_id, status):
         with get_connection() as conn:
             cursor = conn.cursor()
+            # Get status_id from attendance_status_types table
             cursor.execute('''
-                INSERT INTO attendance_logs (student_id, class_id, status)
+                SELECT status_id FROM attendance_status_types WHERE status_name = ?
+            ''', (status,))
+            status_row = cursor.fetchone()
+            if not status_row:
+                raise ValueError(f"Invalid status: {status}")
+            status_id = status_row[0]
+            
+            cursor.execute('''
+                INSERT INTO attendance_logs (student_id, class_id, status_id)
                 VALUES (?, ?, ?)
-            ''', (student_id, class_id, status))
+            ''', (student_id, class_id, status_id))
             conn.commit()
             try:
                 return cursor.lastrowid

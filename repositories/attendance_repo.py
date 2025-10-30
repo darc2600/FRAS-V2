@@ -29,8 +29,10 @@ class AttendanceRepository:
             class_id = class_row[0]
             if start_date and end_date and start_date.strip() and end_date.strip():
                 cursor.execute("""
-                    SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, a.status FROM attendance_logs a
+                    SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, ast.status_name 
+                    FROM attendance_logs a
                     LEFT JOIN students s ON a.student_id = s.student_id
+                    LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
                     WHERE a.class_id = ?
                     AND DATE(a.timestamp) >= DATE(?)
                     AND DATE(a.timestamp) <= DATE(?)
@@ -38,8 +40,10 @@ class AttendanceRepository:
                 """, (class_id, start_date, end_date))
             else:
                 cursor.execute("""
-                    SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, a.status FROM attendance_logs a
+                    SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, ast.status_name 
+                    FROM attendance_logs a
                     LEFT JOIN students s ON a.student_id = s.student_id
+                    LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
                     WHERE a.class_id = ?
                     ORDER BY a.timestamp
                 """, (class_id,))

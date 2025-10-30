@@ -10,7 +10,7 @@ import { NavbarComponent } from '../components/navbar/navbar.component';
 @Component({
   selector: 'app-attendance-monitor',
   templateUrl: './attendance-monitor.component.html',
-  styleUrls: ['./attendance-monitor.component.css'],
+  styleUrls: ['./attendance-monitor.component.css', '../shared/status-styles.css'],
 })
 export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   courseCode = '';
@@ -307,7 +307,7 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
           studentId: log[0],
           studentName: log[1],
           time: log[2],
-          status: log[3] || 'Unknown'
+          status: (log[3] || 'Unknown').toLowerCase()
         }));
         console.log('fetchLogs: Loaded', this.attendanceLogs.length, 'records');
       },
@@ -319,9 +319,10 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   }
 
   getStatusClass(status: string) {
-    if (status.toLowerCase() === 'present') return 'present';
-    if (status.toLowerCase() === 'late') return 'late';
-    if (status.toLowerCase() === 'absent') return 'absent';
+    if (status.toLowerCase() === 'present') return 'status-present';
+    if (status.toLowerCase() === 'late') return 'status-late';
+    if (status.toLowerCase() === 'absent') return 'status-absent';
+    if (status.toLowerCase() === 'excused absence') return 'status-excused';
     return '';
   }
 

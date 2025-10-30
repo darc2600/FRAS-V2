@@ -67,7 +67,9 @@
                 <td>{{ log.studentId }}</td>
                 <td>{{ log.studentName }}</td>
                 <td>{{ log.time | date:'hh:mm:ss a' }}</td>
-                <td [ngClass]="getStatusClass(log.status)">{{ log.status }}</td>
+                <td class="status-cell">
+                  <span [ngClass]="getStatusClass(log.status)">{{ log.status }}</span>
+                </td>
               </tr>
             </table>
             <div *ngIf="attendanceLogs.length === 0">No attendance records yet.</div>
