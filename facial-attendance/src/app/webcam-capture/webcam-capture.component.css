@@ -1,0 +1,63 @@
+/* Sidebar */
+.sidebar {
+  --background: #7a0a0a;
+  color: #ffc107;
+}
+
+.sidebar ion-item {
+  color: #ffc107;
+  font-weight: bold;
+}
+
+.sidebar .signout {
+  color: #ffc107;
+  text-align: center;
+}
+
+/* Top Bar */
+.top-bar {
+  background: #fff;
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.top-bar h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* Webcam Box */
+.webcam-box {
+  margin: 20px auto;
+  width: 400px;
+  height: 280px;
+  border: 2px solid #500000;
+  background: #f5ebeb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Student Info Row */
+.student-info {
+  margin: 10px;
+  padding: 5px;
+  background: #e5e5e5;
+  display: flex;
+  justify-content: space-around;
+  font-size: 14px;
+}
+
+.present {
+  color: green;
+}
+
+.ontime {
+  color: limegreen;
+}
+
+/* Logo */
+.logo {
+  width: 50px;
+}

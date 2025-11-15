@@ -1,0 +1,80 @@
+<main class="content-area">
+  <div class="attendance-page">
+    <header class="top-bar">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <label>
+            Floor:
+            <select [(ngModel)]="selectedFloor" (change)="onFloorChange()">
+              <option *ngFor="let f of availableFloors" [value]="f">{{f}}</option>
+            </select>
+          </label>
+          <label>
+            Room:
+            <select [(ngModel)]="room" (change)="onRoomChange()">
+              <option *ngFor="let r of availableRooms" [value]="r">{{r}}</option>
+            </select>
+          </label>
+          <label>
+            Course-Section:
+            <select [(ngModel)]="courseSection" (change)="onCourseSectionChange()">
+              <option *ngFor="let cs of availableCourseSections" [value]="cs">{{cs}}</option>
+            </select>
+          </label>
+        </div>
+      </header>
+      
+      <div class="main-content">
+        <div class="left-panel">
+          <div class="clock">{{ currentTime }}</div>
+          <div class="webcam">
+            <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)"></webcam>
+            <div class="status-indicators">
+              <div class="status-indicator" [class.active]="autoRecognitionActive">
+                <span class="indicator-dot"></span>
+                Auto Recognition Active
+              </div>
+            </div>
+          </div>
+          <div class="button-group">
+            <button (click)="captureAndMarkAttendance()" [disabled]="isCapturing">
+              <span *ngIf="isCapturing">Capturing...</span>
+              <span *ngIf="!isCapturing">
+                Capture & Mark Attendance
+                <small class="space-hint">(Space)</small>
+              </span>
+            </button>
+            <button class="auto-recognition-btn"
+                    [class.running]="autoRecognitionActive"
+                    (click)="toggleAutoRecognition()">
+              <span *ngIf="!autoRecognitionActive">Start Auto Recognition</span>
+              <span *ngIf="autoRecognitionActive">Stop Auto Recognition</span>
+            </button>
+          </div>
+          <div class="message">{{ message }}</div>
+        </div>
+
+        <div class="right-panel">
+          <h2>Attendance Log</h2>
+          <div class="attendance-table">
+            <table>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+              <tr *ngFor="let log of attendanceLogs">
+                <td>{{ log.studentId }}</td>
+                <td>{{ log.studentName }}</td>
+                <td>{{ log.time | date:'hh:mm:ss a' }}</td>
+                <td class="status-cell">
+                  <span [ngClass]="getStatusClass(log.status)">{{ log.status }}</span>
+                </td>
+              </tr>
+            </table>
+            <div *ngIf="attendanceLogs.length === 0">No attendance records yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>

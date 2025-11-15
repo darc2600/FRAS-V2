@@ -1,0 +1,54 @@
+/* Ensure main app content does not overlap sidebar */
+.app-content {
+  margin-left: 192px;
+}
+
+/* If you use a router-outlet, wrap it in a div with class 'app-content' in app.component.html */
+
+.burger-container {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.burger-btn {
+  background: #FFD700;
+  color: #990000;
+  border: none;
+  font-size: 20px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.262);
+}
+
+.burger-btn:focus {
+  outline: none;
+}
+
+.burger-label {
+  margin-top: 4px;
+  color: #FFD700;
+  font-weight: bold;
+  font-size: 16px;
+  text-align: center;
+}
+
+/* Guest shell shown on auth pages (login / registration) */
+.guest-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--guest-bg, #ffffff);
+  padding: 0px;
+}
+
+/* When guest-shell contains a centered login component, remove default app-content offset */
+.guest-shell .app-content {
+  margin-left: 0;
+}

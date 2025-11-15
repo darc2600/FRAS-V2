@@ -19,9 +19,11 @@ facial_attendance_system/
     └── BM4/
         ├── 2019123456/
         └── 2024123456/
-├── attendance.db          # SQLite database file (auto-created)
+├── attendance.db          # SQLite database file (created by init_database.py - not tracked in git)
 ├── main.py                # Main script
 ├── utils.py               # Helper functions
+├── init_database.py       # Database schema initialization script
+├── seed_database.py       # Sample data seeding script
 └── README.md              # Project documentation
 ```
 
@@ -39,7 +41,19 @@ facial_attendance_system/
    pip install -r requirements.txt
    ```
 
-3. **Prepare the dataset:**
+3. **Initialize the database:**
+   Create the database schema and tables:
+   ```
+   python init_database.py
+   ```
+
+4. **Seed with sample data (optional):**
+   Populate the database with sample data for development/testing:
+   ```
+   python seed_database.py
+   ```
+
+5. **Prepare the dataset:**
    Place student images in the `dataset/` directory, organized by student ID.
 
 ## Usage Guidelines

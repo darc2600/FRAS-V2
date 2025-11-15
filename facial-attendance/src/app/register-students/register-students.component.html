@@ -1,0 +1,137 @@
+<div class="page">
+  <header class="topbar">
+    <h1>Student Facial Recognition Registration</h1>
+    <div class="hint">Complete your personal information and class schedule on the left, then capture facial images on the right.</div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: Personal Info + Schedule -->
+    <section class="registration-section">
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <label>
+          <span>Student ID *</span>
+          <input formControlName="studentId" placeholder="e.g., 2023001" (blur)="onStudentIdBlur()">
+          <div class="error" *ngIf="validationErrors['studentId']">{{ validationErrors['studentId'] }}</div>
+          <div class="success" *ngIf="studentValidated && !validationErrors['studentId']">✓ Student ID validated - please enter your information below</div>
+        </label>
+        <label>
+          <span>Last Name *</span>
+          <input formControlName="lastName" placeholder="e.g., Doe" (blur)="onFieldBlur('lastName')" [readonly]="!studentValidated">
+          <div class="error" *ngIf="validationErrors['lastName']">{{ validationErrors['lastName'] }}</div>
+        </label>
+        <label>
+          <span>First Name *</span>
+          <input formControlName="firstName" placeholder="e.g., John" (blur)="onFieldBlur('firstName')" [readonly]="!studentValidated">
+          <div class="error" *ngIf="validationErrors['firstName']">{{ validationErrors['firstName'] }}</div>
+        </label>
+        <label>
+          <span>Email</span>
+          <input formControlName="email" placeholder="e.g., john.doe@email.com" type="email" (blur)="onFieldBlur('email')" [readonly]="!studentValidated">
+          <div class="error" *ngIf="validationErrors['email']">{{ validationErrors['email'] }}</div>
+        </label>
+      </form>
+
+      <div class="schedule-section">
+        <h3>Class Schedule</h3>
+        <div class="schedule-entry">
+          <div class="schedule-field">
+            <label>Course Code</label>
+            <div class="course-input-container">
+              <input [(ngModel)]="scheduleCourseCode"
+                     (input)="onCourseInputChange()"
+                     (focus)="onCourseInputChange()"
+                     (blur)="hideSuggestions()"
+                     placeholder="Search courses..."
+                     autocomplete="off">
+              <div class="suggestions-dropdown" *ngIf="showCourseSuggestions">
+                <div class="suggestion-item"
+                     *ngFor="let course of filteredCourses"
+                     (mousedown)="selectCourse(course)">
+                  <strong>{{ course.code }}</strong> - {{ course.name }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="schedule-field">
+            <label>Section</label>
+            <div class="section-input-container">
+              <input [(ngModel)]="scheduleSection"
+                     (input)="onSectionInputChange()"
+                     (focus)="onSectionInputChange()"
+                     (blur)="hideSuggestions()"
+                     placeholder="Search sections..."
+                     autocomplete="off">
+              <div class="suggestions-dropdown" *ngIf="showSectionSuggestions">
+                <div class="suggestion-item"
+                     *ngFor="let section of filteredSections"
+                     (mousedown)="selectSection(section)">
+                  {{ section }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="btn" type="button" (click)="addScheduleEntry()" [disabled]="!scheduleCourseCode || !scheduleSection">Add</button>
+        </div>
+        <ul class="schedule-list">
+          <li *ngFor="let entry of schedule; let i = index">
+            <span>{{entry.course_code}} - {{entry.section}}</span>
+            <button class="btn danger" type="button" (click)="removeScheduleEntry(i)">Remove</button>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- RIGHT: Facial Recognition Setup -->
+    <section class="camera-section">
+      <h3>Facial Recognition Setup</h3>
+      <div class="video-container">
+        <video #videoEl playsinline></video>
+        <div class="angle-overlay" *ngIf="!allAnglesCaptured">
+          <div class="angle-cue" [ngClass]="getAngleCueClass()">
+            <div class="angle-text">{{ currentAngleLabel }}</div>
+            <div class="angle-arrow" [ngClass]="getArrowDirection()"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANGLE CAPTURE UI -->
+      <div class="angle-guide">
+        <div class="angle-label">Current Angle: <span class="angle-label-bordered">{{ currentAngleLabel }}</span></div>
+        <div class="capture-controls">
+          <button class="btn" type="button" (click)="captureAngle()" [disabled]="!stream || isCapturing || faceAngles[currentAngleIndex].captured || autoCaptureActive">
+            Capture {{ currentAngleLabel }}
+          </button>
+          <button class="btn primary" type="button" (click)="startAutoCapture()" [disabled]="!stream || isCapturing || autoCaptureActive">
+            Start Auto Capture
+          </button>
+          <button class="btn danger" type="button" (click)="stopAutoCapture()" [disabled]="!autoCaptureActive">
+            Stop Auto Capture
+          </button>
+        </div>
+        <button class="btn danger" type="button" (click)="resetAngles()" [disabled]="autoCaptureActive">Reset Angles</button>
+        <div class="angle-progress">
+          <span *ngFor="let angle of faceAngles; let i = index" [class.captured]="angle.captured">
+            {{ angle.label }}<span *ngIf="i < faceAngles.length - 1">, </span>
+          </span>
+        </div>
+      </div>
+      <div class="gallery" *ngIf="previews.length">
+        <div class="thumb" *ngFor="let p of previews; let i = index">
+          <img [src]="p.url" alt="shot {{i+1}}">
+          <button class="x" (click)="removeShot(i)" title="Remove">×</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Submit Button at Bottom -->
+  <div class="submit-section">
+    <div class="progress" *ngIf="submitting">
+      <div class="bar" [style.width.%]="uploadProgress"></div>
+    </div>
+    <button class="btn primary block" type="submit" [disabled]="submitting || !studentValidated || validationErrorsCount > 0 || !form.valid || !allAnglesCaptured || schedule.length === 0" (click)="submit()">
+      {{ submitting ? 'Submitting…' : 'Submit Registration' }}
+    </button>
+  </div>
+  <canvas #canvasEl class="hidden-canvas"></canvas>
+</div>

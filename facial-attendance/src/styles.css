@@ -1,0 +1,36 @@
+/* You can add global styles to this file, and also import other style files */
+/* Import Roboto from Google Fonts and set as the global font-family. */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+/* Global font set for the app */
+body {
+  font-family: 'Roboto', Arial, sans-serif;
+}
+
+/* Status color coding for attendance */
+.status-present {
+  color: #28a745;
+  font-weight: 600;
+  background: rgba(40, 167, 69, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.status-absent {
+  color: #dc3545;
+  font-weight: 600;
+  background: rgba(220, 53, 69, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.status-late {
+  color: #ffc107;
+  font-weight: 600;
+  background: rgba(255, 193, 7, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}

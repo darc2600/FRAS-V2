@@ -1,0 +1,108 @@
+.profile-sidebar {
+  position: fixed;
+  top: 0;
+  right: -300px;
+  width: 200px;
+  height: 100vh;
+  background: #333333;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+  transition: right 0.3s ease;
+  z-index: 1100;
+  padding: 16px 0px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.profile-sidebar.open {
+  right: 0;
+}
+
+@media (max-width: 600px) {
+  .profile-sidebar {
+    width: 90vw;
+    right: -90vw;
+  }
+  .profile-sidebar.open {
+    right: 0;
+  }
+}
+
+/* Temporary styles for debugging 
+.profile-sidebar {
+  right: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+*/
+.profile-sidebar h3 {
+  margin-top: 0;
+  color: #ffffff;
+}
+
+.profile-sidebar a,
+.profile-sidebar a.active,
+.profile-sidebar a:hover,
+.sidebar-title {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  padding: 10px 0;
+  margin: 0 !important;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 18px;
+  border-radius: 2px;
+  text-align: left;
+  transition: background 0.2s, color 0.2s;
+  box-sizing: border-box;
+}
+
+.profile-sidebar a.active,
+.profile-sidebar a:hover {
+  background: #b30000;
+  color: #FFD700;
+  z-index: 1;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  /* Prevent overlap with sidebar edge */
+}
+
+.profile-sidebar li {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.sidebar-signout {
+  margin-bottom: 32px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.signout-btn {
+  background: #FFD700;
+  color: #990000;
+  border: none;
+  padding: 5px 4px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.2s, color 0.2s;
+  width: 50%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+  display: block;
+}
+
+.signout-btn:hover {
+  background: #fff;
+  color: #990000;
+}
+
+.sidebar-header-space {
+  height: 64px;
+}
