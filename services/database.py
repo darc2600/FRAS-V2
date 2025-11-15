@@ -10,7 +10,16 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.declarative import declarative_base
 
-from config import settings
+# Hardcoded settings for now
+database_url = "sqlite:///attendance.db"
+db_pool_size = 10
+db_max_overflow = 20
+host = "127.0.0.1"
+port = 8000
+debug = True
+secret_key = "dev-secret-change-me"
+jwt_algorithm = "HS256"
+jwt_expiration_hours = 24
 
 LOG = logging.getLogger(__name__)
 
@@ -22,21 +31,21 @@ def init_database():
     """Initialize database connection and create tables"""
     global engine, SessionLocal
 
-    if settings.database_url.startswith("sqlite"):
+    if database_url.startswith("sqlite"):
         # SQLite-specific configuration
         engine = create_engine(
-            settings.database_url,
+            database_url,
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
-            echo=settings.debug
+            echo=debug
         )
     else:
         # PostgreSQL configuration
         engine = create_engine(
-            settings.database_url,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_max_overflow,
-            echo=settings.debug
+            database_url,
+            pool_size=db_pool_size,
+            max_overflow=db_max_overflow,
+            echo=debug
         )
 
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

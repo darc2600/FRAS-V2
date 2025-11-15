@@ -1,8 +1,8 @@
 import os
 from typing import Optional
-from pydantic import BaseSettings
+from pydantic import BaseModel
 
-class Settings(BaseSettings):
+class Settings(BaseModel):
     # Database
     database_url: str = "sqlite:///attendance.db"
     db_pool_size: int = 10

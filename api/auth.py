@@ -2,21 +2,31 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 import sqlite3
+import os
 import secrets
 from typing import Optional
 import importlib
+import jwt
+from datetime import datetime, timedelta
 
 # Optional imports for secure password hashing / verification
 # not sure how this works but bot suggested it
 try:
 	_pb = importlib.import_module("passlib.hash")
 	bcrypt = getattr(_pb, "bcrypt")
-	_HAS_BCRYPT = True
+	pbkdf2_sha256 = getattr(_pb, "pbkdf2_sha256")
+	_HAS_PASSLIB = True
 except Exception:
 	bcrypt = None
-	_HAS_BCRYPT = False
+	pbkdf2_sha256 = None
+	_HAS_PASSLIB = False
 
-DB_PATH = "attendance.db"
+DB_PATH = os.path.join(os.getcwd(), "attendance.db")
+
+# JWT settings
+JWT_SECRET = "dev-secret-change-me"
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_MINUTES = 1440
 
 router = APIRouter()
 
@@ -28,6 +38,35 @@ TEST_PASSWORD = "testpass"
 class LoginRequest(BaseModel):
 	email: str
 	password: str
+
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+
+def _get_user_auth(email: str):
+	"""Get user authentication data including role."""
+	with sqlite3.connect(DB_PATH) as conn:
+		cur = conn.cursor()
+		cur.execute("""
+			SELECT u.password, u.role, u.user_id, u.reference_id 
+			FROM users u 
+			WHERE u.email = ?
+		""", (email,))
+		result = cur.fetchone()
+		return result
+
+
+def _update_last_login(user_id: int):
+	"""Update the last login timestamp for a user."""
+	with sqlite3.connect(DB_PATH) as conn:
+		cur = conn.cursor()
+		cur.execute("UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
+		conn.commit()
 
 
 def _ensure_users_table():
@@ -79,41 +118,46 @@ def _get_user_password(email: str) -> Optional[str]:
 
 @router.post("/api/login")
 async def login(payload: LoginRequest):
-	"""Simple login endpoint for development/testing.
+	"""Login endpoint that returns JWT token.
 
 	Request JSON: { "email": "...", "password": "..." }
-
-	Response on success: { "status": "ok", "email": "...", "token": "..." }
+	Response on success: { "access_token": "...", "token_type": "bearer", "role": "...", "user_id": ... }
 	"""
-	# Quick dev path: accept a hardcoded test credential without DB dependency
+	# Quick dev path: accept a hardcoded test credential
 	if payload.email == TEST_EMAIL and payload.password == TEST_PASSWORD:
-		token = secrets.token_urlsafe(24)
-		return {"status": "ok", "email": payload.email, "token": token}
+		token = create_access_token(data={"sub": payload.email, "role": "admin", "user_id": 0})
+		return {"access_token": token, "token_type": "bearer", "role": "admin", "user_id": 0}
 
-	# Ensure table and a test user exist (safe no-op if already present)
-	_seed_test_user()
-
-	stored = _get_user_password(payload.email)
-	if stored is None:
+	# Get user authentication data
+	user_data = _get_user_auth(payload.email)
+	if user_data is None:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+	stored_password, role, user_id, reference_id = user_data
+
 	valid = False
-	# If passlib bcrypt is available we expect the stored value to be a bcrypt hash
-	if _HAS_BCRYPT:
+	if stored_password.startswith('$'):
+		# Hashed password
 		try:
-			valid = bcrypt.verify(payload.password, stored)
+			if pbkdf2_sha256 is not None and stored_password.startswith('$pbkdf2-sha256$'):
+				valid = pbkdf2_sha256.verify(payload.password, stored_password)
+			elif bcrypt is not None and stored_password.startswith('$2b$'):
+				valid = bcrypt.verify(payload.password, stored_password)
+			else:
+				valid = False
 		except Exception:
 			valid = False
 	else:
-		# Plaintext comparison (development only)
-		valid = (payload.password == stored)
+		# Plaintext password (fallback for existing users)
+		valid = (payload.password == stored_password)
 
 	if not valid:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-	# Issue a short-lived random token for the frontend to use as a placeholder.
-	# For production replace this with a signed JWT and proper session handling.
-	token = secrets.token_urlsafe(24)
+	# Update last login
+	_update_last_login(user_id)
 
-	# Return email key (frontend expects `email`) — email field is used as the identifier
-	return {"status": "ok", "email": payload.email, "token": token}
+	# Create JWT token
+	token = create_access_token(data={"sub": payload.email, "role": role, "user_id": user_id})
+
+	return {"access_token": token, "token_type": "bearer", "role": role, "user_id": user_id}

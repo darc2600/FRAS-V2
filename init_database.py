@@ -57,6 +57,21 @@ def init_database():
             )
         ''')
 
+        # ADMINS
+        cursor.execute('''
+            CREATE TABLE admins (
+                admin_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_number VARCHAR(20) UNIQUE,
+                last_name TEXT,
+                first_name TEXT,
+                email TEXT,
+                dept_id INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(dept_id) REFERENCES departments(dept_id)
+            )
+        ''')
+
         # COURSES
         cursor.execute('''
             CREATE TABLE courses (

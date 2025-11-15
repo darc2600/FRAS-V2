@@ -4,3 +4,7 @@ opencv-python
 deepface
 boto3
 psycopg2-binary
+PyJWT
+passlib[bcrypt]
+pydantic
+python-multipart

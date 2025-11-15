@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { LoginService } from './login.service';
+import { AuthService, User } from '../auth.service';
 
 @Component({
   selector: 'app-login',
@@ -14,7 +15,11 @@ export class LoginComponent {
   error = '';
   success = '';
 
-  constructor(private loginService: LoginService, private router: Router) {}
+  constructor(
+    private loginService: LoginService,
+    private router: Router,
+    private authService: AuthService
+  ) {}
 
   login() {
     if (this.email && this.password) {
@@ -26,16 +31,15 @@ export class LoginComponent {
       }).subscribe({
         next: (res: any) => {
           this.success = 'Login successful!';
-          // persist token/email for later API calls
-          try {
-            if (res?.token) {
-              localStorage.setItem('authToken', res.token);
-            }
-            const returnedEmail = res?.email ?? this.email;
-            localStorage.setItem('authEmail', returnedEmail);
-          } catch (e) {
-            // ignore storage errors
-          }
+          // Create user object and login via AuthService
+          const user: User = {
+            email: this.email,
+            role: res.role,
+            userId: res.user_id,
+            token: res.access_token
+          };
+          this.authService.login(user);
+
           this.email = '';
           this.password = '';
           // navigate to webcam capture page

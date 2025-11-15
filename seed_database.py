@@ -19,11 +19,16 @@ def seed_database():
 
         # Clear FRAS-specific tables (attendance_logs, classes, enrollments) to start fresh
         # while keeping the migrated Mapúa data
-        cursor.execute("DELETE FROM attendance_logs")
-        cursor.execute("DELETE FROM classes") 
-        cursor.execute("DELETE FROM enrollments")
-
-        print("Cleared FRAS-specific tables (attendance_logs, classes, enrollments)")
+        tables_to_clear = ['attendance_logs', 'classes', 'enrollments']
+        for table in tables_to_clear:
+            try:
+                cursor.execute(f"DELETE FROM {table}")
+                print(f"Cleared table: {table}")
+            except sqlite3.OperationalError as e:
+                if "no such table" in str(e):
+                    print(f"Table {table} does not exist, skipping clear.")
+                else:
+                    raise
 
         # Insert campuses
         cursor.execute("INSERT OR IGNORE INTO campuses (campus_name, location) VALUES (?, ?)", ('Mapúa Makati', 'Makati City'))
@@ -50,11 +55,31 @@ def seed_database():
         cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Laboratory',))
         cursor.execute("INSERT OR IGNORE INTO room_types (type_name) VALUES (?)", ('Cisco',))
 
+        # Create attendance_status_types table if not exists
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance_status_types (
+            status_code TEXT PRIMARY KEY,
+            status_name TEXT NOT NULL,
+            description TEXT
+        )
+        """)
+
         # Insert attendance status types
         cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('present', 'Present', 'Student was present for the class'))
         cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('absent', 'Absent', 'Student was absent from the class'))
         cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('late', 'Late', 'Student arrived late to the class'))
         cursor.execute("INSERT OR IGNORE INTO attendance_status_types (status_code, status_name, description) VALUES (?, ?, ?)", ('excused', 'Excused Absence', 'Student had an approved absence'))
+
+        # Create school_terms table if not exists
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS school_terms (
+            school_year TEXT,
+            term INTEGER,
+            start_date TEXT,
+            end_date TEXT,
+            PRIMARY KEY (school_year, term)
+        )
+        """)
 
         # Insert school terms for 2024-2025 (only if they don't already exist)
         school_terms = [
@@ -124,7 +149,7 @@ def seed_database():
         # Insert sample instructors (at least 10 instructors with numbers 2020103001 to 2020103010)
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103001', 'Smith', 'Jane', 'jane.smith@mapua.edu.ph', soit_dept_id))
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103002', 'Johnson', 'John', 'john.johnson@mapua.edu.ph', dla_dept_id))
-        cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103003', 'Williams', 'Emily', 'emily.williams@mapua.edu.ph', soit_dept_id))
+        cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103003', 'Williams', 'Emily', 'emily.williams@example.com', soit_dept_id))
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103004', 'Brown', 'Michael', 'michael.brown@mapua.edu.ph', soit_dept_id))
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103005', 'Davis', 'Sarah', 'sarah.davis@mapua.edu.ph', soit_dept_id))
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103006', 'Miller', 'David', 'david.miller@mapua.edu.ph', soit_dept_id))
@@ -132,6 +157,9 @@ def seed_database():
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103008', 'Deveza', 'Eric', 'eric.deveza@mapua.edu.ph', soit_dept_id))
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103009', 'Romance', 'Isaac', 'isaac.romance@mapua.edu.ph', soit_dept_id))
         cursor.execute("INSERT OR IGNORE INTO instructors (instructor_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('2020103010', 'Santos', 'Maria', 'maria.santos@mapua.edu.ph', math_dept_id))
+
+        # Insert sample admins
+        cursor.execute("INSERT OR IGNORE INTO admins (employee_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", ('ADMIN001', 'Admin', 'Super', 'admin@mapua.edu.ph', soit_dept_id))
 
         # Insert sample students (at least 10 students with numbers 2025103001 to 2025103010)
         cursor.execute("INSERT OR IGNORE INTO students (student_number, last_name, first_name, email) VALUES (?, ?, ?, ?)", ('2025103001', 'Doe', 'John', 'john.doe@mapua.edu.ph'))

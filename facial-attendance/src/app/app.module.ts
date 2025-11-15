@@ -2,7 +2,7 @@ import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { IonicModule } from '@ionic/angular';
 import { WebcamModule } from 'ngx-webcam';
 import { AppComponent } from './app.component';
@@ -19,6 +19,7 @@ import { RegistrationComponent } from './registration/registration.component';
 import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.component';
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
 import { ProfileSidebarComponent } from './components/profile-sidebar/profile-sidebar.component';
+import { AuthInterceptor } from './auth.interceptor';
 // Import other components as needed
 
 @NgModule({
@@ -46,7 +47,13 @@ import { ProfileSidebarComponent } from './components/profile-sidebar/profile-si
   WebcamModule,
   RouterModule.forRoot(routes)
   ],
-  providers: [],
+  providers: [
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthInterceptor,
+      multi: true
+    }
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule {}
