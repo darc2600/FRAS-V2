@@ -42,8 +42,8 @@ export class LoginComponent {
 
           this.email = '';
           this.password = '';
-          // navigate to webcam capture page
-          this.router.navigate(['/webcam']);
+          // navigate to monitor page
+          this.router.navigate(['/monitor']);
         },
         error: err => {
           this.error = err?.error?.message || 'Invalid credentials';

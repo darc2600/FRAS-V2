@@ -8,7 +8,6 @@ import { WebcamModule } from 'ngx-webcam';
 import { AppComponent } from './app.component';
 import { RouterModule } from '@angular/router';
 import { routes } from './app.routes';
-import { WebcamCaptureComponent } from './webcam-capture/webcam-capture.component';
 import { NavbarComponent } from './components/navbar/navbar.component';
 import { AttendanceMonitorComponent } from './attendance-monitor/attendance-monitor.component';
 import { AttendanceLogsComponent } from './attendance-logs/attendance-logs.component';
@@ -25,7 +24,6 @@ import { AuthInterceptor } from './auth.interceptor';
 @NgModule({
   declarations: [
     AppComponent,
-    WebcamCaptureComponent,
     NavbarComponent,
     AttendanceMonitorComponent,
     AttendanceLogsComponent,

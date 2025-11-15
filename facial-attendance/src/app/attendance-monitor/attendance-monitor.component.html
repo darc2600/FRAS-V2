@@ -26,7 +26,7 @@
       <div class="main-content">
         <div class="left-panel">
           <div class="clock">{{ currentTime }}</div>
-          <div class="webcam">
+          <div class="monitor">
             <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)"></webcam>
             <div class="status-indicators">
               <div class="status-indicator" [class.active]="autoRecognitionActive">
