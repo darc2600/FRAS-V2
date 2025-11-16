@@ -1,18 +1,14 @@
 import sqlite3
 import os
+from backend import init_db
 
 # Database path
 DB_PATH = "attendance.db"
 
 def seed_database():
     """Populate the database with sample Mapúa data for development/testing"""
-    # Delete existing database to start fresh
-    if os.path.exists(DB_PATH):
-        try:
-            os.remove(DB_PATH)
-            print(f"Removed existing {DB_PATH}")
-        except PermissionError:
-            print(f"Warning: Could not remove {DB_PATH} (file may be in use). Continuing with existing database.")
+    # Ensure database and tables exist
+    init_db()
     
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()

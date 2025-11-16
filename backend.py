@@ -236,6 +236,21 @@ def init_db():
                     UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
                 END;
             ''')
+        
+        # ADMINS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admins (
+                admin_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_number TEXT UNIQUE,
+                last_name TEXT,
+                first_name TEXT,
+                email TEXT,
+                dept_id INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(dept_id) REFERENCES departments(dept_id)
+            )
+        ''')
 
         conn.commit()
 
@@ -380,19 +395,6 @@ async def register_user(payload: UserRegister):
                 password TEXT NOT NULL,
                 role TEXT,
                 reference_id INTEGER,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        # Ensure admins table exists
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS admins (
-                admin_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                employee_number TEXT UNIQUE,
-                last_name TEXT,
-                first_name TEXT,
-                email TEXT,
-                dept_id INTEGER,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
