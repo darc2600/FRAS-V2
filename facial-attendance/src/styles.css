@@ -15,6 +15,9 @@ body {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.85em;
+  display: inline-block;
+  text-align: center;
+  min-width: 70px;
 }
 
 .status-absent {
@@ -24,6 +27,9 @@ body {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.85em;
+  display: inline-block;
+  text-align: center;
+  min-width: 70px;
 }
 
 .status-late {
@@ -33,4 +39,19 @@ body {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.85em;
+  display: inline-block;
+  text-align: center;
+  min-width: 70px;
+}
+
+.status-excused {
+  color: #6c757d;
+  font-weight: 600;
+  background: rgba(108, 117, 125, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  display: inline-block;
+  text-align: center;
+  min-width: 70px;
 }
