@@ -224,19 +224,6 @@ def init_db():
             )
         ''')
 
-        # Triggers to auto-update updated_at on row update
-        for table in [
-            'students', 'instructors', 'courses', 'departments', 'room_types', 'attendance_status_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes', 'enrollments', 'attendance_logs'
-        ]:
-            cursor.execute(f'''
-                CREATE TRIGGER IF NOT EXISTS trg_{table}_updated_at
-                AFTER UPDATE ON {table}
-                FOR EACH ROW
-                BEGIN
-                    UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
-                END;
-            ''')
-        
         # ADMINS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS admins (
@@ -252,10 +239,33 @@ def init_db():
             )
         ''')
 
-        conn.commit()
+        # USERS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT,
+                reference_id INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-# Initialize DB on startup
-init_db()
+        # Triggers to auto-update updated_at on row update
+        for table in [
+            'students', 'instructors', 'courses', 'departments', 'room_types', 'attendance_status_types', 'campuses', 'buildings', 'rooms', 'school_terms', 'classes', 'enrollments', 'attendance_logs', 'admins', 'users'
+        ]:
+            cursor.execute(f'''
+                CREATE TRIGGER IF NOT EXISTS trg_{table}_updated_at
+                AFTER UPDATE ON {table}
+                FOR EACH ROW
+                BEGIN
+                    UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
+                END;
+            ''')
+
+        conn.commit()
 
 # -----------------------
 # FastAPI app setup
@@ -387,18 +397,6 @@ async def register_user(payload: UserRegister):
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.cursor()
         
-        # Ensure users table exists with required columns
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                role TEXT,
-                reference_id INTEGER,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
         # Add columns if they don't exist (for existing tables)
         try:
             cur.execute("ALTER TABLE users ADD COLUMN role TEXT")
