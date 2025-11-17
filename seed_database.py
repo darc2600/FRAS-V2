@@ -169,6 +169,14 @@ def seed_database():
         cursor.execute("INSERT OR IGNORE INTO students (student_number, last_name, first_name, email) VALUES (?, ?, ?, ?)", ('2025103009', 'Moore', 'James', 'james.moore@mapua.edu.ph'))
         cursor.execute("INSERT OR IGNORE INTO students (student_number, last_name, first_name, email) VALUES (?, ?, ?, ?)", ('2025103010', 'Taylor', 'Olivia', 'olivia.taylor@mapua.edu.ph'))
 
+        # Insert sample class
+        cursor.execute("INSERT INTO classes (course_id, instructor_id, room_id, section, day_of_week, start_time, end_time, term_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (1, 1, 1, 'A', 'MWF', '07:00', '08:00', 1))
+        class_id = cursor.lastrowid
+
+        # Enroll students 1-5 in this class
+        for student_id in range(1, 6):
+            cursor.execute("INSERT INTO enrollments (student_id, class_id) VALUES (?, ?)", (student_id, class_id))
+
         conn.commit()
         print("Mapúa database seeded successfully!")
 
@@ -189,8 +197,12 @@ def seed_database():
         print(f"✓ Buildings: {cursor.fetchone()[0]}")
         cursor.execute("SELECT COUNT(*) FROM school_terms")
         print(f"✓ School Terms: {cursor.fetchone()[0]}")
+        cursor.execute("SELECT COUNT(*) FROM classes")
+        print(f"✓ Classes: {cursor.fetchone()[0]}")
+        cursor.execute("SELECT COUNT(*) FROM enrollments")
+        print(f"✓ Enrollments: {cursor.fetchone()[0]}")
 
-        print("\nNote: attendance_logs, classes, and enrollments tables are left empty for the FRAS system to populate.")
+        print("\nNote: attendance_logs table is left empty for the FRAS system to populate.")
 
 if __name__ == "__main__":
     seed_database()

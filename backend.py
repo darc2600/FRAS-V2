@@ -370,11 +370,6 @@ async def get_courses_sections_by_room(room_id: int, room_service=Depends(get_ro
 async def get_attendance(course_code: str, section: str, room: str = None, start_date: str = None, end_date: str = None, attendance_service=Depends(get_attendance_service)):
     return attendance_service.get_attendance(course_code, section, room, start_date, end_date)
 
-# --- Recognition Endpoint ---
-@app.post("/api/recognize", response_model=None, tags=["Recognition"])
-# async def recognize_face(file: UploadFile = File(...), class_id: int = Form(...), recognition_service=Depends(get_recognition_service)):
-#     return await recognition_service.recognize_face(file, class_id)
-
 # --- User Registration Endpoint ---
 @app.post("/api/user/register", response_model=None, tags=["User"])
 async def register_user(payload: UserRegister):
@@ -546,7 +541,7 @@ except Exception as e:
     print(f"Warning: could not include professors router: {e}")
 
 # Include other API routers
-for module_name in ['attendance', 'auth', 'capture', 'course_students', 'debug', 'registration', 'schedule', 'student_courses']:
+for module_name in ['attendance', 'auth', 'capture', 'course_students', 'debug', 'recognition', 'registration', 'schedule', 'student_courses']:
     try:
         module = __import__(f'api.{module_name}', fromlist=['router'])
         if hasattr(module, 'router'):
