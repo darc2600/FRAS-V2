@@ -63,6 +63,14 @@ export class ApiService {
     return this.http.get<any[]>(`${this.backendUrl}/api/courses`);
   }
 
+  getSectionsForCourse(courseCode: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.backendUrl}/api/courses/${courseCode}/sections`);
+  }
+
+  getSectionsForCourseAndRoom(roomId: number, courseCode: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.backendUrl}/api/rooms/${roomId}/courses/${courseCode}/sections`);
+  }
+
   getInstructors(): Observable<string[]> {
     return this.http.get<string[]>(`${this.backendUrl}/api/instructors`);
   }

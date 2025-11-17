@@ -24,7 +24,7 @@ export class AttendanceLogsComponent implements OnInit {
   courseCode = '';
   section = '';
   validCourses: any[] = [];
-  availableSections: string[] = []; // Dynamic sections based on course/room
+  availableSections: string[] = []; // Dynamic sections based on course
   filteredCourses: any[] = [];
   showCourseSuggestions = false;
   
@@ -42,53 +42,8 @@ export class AttendanceLogsComponent implements OnInit {
     this.startDate = today.toISOString().split('T')[0];
     this.endDate = today.toISOString().split('T')[0];
     
-    // this.fetchFloors();
     this.loadValidationData();
   }
-
-  // fetchFloors() {
-  //   this.api.getFloors().subscribe(
-  //     (floors: number[]) => {
-  //       this.availableFloors = floors;
-  //       if (this.availableFloors.length > 0) {
-  //         this.selectedFloor = this.availableFloors[0];
-  //         this.onFloorChange();
-  //       }
-  //     },
-  //     err => this.message = 'Error fetching floors.'
-  //   );
-  // }
-
-  // onFloorChange() {
-  //   if (this.selectedFloor == null) {
-  //     this.availableRooms = [];
-  //     this.room = '';
-  //     return;
-  //   }
-  //   this.fetchRoomsByFloor();
-  // }
-
-  // fetchRoomsByFloor() {
-  //   this.api.getRoomsByFloor(this.selectedFloor!).subscribe(
-  //     (rooms: any[]) => {
-  //       this.allRooms = rooms;
-  //       this.availableRooms = rooms.map(r => r.room_number);
-  //       if (this.availableRooms.length > 0) {
-  //         this.room = this.availableRooms[0];
-  //         this.onRoomChange();
-  //       } else {
-  //         this.room = '';
-  //         this.availableSections = [];
-  //         this.section = '';
-  //       }
-  //     },
-  //     err => this.message = 'Error fetching rooms for floor.'
-  //   );
-  // }
-
-  // onRoomChange() {
-  //   this.loadAvailableSections();
-  // }
 
   onCourseChange() {
     this.loadAvailableSections();
@@ -111,25 +66,24 @@ export class AttendanceLogsComponent implements OnInit {
   }
 
   getAllSectionsForCourse() {
-    // Since we don't have room filtering, we need to get sections differently
-    // For now, let's use a simple approach - get all courses and find sections for the selected course
-    this.api.getCourses().subscribe(
-      (courses: any[]) => {
-        const selectedCourse = courses.find(c => c.code === this.courseCode);
-        if (selectedCourse) {
-          // For simplicity, let's assume sections are AM1, PM1, etc. or we can hardcode some common sections
-          // In a real implementation, we'd need a backend endpoint to get sections for a course
-          this.availableSections = ['AM1', 'PM1', 'AM2', 'PM2']; // Common sections
-          if (!this.section && this.availableSections.length > 0) {
-            this.section = this.availableSections[0];
-          }
-        } else {
-          this.availableSections = [];
-          this.section = '';
+    console.log('getAllSectionsForCourse called with courseCode:', this.courseCode);
+    if (!this.courseCode) {
+      this.availableSections = [];
+      this.section = '';
+      return;
+    }
+
+    // Fetch sections from backend for the selected course
+    this.api.getSectionsForCourse(this.courseCode).subscribe(
+      (sections: string[]) => {
+        console.log('Sections fetched:', sections);
+        this.availableSections = sections;
+        if (!this.section && this.availableSections.length > 0) {
+          this.section = this.availableSections[0];
         }
       },
-      err => {
-        console.error('Error fetching courses:', err);
+      (err: any) => {
+        console.error('Error fetching sections:', err);
         this.availableSections = [];
         this.section = '';
       }
@@ -140,6 +94,7 @@ export class AttendanceLogsComponent implements OnInit {
     // Load valid courses
     this.api.getCourses().subscribe({
       next: (courses: any[]) => {
+        console.log('Courses loaded:', courses);
         this.validCourses = courses;
       },
       error: (error) => {
@@ -162,6 +117,13 @@ export class AttendanceLogsComponent implements OnInit {
     ).slice(0, 10); // Limit to 10 suggestions
 
     this.showCourseSuggestions = this.filteredCourses.length > 0;
+
+    // If exact match, load sections
+    const exactMatch = this.validCourses.find(c => c.code.toLowerCase() === searchTerm);
+    if (exactMatch) {
+      this.courseCode = exactMatch.code; // normalize case
+      this.getAllSectionsForCourse();
+    }
   }
 
   selectCourse(course: any) {
@@ -196,7 +158,7 @@ export class AttendanceLogsComponent implements OnInit {
       endDate = this.selectedDate;
     }
     
-    // Pass undefined for room since we're not using room filtering
+    // Pass room for filtering
     this.api.getAttendance(this.courseCode, this.section, undefined, startDate, endDate).subscribe(
       res => {
         this.logs = (res.attendance || []).map((log: any) => ({

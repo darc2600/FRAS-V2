@@ -538,6 +538,36 @@ async def get_courses():
         courses = cursor.fetchall()
         return [{"code": course[0], "name": course[1]} for course in courses]
 
+@app.get("/api/courses/{course_code}/sections", tags=["Courses"])
+async def get_sections_for_course(course_code: str):
+    """Get all sections for a specific course across all rooms"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT c.section 
+            FROM classes c
+            JOIN courses co ON c.course_id = co.course_id
+            WHERE co.course_code = ?
+            ORDER BY c.section
+        """, (course_code,))
+        sections = cursor.fetchall()
+        return [section[0] for section in sections]
+
+@app.get("/api/rooms/{room_id}/courses/{course_code}/sections", tags=["Rooms"])
+async def get_sections_for_course_and_room(room_id: int, course_code: str):
+    """Get sections for a specific course in a specific room"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT c.section 
+            FROM classes c
+            JOIN courses co ON c.course_id = co.course_id
+            WHERE co.course_code = ? AND c.room_id = ?
+            ORDER BY c.section
+        """, (course_code, room_id))
+        sections = cursor.fetchall()
+        return [section[0] for section in sections]
+
 @app.get("/api/instructors", tags=["Instructors"])  
 async def get_instructors():
     """Get all available instructors in 'Last, First' format"""
