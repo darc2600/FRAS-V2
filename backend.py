@@ -327,9 +327,12 @@ scheduler = AsyncIOScheduler()
 
 async def mark_daily_absents():
     """Mark absents for classes that have ended today."""
+    print("[SCHEDULER] Running mark_daily_absents")
     now = datetime.now()
     current_day = now.strftime("%A")
     attendance_date = now.strftime("%Y-%m-%d")
+    current_time = now.strftime("%H:%M")
+    print(f"[SCHEDULER] Current day: {current_day}, date: {attendance_date}, time: {current_time}")
     
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
@@ -338,15 +341,16 @@ async def mark_daily_absents():
         cursor.execute('''
             SELECT class_id, end_time FROM classes 
             WHERE day_of_week = ? AND end_time < ?
-        ''', (current_day, now.strftime("%H:%M")))
+        ''', (current_day, current_time))
         ended_classes = cursor.fetchall()
+        print(f"[SCHEDULER] Ended classes: {ended_classes}")
         
         for class_id, end_time_str in ended_classes:
             # Mark absents for this class and date
             from repositories.recognition_repo import RecognitionRepository
             repo = RecognitionRepository()
-            await repo.mark_absents(class_id, attendance_date)
-            print(f"[SCHEDULER] Marked absents for class {class_id} on {attendance_date}")
+            result = await repo.mark_absents(class_id, attendance_date)
+            print(f"[SCHEDULER] Marked absents for class {class_id} on {attendance_date}: {result}")
 
 # Start scheduler on startup
 @app.on_event("startup")
