@@ -11,3 +11,11 @@ async def recognize_face(
     service: RecognitionService = Depends(get_recognition_service)
 ):
     return await service.recognize_face(file, class_id)
+
+@router.post("/api/mark-absents")
+async def mark_absents(
+    class_id: int = Form(...),
+    date: str = Form(...),  # YYYY-MM-DD
+    service: RecognitionService = Depends(get_recognition_service)
+):
+    return await service.mark_absents(class_id, date)

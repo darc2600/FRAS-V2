@@ -9,6 +9,8 @@ import secrets
 import jwt
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 JWT_SECRET = "dev-secret-change-me"
 JWT_ALGORITHM = "HS256"
@@ -319,6 +321,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Scheduler for marking absents
+scheduler = AsyncIOScheduler()
+
+async def mark_daily_absents():
+    """Mark absents for classes that have ended today."""
+    now = datetime.now()
+    current_day = now.strftime("%A")
+    attendance_date = now.strftime("%Y-%m-%d")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        
+        # Get classes for today that have ended
+        cursor.execute('''
+            SELECT class_id, end_time FROM classes 
+            WHERE day_of_week = ? AND end_time < ?
+        ''', (current_day, now.strftime("%H:%M")))
+        ended_classes = cursor.fetchall()
+        
+        for class_id, end_time_str in ended_classes:
+            # Mark absents for this class and date
+            from repositories.recognition_repo import RecognitionRepository
+            repo = RecognitionRepository()
+            await repo.mark_absents(class_id, attendance_date)
+            print(f"[SCHEDULER] Marked absents for class {class_id} on {attendance_date}")
+
+# Start scheduler on startup
+@app.on_event("startup")
+async def startup_event():
+    scheduler.add_job(mark_daily_absents, CronTrigger(hour=23, minute=0))  # Daily at 11 PM
+    scheduler.start()
+    print("[SCHEDULER] Started daily absent marking job at 11 PM")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    scheduler.shutdown()
+    print("[SCHEDULER] Stopped scheduler")
 
 # Tag metadata for grouping in Swagger UI
 tags_metadata = [

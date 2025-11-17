@@ -63,40 +63,56 @@ class RecognitionRepository:
                         result = DeepFace.verify(img1_path=temp_path, img2_path=img_path, model_name="ArcFace", enforce_detection=False)
                         print(f"[DEBUG] DeepFace result for {student_id}: {result}")
                         if result["verified"]:
-                            # Get class start_time for attendance status
+                            # Get class details for attendance status
                             cursor.execute('''
-                                SELECT start_time FROM classes WHERE class_id = ?
+                                SELECT day_of_week, start_time, end_time FROM classes WHERE class_id = ?
                             ''', (class_id,))
-                            class_time_row = cursor.fetchone()
-                            if not class_time_row:
-                                print(f"[DEBUG] No start_time found for class_id={class_id}")
+                            class_row = cursor.fetchone()
+                            if not class_row:
+                                print(f"[DEBUG] No class details found for class_id={class_id}")
                                 continue
-                            start_time_str = class_time_row[0]  # e.g., '07:00AM'
+                            day_of_week, start_time_str, end_time_str = class_row
                             
                             # Parse times
                             now = datetime.now()
                             timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
                             attendance_date = now.strftime("%Y-%m-%d")
+                            current_day = now.strftime("%A")  # e.g., "Monday"
                             
-                            # Convert start_time to datetime for today
+                            # Check if today is the class day
+                            if current_day != day_of_week:
+                                print(f"[DEBUG] Not class day: today={current_day}, class_day={day_of_week}")
+                                continue
+                            
+                            # Convert start_time and end_time to datetime for today
                             try:
                                 # Try 24-hour format first (HH:MM)
                                 class_start = datetime.strptime(attendance_date + ' ' + start_time_str, "%Y-%m-%d %H:%M")
+                                class_end = datetime.strptime(attendance_date + ' ' + end_time_str, "%Y-%m-%d %H:%M")
                             except ValueError:
                                 try:
                                     # Fall back to 12-hour format with AM/PM (HH:MMAM/PM)
                                     class_start = datetime.strptime(attendance_date + ' ' + start_time_str, "%Y-%m-%d %I:%M%p")
+                                    class_end = datetime.strptime(attendance_date + ' ' + end_time_str, "%Y-%m-%d %I:%M%p")
                                 except Exception as e:
-                                    print(f"[DEBUG] Could not parse start_time: {e}")
+                                    print(f"[DEBUG] Could not parse start_time or end_time: {e}")
                                     continue
                             
+                            # Check if current time is within class hours
+                            if not (class_start <= now <= class_end):
+                                print(f"[DEBUG] Outside class hours: now={now}, class_start={class_start}, class_end={class_end}")
+                                continue
+                            
                             delta = (now - class_start).total_seconds() / 60.0
-                            if 0 <= delta <= 30:
+                            if 0 <= delta <= 15:
                                 status_name = "Present"
-                                print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= 30 mins)")
-                            else:
+                                print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= 15 mins)")
+                            elif 15 < delta <= 30:
                                 status_name = "Late"
-                                print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start (> 30 mins)")
+                                print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start (15-30 mins)")
+                            else:
+                                status_name = "Absent"
+                                print(f"[DEBUG] Marked as Absent: delta={delta:.2f} mins since class start (> 30 mins)")
                             
                             # Get status_id from attendance_status_types table
                             cursor.execute('''
@@ -156,6 +172,50 @@ class RecognitionRepository:
         else:
             print(f"[DEBUG] Returning failure response: No match found")
             return RecognitionResponse(status="failed", message="No match found")
+
+    async def mark_absents(self, class_id: int, date: str):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get all enrolled students for the class
+            cursor.execute('''
+                SELECT e.student_id, s.last_name
+                FROM enrollments e
+                JOIN students s ON e.student_id = s.student_id
+                WHERE e.class_id = ?
+            ''', (class_id,))
+            enrolled_students = cursor.fetchall()
+            
+            # Get students who already have attendance for the date
+            cursor.execute('''
+                SELECT DISTINCT student_id FROM attendance_logs
+                WHERE class_id = ? AND DATE(timestamp) = ?
+            ''', (class_id, date))
+            attended_students = {row[0] for row in cursor.fetchall()}
+            
+            # Get absent status_id
+            cursor.execute('''
+                SELECT status_id FROM attendance_status_types WHERE status_name = 'Absent'
+            ''')
+            status_row = cursor.fetchone()
+            if not status_row:
+                return {"error": "Absent status not found"}
+            absent_status_id = status_row[0]
+            
+            absent_count = 0
+            for student_id, last_name in enrolled_students:
+                if student_id not in attended_students:
+                    # Insert absent record
+                    timestamp = f"{date} 23:59:59"  # End of day
+                    cursor.execute('''
+                        INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id)
+                        VALUES (?, ?, ?, ?)
+                    ''', (student_id, class_id, timestamp, absent_status_id))
+                    absent_count += 1
+                    print(f"[DEBUG] Marked student {student_id} ({last_name}) as Absent for class {class_id} on {date}")
+            
+            conn.commit()
+            return {"message": f"Marked {absent_count} students as absent for class {class_id} on {date}"}
 
 
 def get_recognition_repository():

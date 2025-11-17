@@ -8,3 +8,4 @@ PyJWT
 passlib[bcrypt]
 pydantic
 python-multipart
+apscheduler
