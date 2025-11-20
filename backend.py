@@ -3,14 +3,21 @@ import os
 import sys
 print("UNIQUE BACKEND LOADED MARKER")
 print(f"Current working directory: {os.getcwd()}")
+import asyncio
+import sys
+
+# Set event loop policy for Windows
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from fastapi import FastAPI, Depends, UploadFile, File, Form, Request
 from typing import List
 import secrets
 import jwt
 from datetime import datetime, timedelta
 from pydantic import BaseModel
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+# from apscheduler.schedulers.asyncio import AsyncIOScheduler
+# from apscheduler.triggers.cron import CronTrigger
 
 JWT_SECRET = "dev-secret-change-me"
 JWT_ALGORITHM = "HS256"
@@ -317,16 +324,16 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
 # Enable CORS for Angular frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:4200"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:4200"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 # Scheduler for marking absents
-scheduler = AsyncIOScheduler()
+# scheduler = AsyncIOScheduler()
 
 async def mark_daily_absents():
     """Mark absents for classes that have ended today."""
@@ -600,22 +607,23 @@ async def get_student_by_number(student_number: str):
             return None
 
 # --- Debug Endpoint ---
-@app.get("/api/routes", tags=["Debug"])
-async def list_routes():
-    return [route.path for route in app.routes]
+@app.get("/test", tags=["Debug"])
+async def test_endpoint():
+    return {"message": "test"}
 
 # Include additional routers
-try:
-    from api import auth
-    app.include_router(auth.router)
-except Exception as e:
-    print(f"Warning: could not include auth router: {e}")
+# try:
+#     from api import auth
+#     app.include_router(auth.router)
+# except Exception as e:
+#     print(f"Warning: could not include auth router: {e}")
 
 # Include other API routers
-# for module_name in ['attendance', 'auth', 'capture', 'course_students', 'debug', 'recognition', 'registration', 'schedule', 'student_courses']:
-#     try:
-#         module = __import__(f'api.{module_name}', fromlist=['router'])
-#         if hasattr(module, 'router'):
-#             app.include_router(module.router)
-#     except Exception as e:
-#         print(f"Warning: could not include {module_name} router: {e}")
+# Temporarily disabled for debugging
+for module_name in ['admin', 'auth']:  # Re-enabling auth and admin
+    try:
+        module = __import__(f'api.{module_name}', fromlist=['router'])
+        if hasattr(module, 'router'):
+            app.include_router(module.router)
+    except Exception as e:
+        print(f"Warning: could not include {module_name} router: {e}")

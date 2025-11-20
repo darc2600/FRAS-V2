@@ -21,7 +21,7 @@ except Exception:
 	pbkdf2_sha256 = None
 	_HAS_PASSLIB = False
 
-DB_PATH = os.path.join(os.getcwd(), "attendance.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
 # JWT settings
 JWT_SECRET = "dev-secret-change-me"
@@ -87,71 +87,89 @@ def create_access_token(data: dict):
 
 
 def _get_user_auth(email: str):
-	"""Get user authentication data including role."""
+	"""Get user authentication data from our FRAS database schema."""
 	with sqlite3.connect(DB_PATH) as conn:
 		cur = conn.cursor()
+
+		# Check students table
 		cur.execute("""
-			SELECT u.password, u.role, u.user_id, u.reference_id 
-			FROM users u 
-			WHERE u.email = ?
+			SELECT s.password, s.user_type, s.student_id, NULL as reference_id
+			FROM students s
+			WHERE s.email = ?
 		""", (email,))
 		result = cur.fetchone()
-		return result
+		if result:
+			return result
+
+		# Check instructors table
+		cur.execute("""
+			SELECT i.password, i.user_type, i.instructor_id, NULL as reference_id
+			FROM instructors i
+			WHERE i.email = ?
+		""", (email,))
+		result = cur.fetchone()
+		if result:
+			return result
+
+		# Check admins table
+		cur.execute("""
+			SELECT a.password, a.user_type, a.admin_id, NULL as reference_id
+			FROM admins a
+			WHERE a.email = ?
+		""", (email,))
+		result = cur.fetchone()
+		if result:
+			return result
+
+		return None
 
 
-def _update_last_login(user_id: int):
-	"""Update the last login timestamp for a user."""
+def _update_last_login(user_id: int, user_type: str):
+	"""Update the last login timestamp for a user in the appropriate table."""
 	with sqlite3.connect(DB_PATH) as conn:
 		cur = conn.cursor()
-		cur.execute("UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
+
+		if user_type == 'regular':
+			# For regular users (students), we don't have a last_login field
+			# Could add one later if needed
+			pass
+		elif user_type == 'it_admin':
+			# For IT admins (instructors), we don't have a last_login field
+			pass
+		elif user_type == 'super_admin':
+			# For super admins, we don't have a last_login field
+			pass
+
 		conn.commit()
 
 
-def _ensure_users_table():
-	"""Create a minimal users table if it doesn't exist."""
-	with sqlite3.connect(DB_PATH) as conn:
-		cur = conn.cursor()
-		cur.execute(
-			"""
-			CREATE TABLE IF NOT EXISTS users (
-				user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-				email TEXT UNIQUE NOT NULL,
-				password TEXT NOT NULL,
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-			)
-			"""
-		)
-		conn.commit()
-
-
-def _seed_test_user(email: str = "testuser@example.com", password: str = "testpass"):
-	"""Insert a test user if it doesn't already exist.
-
-	This stores the password in plaintext unless passlib/bcrypt is available,
-	in which case it stores a bcrypt hash. This keeps the dependency optional
-	for quick local testing while recommending a hashed password for real use.
-	"""
-	_ensure_users_table()
-	with sqlite3.connect(DB_PATH) as conn:
-		cur = conn.cursor()
-		cur.execute("SELECT COUNT(*) FROM users WHERE email = ?", (email,))
-		if cur.fetchone()[0] == 0:
-			if _HAS_BCRYPT:
-				stored = bcrypt.hash(password)
-			else:
-				stored = password
-			cur.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, stored))
-			conn.commit()
+# Removed _ensure_users_table and _seed_test_user as they're not needed for our FRAS schema
 
 
 def _get_user_password(email: str) -> Optional[str]:
-	_ensure_users_table()
+	"""Get user password from our FRAS database schema."""
 	with sqlite3.connect(DB_PATH) as conn:
 		cur = conn.cursor()
-		cur.execute("SELECT password FROM users WHERE email = ?", (email,))
+
+		# Check students table
+		cur.execute("SELECT password FROM students WHERE email = ?", (email,))
 		row = cur.fetchone()
-		return row[0] if row else None
+		if row:
+			return row[0]
+
+		# Check instructors table
+		cur.execute("SELECT password FROM instructors WHERE email = ?", (email,))
+		row = cur.fetchone()
+		if row:
+			return row[0]
+
+		# Check admins table
+		cur.execute("SELECT password FROM admins WHERE email = ?", (email,))
+		row = cur.fetchone()
+		if row:
+			return row[0]
+
+		return None
 
 
 @router.post("/api/login")
@@ -184,7 +202,7 @@ async def login(payload: LoginRequest):
 	if user_data is None:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-	stored_password, role, user_id, reference_id = user_data
+	stored_password, user_type, user_id, reference_id = user_data
 
 	valid = False
 	if stored_password.startswith('$'):
@@ -205,12 +223,11 @@ async def login(payload: LoginRequest):
 	if not valid:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-	# Get user type and permissions
-	user_type = get_user_type_from_email(payload.email)
+	# Get permissions for the user type
 	permissions = get_user_permissions(user_type)
 
 	# Update last login
-	_update_last_login(user_id)
+	_update_last_login(user_id, user_type)
 
 	# Create JWT token with user_type and permissions
 	token = create_access_token(data={
