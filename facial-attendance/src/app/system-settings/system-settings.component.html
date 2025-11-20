@@ -1,0 +1,95 @@
+<div class="system-settings-container">
+  <h2>System Settings</h2>
+  <p class="text-muted">Super Admin Only - Configure system-wide settings</p>
+
+  <!-- Success/Error Messages -->
+  <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+  <div *ngIf="success" class="alert alert-success">{{ success }}</div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading">
+    <p>Loading system settings...</p>
+  </div>
+
+  <!-- Settings Form -->
+  <div *ngIf="!loading" class="settings-form">
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header">
+            <h5>Configuration Settings</h5>
+          </div>
+          <div class="card-body">
+            <div *ngFor="let setting of settings | keyvalue" class="setting-item mb-3">
+              <label class="form-label">{{ setting.key | titlecase }}</label>
+
+              <!-- Boolean Settings -->
+              <div *ngIf="isBooleanSetting(setting.value)" class="form-check">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="setting.value.value === 'true'"
+                  (change)="onBooleanSettingChange(setting.key, $event)"
+                  [disabled]="!hasPermission('system_config')">
+                <label class="form-check-label">
+                  {{ setting.value.value === 'true' ? 'Enabled' : 'Disabled' }}
+                </label>
+              </div>
+
+              <input
+                *ngIf="isNumberSetting(setting.value)"
+                type="number"
+                class="form-control"
+                [value]="setting.value.value"
+                (blur)="onTextSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')">
+
+              <!-- Text Settings -->
+              <input
+                *ngIf="isTextSetting(setting.value)"
+                type="text"
+                class="form-control"
+                [value]="setting.value.value"
+                (blur)="onTextSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <!-- Analytics Card -->
+        <div class="card">
+          <div class="card-header">
+            <h5>System Analytics</h5>
+          </div>
+          <div class="card-body">
+            <button
+              *ngIf="hasPermission('view_all_data')"
+              (click)="getAnalytics()"
+              class="btn btn-primary w-100 mb-3">
+              View Analytics
+            </button>
+            <p class="text-muted small">
+              View system-wide statistics and usage data.
+            </p>
+          </div>
+        </div>
+
+        <!-- Permissions Info -->
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6>Your Permissions</h6>
+          </div>
+          <div class="card-body">
+            <div class="permissions-list">
+              <span *ngFor="let permission of authService.getCurrentUser()?.permissions" class="badge bg-secondary me-1 mb-1">
+                {{ permission }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -7,7 +7,9 @@ import { LoginComponent } from './login/login.component';
 import { RegistrationComponent } from './registration/registration.component';
 import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.component';
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
-import { AuthGuard, AdminGuard } from './auth.guard';
+import { UserManagementComponent } from './user-management/user-management.component';
+import { SystemSettingsComponent } from './system-settings/system-settings.component';
+import { AuthGuard, AdminGuard, InstructorGuard } from './auth.guard';
 import { SuperAdminGuard } from './super-admin.guard';
 
 
@@ -19,7 +21,8 @@ export const routes: Routes = [
   { path: 'register-student', component: RegisterStudentsComponent, canActivate: [AuthGuard] },
   { path: 'upload-schedule', component: ScheduleUploadComponent, canActivate: [AdminGuard] },
   { path: 'room-schedule-editor', component: RoomScheduleEditorComponent, canActivate: [AdminGuard] },
-  { path: 'admin', component: AttendanceLogsComponent, canActivate: [SuperAdminGuard] }, // Placeholder for admin management
+  { path: 'user-management', component: UserManagementComponent, canActivate: [AdminGuard] },
+  { path: 'system-settings', component: SystemSettingsComponent, canActivate: [SuperAdminGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'registration', component: RegistrationComponent },
 

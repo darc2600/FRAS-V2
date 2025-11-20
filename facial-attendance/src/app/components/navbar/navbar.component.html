@@ -8,5 +8,10 @@
     <li *ngIf="isAdmin || isInstructor"><a routerLink="/register-student" routerLinkActive="active">Register</a></li>
     <li *ngIf="isAdmin || isInstructor"><a routerLink="/room-schedule" routerLinkActive="active">View Schedule</a></li>
     <li *ngIf="isAdmin"><a routerLink="/room-schedule-editor" routerLinkActive="active">Add/Edit Schedule</a></li>
+
+    <!-- Admin Section -->
+    <li *ngIf="canManageUsers" class="nav-section">Admin</li>
+    <li *ngIf="canManageUsers"><a routerLink="/user-management" routerLinkActive="active">User Management</a></li>
+    <li *ngIf="canConfigureSystem"><a routerLink="/system-settings" routerLinkActive="active">System Settings</a></li>
   </ul>
 </nav>

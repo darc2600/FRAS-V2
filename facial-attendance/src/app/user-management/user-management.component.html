@@ -1,0 +1,68 @@
+<div class="user-management-container">
+  <h2>User Management</h2>
+
+  <!-- Success/Error Messages -->
+  <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+  <div *ngIf="success" class="alert alert-success">{{ success }}</div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading">
+    <p>Loading users...</p>
+  </div>
+
+  <!-- Users Table -->
+  <div *ngIf="!loading" class="users-table">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Email</th>
+          <th>User Type</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of users">
+          <td>{{ user.id }}</td>
+          <td>{{ user.email }}</td>
+          <td>
+            <select
+              *ngIf="hasPermission('manage_users')"
+              [value]="user.user_type"
+              (change)="onUserTypeChange(user, $event)"
+              class="form-select form-select-sm">
+              <option *ngFor="let type of getUserTypeOptions(user.user_type)" [value]="type">
+                {{ type }}
+              </option>
+            </select>
+            <span *ngIf="!hasPermission('manage_users')">{{ user.user_type }}</span>
+          </td>
+          <td>
+            <span class="badge" [class]="user.is_active ? 'bg-success' : 'bg-danger'">
+              {{ user.is_active ? 'Active' : 'Inactive' }}
+            </span>
+          </td>
+          <td>
+            <button
+              *ngIf="hasPermission('reset_passwords')"
+              (click)="resetPassword(user.email)"
+              class="btn btn-sm btn-warning me-2">
+              Reset Password
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Permissions Info -->
+  <div class="permissions-info mt-4" *ngIf="authService.getCurrentUser()">
+    <h5>Your Permissions:</h5>
+    <div class="permissions-list">
+      <span *ngFor="let permission of authService.getCurrentUser()?.permissions" class="badge bg-info me-2">
+        {{ permission }}
+      </span>
+    </div>
+  </div>
+</div>

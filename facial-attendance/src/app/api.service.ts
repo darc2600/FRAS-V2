@@ -86,4 +86,29 @@ export class ApiService {
   getStudentByNumber(studentNumber: string): Observable<any> {
     return this.http.get(`${this.backendUrl}/api/students/${studentNumber}`);
   }
+
+  // Admin API methods
+  getUsers(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/admin/users`);
+  }
+
+  updateUser(userId: number, userData: any): Observable<any> {
+    return this.http.put(`${this.backendUrl}/api/admin/users/${userId}`, userData);
+  }
+
+  resetPassword(email: string): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/admin/reset-password`, { email });
+  }
+
+  getSystemSettings(): Observable<any> {
+    return this.http.get<any>(`${this.backendUrl}/api/admin/system-settings`);
+  }
+
+  updateSystemSetting(key: string, value: string): Observable<any> {
+    return this.http.put(`${this.backendUrl}/api/admin/system-settings`, { setting_key: key, setting_value: value });
+  }
+
+  getAnalytics(): Observable<any> {
+    return this.http.get<any>(`${this.backendUrl}/api/admin/analytics`);
+  }
 }
