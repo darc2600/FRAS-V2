@@ -269,6 +269,9 @@ def init_db():
 
         conn.commit()
 
+# Initialize database on startup
+# init_db()
+
 # -----------------------
 # FastAPI app setup
 # -----------------------
@@ -353,16 +356,16 @@ async def mark_daily_absents():
             print(f"[SCHEDULER] Marked absents for class {class_id} on {attendance_date}: {result}")
 
 # Start scheduler on startup
-@app.on_event("startup")
-async def startup_event():
-    scheduler.add_job(mark_daily_absents, CronTrigger(hour=23, minute=0))  # Daily at 11 PM
-    scheduler.start()
-    print("[SCHEDULER] Started daily absent marking job at 11 PM")
+# @app.on_event("startup")
+# async def startup_event():
+#     scheduler.add_job(mark_daily_absents, CronTrigger(hour=23, minute=0))  # Daily at 11 PM
+#     scheduler.start()
+#     print("[SCHEDULER] Started daily absent marking job at 11 PM")
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    scheduler.shutdown()
-    print("[SCHEDULER] Stopped scheduler")
+# @app.on_event("shutdown")
+# async def shutdown_event():
+#     scheduler.shutdown()
+#     print("[SCHEDULER] Stopped scheduler")
 
 # Tag metadata for grouping in Swagger UI
 tags_metadata = [
@@ -608,17 +611,11 @@ try:
 except Exception as e:
     print(f"Warning: could not include auth router: {e}")
 
-try:
-    from api import professors
-    app.include_router(professors.router)
-except Exception as e:
-    print(f"Warning: could not include professors router: {e}")
-
 # Include other API routers
-for module_name in ['attendance', 'auth', 'capture', 'course_students', 'debug', 'recognition', 'registration', 'schedule', 'student_courses']:
-    try:
-        module = __import__(f'api.{module_name}', fromlist=['router'])
-        if hasattr(module, 'router'):
-            app.include_router(module.router)
-    except Exception as e:
-        print(f"Warning: could not include {module_name} router: {e}")
+# for module_name in ['attendance', 'auth', 'capture', 'course_students', 'debug', 'recognition', 'registration', 'schedule', 'student_courses']:
+#     try:
+#         module = __import__(f'api.{module_name}', fromlist=['router'])
+#         if hasattr(module, 'router'):
+#             app.include_router(module.router)
+#     except Exception as e:
+#         print(f"Warning: could not include {module_name} router: {e}")

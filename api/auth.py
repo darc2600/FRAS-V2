@@ -28,6 +28,44 @@ JWT_SECRET = "dev-secret-change-me"
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 1440
 
+def get_user_permissions(user_type: str) -> list:
+    """Get permissions for a user type"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT p.permission_name
+            FROM permissions p
+            JOIN role_permissions rp ON p.permission_id = rp.permission_id
+            WHERE rp.user_type = ?
+        """, (user_type,))
+        return [row[0] for row in cursor.fetchall()]
+
+def get_user_type_from_email(email: str) -> str:
+    """Get user type from email by checking all user tables"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        # Check students table
+        cursor.execute("SELECT user_type FROM students WHERE email = ?", (email,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+
+        # Check instructors table
+        cursor.execute("SELECT user_type FROM instructors WHERE email = ?", (email,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+
+        # Check admins table
+        cursor.execute("SELECT user_type FROM admins WHERE email = ?", (email,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+
+        # Default to regular if not found
+        return 'regular'
+
 router = APIRouter()
 
 # Hardcoded test credential (development only)
@@ -121,12 +159,25 @@ async def login(payload: LoginRequest):
 	"""Login endpoint that returns JWT token.
 
 	Request JSON: { "email": "...", "password": "..." }
-	Response on success: { "access_token": "...", "token_type": "bearer", "role": "...", "user_id": ... }
+	Response on success: { "access_token": "...", "token_type": "bearer", "user_type": "...", "permissions": [...], "user_id": ... }
 	"""
 	# Quick dev path: accept a hardcoded test credential
 	if payload.email == TEST_EMAIL and payload.password == TEST_PASSWORD:
-		token = create_access_token(data={"sub": payload.email, "role": "admin", "user_id": 0})
-		return {"access_token": token, "token_type": "bearer", "role": "admin", "user_id": 0}
+		user_type = "super_admin"
+		permissions = get_user_permissions(user_type)
+		token = create_access_token(data={
+			"sub": payload.email, 
+			"user_type": user_type,
+			"permissions": permissions,
+			"user_id": 0
+		})
+		return {
+			"access_token": token, 
+			"token_type": "bearer", 
+			"user_type": user_type,
+			"permissions": permissions,
+			"user_id": 0
+		}
 
 	# Get user authentication data
 	user_data = _get_user_auth(payload.email)
@@ -154,10 +205,25 @@ async def login(payload: LoginRequest):
 	if not valid:
 		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+	# Get user type and permissions
+	user_type = get_user_type_from_email(payload.email)
+	permissions = get_user_permissions(user_type)
+
 	# Update last login
 	_update_last_login(user_id)
 
-	# Create JWT token
-	token = create_access_token(data={"sub": payload.email, "role": role, "user_id": user_id})
+	# Create JWT token with user_type and permissions
+	token = create_access_token(data={
+		"sub": payload.email, 
+		"user_type": user_type,
+		"permissions": permissions,
+		"user_id": user_id
+	})
 
-	return {"access_token": token, "token_type": "bearer", "role": role, "user_id": user_id}
+	return {
+		"access_token": token, 
+		"token_type": "bearer", 
+		"user_type": user_type,
+		"permissions": permissions,
+		"user_id": user_id
+	}
