@@ -1,8 +1,9 @@
 
-from fastapi import APIRouter, HTTPException, status
+import os
+from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import sqlite3
-import os
 import secrets
 from typing import Optional
 import importlib
@@ -23,10 +24,33 @@ except Exception:
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
-# JWT settings
-JWT_SECRET = "dev-secret-change-me"
+# JWT settings - moved to environment variables
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me")  # Use env var with fallback
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 1440
+
+# Security scheme for JWT
+security = HTTPBearer()
+
+def get_current_user_type(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Extract user type from JWT token"""
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("user_type", "regular")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_current_user_permissions(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Extract user permissions from JWT token"""
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("permissions", [])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 def get_user_permissions(user_type: str) -> list:
     """Get permissions for a user type"""
@@ -67,11 +91,6 @@ def get_user_type_from_email(email: str) -> str:
         return 'regular'
 
 router = APIRouter()
-
-# Hardcoded test credential (development only)
-TEST_EMAIL = "testuser@example.com"
-TEST_PASSWORD = "testpass"
-
 
 class LoginRequest(BaseModel):
 	email: str
@@ -179,24 +198,6 @@ async def login(payload: LoginRequest):
 	Request JSON: { "email": "...", "password": "..." }
 	Response on success: { "access_token": "...", "token_type": "bearer", "user_type": "...", "permissions": [...], "user_id": ... }
 	"""
-	# Quick dev path: accept a hardcoded test credential
-	if payload.email == TEST_EMAIL and payload.password == TEST_PASSWORD:
-		user_type = "super_admin"
-		permissions = get_user_permissions(user_type)
-		token = create_access_token(data={
-			"sub": payload.email, 
-			"user_type": user_type,
-			"permissions": permissions,
-			"user_id": 0
-		})
-		return {
-			"access_token": token, 
-			"token_type": "bearer", 
-			"user_type": user_type,
-			"permissions": permissions,
-			"user_id": 0
-		}
-
 	# Get user authentication data
 	user_data = _get_user_auth(payload.email)
 	if user_data is None:

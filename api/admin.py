@@ -3,10 +3,21 @@ from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
 import os
+import secrets
+import importlib
 from datetime import datetime
 
-# Import auth functions
-from .auth import get_user_type_from_email, get_user_permissions
+# Import passlib for password hashing
+try:
+	_pb = importlib.import_module("passlib.hash")
+	bcrypt = getattr(_pb, "bcrypt")
+	_HAS_PASSLIB = True
+except Exception:
+	bcrypt = None
+	_HAS_PASSLIB = False
+
+# Import auth functions and JWT utilities
+from .auth import get_current_user_type, get_current_user_permissions, get_user_permissions
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
@@ -42,15 +53,55 @@ def require_admin_permission(permission: str):
         return user_type
     return dependency
 
-def get_current_user_type():
-    """Placeholder - in real implementation, this would extract from JWT token"""
-    # For now, return super_admin for testing
-    return "super_admin"
+# get_current_user_type is now imported from auth.py
 
-@router.get("/api/admin/users")
-async def get_users():
-    """Get all users (simplified for testing)"""
-    return [{"id": 1, "email": "test@example.com", "user_type": "regular", "is_active": True}]
+@router.get("/api/admin/users", response_model=List[UserResponse])
+async def get_users(user_type: str = Depends(require_admin_permission("manage_users"))):
+    """Get all users (IT Admin and Super Admin only)"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Get users from all tables
+            users = []
+
+            # Students
+            cursor.execute("SELECT student_id, email, user_type, 1 as is_active, NULL as created_at FROM students")
+            for row in cursor.fetchall():
+                users.append({
+                    "id": row[0],
+                    "email": row[1],
+                    "user_type": row[2],
+                    "is_active": bool(row[3]),
+                    "created_at": row[4]
+                })
+
+            # Instructors
+            cursor.execute("SELECT instructor_id, email, user_type, 1 as is_active, NULL as created_at FROM instructors")
+            for row in cursor.fetchall():
+                users.append({
+                    "id": row[0],
+                    "email": row[1],
+                    "user_type": row[2],
+                    "is_active": bool(row[3]),
+                    "created_at": row[4]
+                })
+
+            # Admins
+            cursor.execute("SELECT admin_id, email, user_type, 1 as is_active, NULL as created_at FROM admins")
+            for row in cursor.fetchall():
+                users.append({
+                    "id": row[0],
+                    "email": row[1],
+                    "user_type": row[2],
+                    "is_active": bool(row[3]),
+                    "created_at": row[4]
+                })
+
+            return users
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/api/admin/users")
 async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(require_admin_permission("manage_users"))):
@@ -61,22 +112,47 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
 
             # Basic validation
             if user_data.user_type not in ['regular', 'it_admin', 'super_admin']:
-                raise HTTPException(400, "Invalid user type")
+                raise HTTPException(status_code=400, detail="Invalid user type")
 
             # Check if Super Admin permission is required for creating admins
             if user_data.user_type in ['it_admin', 'super_admin'] and admin_type != 'super_admin':
-                raise HTTPException(403, "Only Super Admin can create admin accounts")
+                raise HTTPException(status_code=403, detail="Only Super Admin can create admin accounts")
 
-            # For now, add to users table (you may want to add to specific tables)
-            cursor.execute("""
-                INSERT INTO users (email, password, user_type, created_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            """, (user_data.email, user_data.password, user_data.user_type))
+            # Hash the password if passlib is available
+            hashed_password = user_data.password
+            if _HAS_PASSLIB and bcrypt:
+                hashed_password = bcrypt.hash(user_data.password)
 
-            user_id = cursor.lastrowid
+            # Create user in appropriate table based on user_type
+            if user_data.user_type == 'regular':
+                # Create student account
+                cursor.execute("""
+                    INSERT INTO students (student_number, email, password, user_type, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (f"STU{secrets.token_hex(4).upper()}", user_data.email, hashed_password, user_data.user_type))
+                user_id = cursor.lastrowid
+
+            elif user_data.user_type == 'it_admin':
+                # Create instructor account
+                cursor.execute("""
+                    INSERT INTO instructors (instructor_number, email, password, user_type, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (f"INS{secrets.token_hex(4).upper()}", user_data.email, hashed_password, user_data.user_type))
+                user_id = cursor.lastrowid
+
+            elif user_data.user_type == 'super_admin':
+                # Create admin account
+                cursor.execute("""
+                    INSERT INTO admins (email, password, user_type, created_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """, (user_data.email, hashed_password, user_data.user_type))
+                user_id = cursor.lastrowid
+
             conn.commit()
+            return {"message": "User created successfully", "user_id": user_id, "user_type": user_data.user_type}
 
-            return {"message": "User created successfully", "user_id": user_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     except sqlite3.IntegrityError:
         raise HTTPException(400, "Email already exists")
