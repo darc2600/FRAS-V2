@@ -43,23 +43,43 @@ def test_login(email: str, password: str):
     stored_password, user_type, user_id, reference_id = user_data
     print(f"✅ Found user: {user_type}, ID: {user_id}")
 
-    # For now, accept any password (since we have hashed passwords in DB)
-    if password:  # Simple check for now
-        access_token = create_access_token({
-            "sub": email,
-            "user_type": user_type,
-            "user_id": user_id,
-            "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
-        })
+    # Verify password
+    valid = False
+    if stored_password.startswith('$'):
+        # Hashed password
+        try:
+            import importlib
+            _pb = importlib.import_module("passlib.hash")
+            bcrypt = getattr(_pb, "bcrypt")
+            pbkdf2_sha256 = getattr(_pb, "pbkdf2_sha256")
+            if pbkdf2_sha256 and stored_password.startswith('$pbkdf2-sha256$'):
+                valid = pbkdf2_sha256.verify(password, stored_password)
+            elif bcrypt and stored_password.startswith('$2b$'):
+                valid = bcrypt.verify(password, stored_password)
+            else:
+                valid = False
+        except Exception:
+            valid = False
+    else:
+        # Plaintext password (fallback)
+        valid = (password == stored_password)
 
-        print("✅ Login successful!")
-        print(f"Token: {access_token[:50]}...")
-        print(f"User Type: {user_type}")
-        print(f"Permissions: {['read'] if user_type == 'student' else ['read', 'write', 'admin']}")
-        return True
+    if not valid:
+        print("❌ Invalid password")
+        return False
 
-    print("❌ Invalid password")
-    return False
+    access_token = create_access_token({
+        "sub": email,
+        "user_type": user_type,
+        "user_id": user_id,
+        "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
+    })
+
+    print("✅ Login successful!")
+    print(f"Token: {access_token[:50]}...")
+    print(f"User Type: {user_type}")
+    print(f"Permissions: {['read'] if user_type == 'student' else ['read', 'write', 'admin']}")
+    return True
 
 def test_admin_endpoints():
     """Test admin functionality"""
@@ -104,7 +124,7 @@ if __name__ == "__main__":
 
     # Test admin login
     print("\n--- Testing Admin Login ---")
-    test_login("admin@mapua.edu.ph", "admin123")
+    test_login("testadmin@fras.com", "admin123")
 
     # Test instructor login (if exists)
     print("\n--- Testing Instructor Login ---")

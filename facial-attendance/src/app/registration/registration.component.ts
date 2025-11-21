@@ -9,9 +9,9 @@ import { AuthService, User } from '../auth.service';
   styleUrls: ['./registration.component.css'],
 })
 export class RegistrationComponent {
-  // Simple registration fields
-  password = '';
+  // Simple registration fields - only email and password needed
   email = '';
+  password = '';
   error = '';
   success = '';
   showPassword = false;
@@ -26,7 +26,7 @@ export class RegistrationComponent {
   register() {
     this.error = '';
     this.success = '';
-    if (!this.password || !this.email) {
+    if (!this.email || !this.password) {
       this.error = 'Email and password are required';
       return;
     }
@@ -38,15 +38,18 @@ export class RegistrationComponent {
       this.error = 'Password must contain at least one uppercase letter, number, or special character';
       return;
     }
-    this.regSvc.register({ email: this.email, password: this.password }).subscribe({
+    this.regSvc.register({
+      email: this.email,
+      password: this.password
+    }).subscribe({
       next: (res: any) => {
         if (res.error) {
           this.error = res.error;
           return;
         }
-        this.success = 'Registration successful! User saved.';
-        this.password = '';
+        this.success = 'Registration successful! You can now login.';
         this.email = '';
+        this.password = '';
         // Do not auto-login, let user login separately
       },
       error: (err: any) => {

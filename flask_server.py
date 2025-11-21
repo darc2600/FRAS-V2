@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import secrets
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["http://localhost:4200", "http://127.0.0.1:4200"], supports_credentials=True)
 
 # Database setup
 DB_PATH = os.path.join(os.path.dirname(__file__), "attendance.db")
@@ -56,91 +56,126 @@ def login():
 
     stored_password, user_type, user_id, reference_id = user_data
 
-    # For now, accept any password (since we have hashed passwords in DB)
-    if password:  # Simple check for now
-        access_token = create_access_token({
-            "sub": email,
-            "user_type": user_type,
-            "user_id": user_id,
-            "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
-        })
+    # Verify password
+    valid = False
+    if stored_password.startswith('$'):
+        # Hashed password
+        try:
+            import importlib
+            _pb = importlib.import_module("passlib.hash")
+            bcrypt = getattr(_pb, "bcrypt")
+            pbkdf2_sha256 = getattr(_pb, "pbkdf2_sha256")
+            if pbkdf2_sha256 and stored_password.startswith('$pbkdf2-sha256$'):
+                valid = pbkdf2_sha256.verify(password, stored_password)
+            elif bcrypt and stored_password.startswith('$2b$'):
+                valid = bcrypt.verify(password, stored_password)
+            else:
+                valid = False
+        except Exception:
+            valid = False
+    else:
+        # Plaintext password (fallback)
+        valid = (password == stored_password)
 
-        return jsonify({
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user_type": user_type,
-            "user_id": user_id,
-            "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
-        })
+    if not valid:
+        return jsonify({'error': 'Invalid credentials'}), 401
 
-    return jsonify({'error': 'Invalid credentials'}), 401
+    access_token = create_access_token({
+        "sub": email,
+        "user_type": user_type,
+        "user_id": user_id,
+        "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
+    })
+
+    return jsonify({
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_type": user_type,
+        "user_id": user_id,
+        "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
+    })
 
 @app.route('/api/user/register', methods=['POST', 'OPTIONS'])
 def register():
     if request.method == 'OPTIONS':
         return '', 200
 
+    print("Registration request received")
+    print("Headers:", dict(request.headers))
     data = request.get_json()
+    print("Request data:", data)
+
     email = data.get('email')
     password = data.get('password')
 
+    print(f"Extracted: email={email}, password={'*' * len(password) if password else None}")
+
     if not email or not password:
-        return jsonify({'error': 'Email and password required'}), 400
+        print("Missing email or password")
+        return jsonify({'error': 'Email and password are required'}), 400
 
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
 
-        # Check if user already exists
+        # Check if user already exists in users table
         cursor.execute("SELECT user_id FROM users WHERE email = ?", (email,))
-        if cursor.fetchone():
+        user_exists = cursor.fetchone()
+        print(f"User exists in users table: {user_exists is not None}")
+        if user_exists:
+            print("Returning 400: User already registered")
             return jsonify({'error': 'User already registered. Please login instead.'}), 400
 
-        # Determine role based on email
+        # Check which table the email exists in to determine role
         role = None
         reference_id = None
 
         # Check instructors table
-        cursor.execute("SELECT instructor_id FROM instructors WHERE email = ?", (email,))
-        instructor_result = cursor.fetchone()
-        if instructor_result:
-            role = "instructor"
-            reference_id = instructor_result[0]
+        cursor.execute("SELECT instructor_id, first_name, last_name FROM instructors WHERE email = ?", (email,))
+        instructor_data = cursor.fetchone()
+        if instructor_data:
+            role = 'instructor'
+            reference_id = instructor_data[0]
+            print(f"Found in instructors table: ID={reference_id}, Name={instructor_data[1]} {instructor_data[2]}")
 
-        # Check admins table
-        cursor.execute("SELECT admin_id FROM admins WHERE email = ?", (email,))
-        admin_result = cursor.fetchone()
-        if admin_result:
-            role = "admin"
-            reference_id = admin_result[0]
+        # Check it_admins table
+        if not role:
+            cursor.execute("SELECT it_admin_id, first_name, last_name FROM it_admins WHERE email = ?", (email,))
+            admin_data = cursor.fetchone()
+            if admin_data:
+                role = 'it_admin'
+                reference_id = admin_data[0]
+                print(f"Found in it_admins table: ID={reference_id}, Name={admin_data[1]} {admin_data[2]}")
+
+        # Check super_admins table
+        if not role:
+            cursor.execute("SELECT super_admin_id, first_name, last_name FROM super_admins WHERE email = ?", (email,))
+            super_admin_data = cursor.fetchone()
+            if super_admin_data:
+                role = 'super_admin'
+                reference_id = super_admin_data[0]
+                print(f"Found in super_admins table: ID={reference_id}, Name={super_admin_data[1]} {super_admin_data[2]}")
 
         if not role:
-            return jsonify({'error': 'Email not found in system. Please contact administrator.'}), 400
+            print("Email not found in any user tables")
+            return jsonify({'error': 'Email not found in system. Please contact administrator for registration.'}), 400
+
+        print(f"Proceeding with registration: role={role}, reference_id={reference_id}")
 
         # Create user record
         cursor.execute("""
-            INSERT INTO users (email, password, role, reference_id)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO users (email, password, role, reference_id, created_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         """, (email, password, role, reference_id))
 
-        # Get user_id
-        cursor.execute("SELECT user_id FROM users WHERE email = ?", (email,))
-        user_id = cursor.fetchone()[0]
-
+        user_id = cursor.lastrowid
         conn.commit()
 
-        # Create JWT token
-        access_token = create_access_token({
-            "sub": email,
-            "user_type": role,
-            "user_id": user_id,
-            "permissions": ["read"] if role == "student" else ["read", "write", "admin"]
-        })
+        print(f"Registration successful: user_id={user_id}, role={role}")
 
         return jsonify({
-            "access_token": access_token,
-            "token_type": "bearer",
-            "role": role,
-            "user_id": user_id
+            'message': 'Registration successful! You can now login.',
+            'user_type': role,
+            'email': email
         })
 
 @app.route('/api/admin/users', methods=['GET'])

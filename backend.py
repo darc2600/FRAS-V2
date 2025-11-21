@@ -620,22 +620,22 @@ async def test_endpoint():
 
 # Include other API routers
 # Temporarily disabled for debugging
-# for module_name in ['admin', 'auth']:  # Re-enabling auth and admin
-#     try:
-#         module = __import__(f'api.{module_name}', fromlist=['router'])
-#         if hasattr(module, 'router'):
-#             app.include_router(module.router)
-#     except Exception as e:
-#         print(f"Warning: could not include {module_name} router: {e}")
+for module_name in ['admin', 'auth']:  # Re-enabling auth and admin
+    try:
+        module = __import__(f'api.{module_name}', fromlist=['router'])
+        if hasattr(module, 'router'):
+            app.include_router(module.router)
+    except Exception as e:
+        print(f"Warning: could not include {module_name} router: {e}")
 
 # Try direct imports
-# try:
-#     from api import auth, admin
-#     app.include_router(auth.router)
-#     app.include_router(admin.router)
-#     print("✅ Auth and admin routers loaded successfully")
-# except Exception as e:
-#     print(f"❌ Error loading routers: {e}")
+try:
+    from api import auth, admin
+    app.include_router(auth.router)
+    app.include_router(admin.router)
+    print("✅ Auth and admin routers loaded successfully")
+except Exception as e:
+    print(f"❌ Error loading routers: {e}")
 
 # Add a simple test endpoint
 @app.get("/test")

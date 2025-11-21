@@ -7,9 +7,12 @@ import { AuthService } from '../../auth.service';
   styleUrls: ['./navbar.component.css']
 })
 export class NavbarComponent implements OnInit {
-  isAdmin = false;
-  isInstructor = false;
-  isSuperAdmin = false;
+  // Permission-based flags
+  canMonitor = false;
+  canViewLogs = false;
+  canRegister = false;
+  canViewSchedule = false;
+  canEditSchedule = false;
   canManageUsers = false;
   canConfigureSystem = false;
 
@@ -18,15 +21,23 @@ export class NavbarComponent implements OnInit {
   ngOnInit(): void {
     this.authService.currentUser$.subscribe(user => {
       if (user) {
-        this.isAdmin = user.user_type === 'it_admin' || user.user_type === 'super_admin';
-        this.isSuperAdmin = user.user_type === 'super_admin';
-        this.isInstructor = user.user_type === 'instructor' || user.user_type === 'regular';
-        this.canManageUsers = user.permissions.includes('manage_users');
-        this.canConfigureSystem = user.permissions.includes('system_config');
+        const permissions = user.permissions || [];
+
+        // Check specific permissions
+        this.canMonitor = permissions.includes('mark_attendance');
+        this.canViewLogs = permissions.includes('view_attendance_logs');
+        this.canRegister = permissions.includes('register_students');
+        this.canViewSchedule = permissions.includes('view_own_schedule');
+        this.canEditSchedule = permissions.includes('manage_rooms_schedule');
+        this.canManageUsers = permissions.includes('manage_users');
+        this.canConfigureSystem = permissions.includes('system_admin') || permissions.includes('manage_content');
       } else {
-        this.isAdmin = false;
-        this.isInstructor = false;
-        this.isSuperAdmin = false;
+        // Reset all permissions
+        this.canMonitor = false;
+        this.canViewLogs = false;
+        this.canRegister = false;
+        this.canViewSchedule = false;
+        this.canEditSchedule = false;
         this.canManageUsers = false;
         this.canConfigureSystem = false;
       }

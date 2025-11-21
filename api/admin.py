@@ -28,13 +28,17 @@ class UserResponse(BaseModel):
     id: int
     email: str
     user_type: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     is_active: bool
     created_at: Optional[str]
 
 class CreateUserRequest(BaseModel):
     email: str
     password: str
-    user_type: str = "regular"
+    user_type: str
+    first_name: str
+    last_name: str
 
 class UpdateUserRequest(BaseModel):
     email: Optional[str] = None
@@ -62,40 +66,61 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
 
-            # Get users from all tables
+            # Get users from users table with joined data
             users = []
 
-            # Students
-            cursor.execute("SELECT student_id, email, user_type, 1 as is_active, NULL as created_at FROM students")
-            for row in cursor.fetchall():
-                users.append({
-                    "id": row[0],
-                    "email": row[1],
-                    "user_type": row[2],
-                    "is_active": bool(row[3]),
-                    "created_at": row[4]
-                })
-
             # Instructors
-            cursor.execute("SELECT instructor_id, email, user_type, 1 as is_active, NULL as created_at FROM instructors")
+            cursor.execute("""
+                SELECT u.user_id, u.email, u.role, i.first_name, i.last_name, u.created_at
+                FROM users u
+                JOIN instructors i ON u.reference_id = i.instructor_id
+                WHERE u.role = 'instructor'
+            """)
             for row in cursor.fetchall():
                 users.append({
                     "id": row[0],
                     "email": row[1],
                     "user_type": row[2],
-                    "is_active": bool(row[3]),
-                    "created_at": row[4]
+                    "first_name": row[3],
+                    "last_name": row[4],
+                    "is_active": True,
+                    "created_at": row[5]
                 })
 
-            # Admins
-            cursor.execute("SELECT admin_id, email, user_type, 1 as is_active, NULL as created_at FROM admins")
+            # IT Admins
+            cursor.execute("""
+                SELECT u.user_id, u.email, u.role, ia.first_name, ia.last_name, u.created_at
+                FROM users u
+                JOIN it_admins ia ON u.reference_id = ia.it_admin_id
+                WHERE u.role = 'it_admin'
+            """)
             for row in cursor.fetchall():
                 users.append({
                     "id": row[0],
                     "email": row[1],
                     "user_type": row[2],
-                    "is_active": bool(row[3]),
-                    "created_at": row[4]
+                    "first_name": row[3],
+                    "last_name": row[4],
+                    "is_active": True,
+                    "created_at": row[5]
+                })
+
+            # Super Admins
+            cursor.execute("""
+                SELECT u.user_id, u.email, u.role, sa.first_name, sa.last_name, u.created_at
+                FROM users u
+                JOIN super_admins sa ON u.reference_id = sa.super_admin_id
+                WHERE u.role = 'super_admin'
+            """)
+            for row in cursor.fetchall():
+                users.append({
+                    "id": row[0],
+                    "email": row[1],
+                    "user_type": row[2],
+                    "first_name": row[3],
+                    "last_name": row[4],
+                    "is_active": True,
+                    "created_at": row[5]
                 })
 
             return users
@@ -111,48 +136,61 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
             cursor = conn.cursor()
 
             # Basic validation
-            if user_data.user_type not in ['regular', 'it_admin', 'super_admin']:
+            if user_data.user_type not in ['instructor', 'it_admin', 'super_admin']:
                 raise HTTPException(status_code=400, detail="Invalid user type")
 
-            # Check if Super Admin permission is required for creating admins
-            if user_data.user_type in ['it_admin', 'super_admin'] and admin_type != 'super_admin':
-                raise HTTPException(status_code=403, detail="Only Super Admin can create admin accounts")
+            # Check permissions
+            if user_data.user_type == 'super_admin' and admin_type != 'super_admin':
+                raise HTTPException(status_code=403, detail="Only Super Admin can create super admin accounts")
+            if user_data.user_type == 'it_admin' and admin_type not in ['it_admin', 'super_admin']:
+                raise HTTPException(status_code=403, detail="Only IT Admin or Super Admin can create IT admin accounts")
+
+            # Check if email already exists
+            cursor.execute("SELECT user_id FROM users WHERE email = ?", (user_data.email,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Email already exists")
 
             # Hash the password if passlib is available
             hashed_password = user_data.password
             if _HAS_PASSLIB and bcrypt:
                 hashed_password = bcrypt.hash(user_data.password)
 
-            # Create user in appropriate table based on user_type
-            if user_data.user_type == 'regular':
-                # Create student account
-                cursor.execute("""
-                    INSERT INTO students (student_number, email, password, user_type, created_at)
-                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (f"STU{secrets.token_hex(4).upper()}", user_data.email, hashed_password, user_data.user_type))
-                user_id = cursor.lastrowid
-
-            elif user_data.user_type == 'it_admin':
+            # Create user in appropriate data table
+            reference_id = None
+            if user_data.user_type == 'instructor':
                 # Create instructor account
                 cursor.execute("""
-                    INSERT INTO instructors (instructor_number, email, password, user_type, created_at)
-                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (f"INS{secrets.token_hex(4).upper()}", user_data.email, hashed_password, user_data.user_type))
-                user_id = cursor.lastrowid
+                    INSERT INTO instructors (instructor_number, last_name, first_name, email, dept_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (f"INS{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
+                reference_id = cursor.lastrowid
+
+            elif user_data.user_type == 'it_admin':
+                # Create IT admin account
+                cursor.execute("""
+                    INSERT INTO it_admins (employee_number, last_name, first_name, email, dept_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (f"IT{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
+                reference_id = cursor.lastrowid
 
             elif user_data.user_type == 'super_admin':
-                # Create admin account
+                # Create super admin account
                 cursor.execute("""
-                    INSERT INTO admins (email, password, user_type, created_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                """, (user_data.email, hashed_password, user_data.user_type))
-                user_id = cursor.lastrowid
+                    INSERT INTO super_admins (employee_number, last_name, first_name, email, dept_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (f"SUPER{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
+                reference_id = cursor.lastrowid
 
+            # Create entry in users table for authentication
+            cursor.execute("""
+                INSERT INTO users (email, password, role, reference_id, created_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_data.email, hashed_password, user_data.user_type, reference_id))
+
+            user_id = cursor.lastrowid
             conn.commit()
-            return {"message": "User created successfully", "user_id": user_id, "user_type": user_data.user_type}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            return {"message": "User created successfully", "user_id": user_id, "user_type": user_data.user_type}
 
     except sqlite3.IntegrityError:
         raise HTTPException(400, "Email already exists")

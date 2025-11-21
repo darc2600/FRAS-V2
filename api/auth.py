@@ -65,27 +65,15 @@ def get_user_permissions(user_type: str) -> list:
         return [row[0] for row in cursor.fetchall()]
 
 def get_user_type_from_email(email: str) -> str:
-    """Get user type from email by checking all user tables"""
+    """Get user type from email by checking users table"""
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
 
-        # Check students table
-        cursor.execute("SELECT user_type FROM students WHERE email = ?", (email,))
+        # Check users table
+        cursor.execute("SELECT role FROM users WHERE email = ?", (email,))
         result = cursor.fetchone()
         if result:
-            return result[0]
-
-        # Check instructors table
-        cursor.execute("SELECT user_type FROM instructors WHERE email = ?", (email,))
-        result = cursor.fetchone()
-        if result:
-            return result[0]
-
-        # Check admins table
-        cursor.execute("SELECT user_type FROM admins WHERE email = ?", (email,))
-        result = cursor.fetchone()
-        if result:
-            return result[0]
+            return result[0]  # Return the role directly (instructor, it_admin, super_admin)
 
         # Default to regular if not found
         return 'regular'
@@ -106,39 +94,27 @@ def create_access_token(data: dict):
 
 
 def _get_user_auth(email: str):
-	"""Get user authentication data from our FRAS database schema."""
+	"""Get user authentication data from users table."""
 	with sqlite3.connect(DB_PATH) as conn:
 		cur = conn.cursor()
 
-		# Check students table
+		# Check users table
 		cur.execute("""
-			SELECT s.password, s.user_type, s.student_id, NULL as reference_id
-			FROM students s
-			WHERE s.email = ?
+			SELECT u.password, u.role, u.user_id, u.reference_id
+			FROM users u
+			WHERE u.email = ?
 		""", (email,))
 		result = cur.fetchone()
 		if result:
-			return result
-
-		# Check instructors table
-		cur.execute("""
-			SELECT i.password, i.user_type, i.instructor_id, NULL as reference_id
-			FROM instructors i
-			WHERE i.email = ?
-		""", (email,))
-		result = cur.fetchone()
-		if result:
-			return result
-
-		# Check admins table
-		cur.execute("""
-			SELECT a.password, a.user_type, a.admin_id, NULL as reference_id
-			FROM admins a
-			WHERE a.email = ?
-		""", (email,))
-		result = cur.fetchone()
-		if result:
-			return result
+			password, role, user_id, reference_id = result
+			# Map role to user_type
+			user_type_map = {
+				'student': 'regular',
+				'instructor': 'it_admin', 
+				'admin': 'super_admin'
+			}
+			user_type = user_type_map.get(role, 'regular')
+			return (password, user_type, user_id, reference_id)
 
 		return None
 
