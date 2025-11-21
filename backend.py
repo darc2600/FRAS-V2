@@ -10,7 +10,7 @@ import sys
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from fastapi import FastAPI, Depends, UploadFile, File, Form, Request
+from fastapi import FastAPI, Depends, UploadFile, File, Form, Request, HTTPException
 from typing import List
 import secrets
 import jwt
@@ -277,7 +277,7 @@ def init_db():
         conn.commit()
 
 # Initialize database on startup
-init_db()
+# init_db()
 
 # -----------------------
 # FastAPI app setup
@@ -609,7 +609,7 @@ async def get_student_by_number(student_number: str):
 # --- Debug Endpoint ---
 @app.get("/test", tags=["Debug"])
 async def test_endpoint():
-    return {"message": "test"}
+    return "OK"
 
 # Include additional routers
 # try:
@@ -630,14 +630,83 @@ for module_name in ['admin', 'auth']:  # Re-enabling auth and admin
 
 # Try direct imports
 try:
-    from api import auth, admin
+    print("Attempting to import auth module...")
+    from api import auth
+    print("Auth module imported, including router...")
     app.include_router(auth.router)
-    app.include_router(admin.router)
-    print("Auth and admin routers loaded successfully")
+    print("Auth router enabled")
+    
+    print("Attempting to import admin module...")
+    from api import admin
+    print("Admin module imported, including router...")
+    # app.include_router(admin.router)
+    print("Admin router disabled for debugging")
+    
+    print("Auth router loaded successfully")
 except Exception as e:
     print(f"Error loading routers: {e}")
+    import traceback
+    traceback.print_exc()
+
+# Add support ticket endpoint
+from pydantic import BaseModel
+from typing import List, Optional
+
+class SupportTicketCreate(BaseModel):
+    subject: str
+    description: str
+    category: str = "other"
+    priority: str = "medium"
+
+@app.post("/api/support/tickets")
+async def create_user_support_ticket(
+    ticket: SupportTicketCreate,
+    request: Request
+):
+    """Create a new support ticket (any authenticated user)"""
+    try:
+        # Get token from Authorization header
+        auth_header = request.headers.get('authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            raise HTTPException(401, "Missing or invalid authorization header")
+
+        token = auth_header.split(' ')[1]
+
+        # Decode token manually
+        import jwt
+        JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me")
+        JWT_ALGORITHM = "HS256"
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+
+        if user_id is None:
+            raise HTTPException(400, "User ID not found in token")
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            from datetime import datetime
+            now = datetime.now().isoformat()
+
+            cursor.execute("""
+                INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+
+            ticket_id = cursor.lastrowid
+            conn.commit()
+
+            return {"message": "Support ticket created successfully", "ticket_id": ticket_id}
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    except Exception as e:
+        print(f"Error creating ticket: {str(e)}")
+        raise HTTPException(500, f"Database error: {str(e)}")
 
 # Add a simple test endpoint
-@app.get("/test")
-async def test_endpoint():
-    return {"message": "Server is running with CORS enabled!"}
+# @app.get("/test")
+# async def test_endpoint():
+#     return {"message": "Server is running with CORS enabled!"}

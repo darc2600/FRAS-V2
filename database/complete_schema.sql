@@ -65,16 +65,27 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Audit logs table
-CREATE TABLE IF NOT EXISTS audit_logs (
-    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER REFERENCES users(user_id),
-    action TEXT NOT NULL,
-    resource_type TEXT,
-    resource_id INTEGER,
-    details TEXT,
-    ip_address TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Support ticket system
+CREATE TABLE IF NOT EXISTS support_tickets (
+    ticket_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(user_id),
+    subject TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT CHECK (category IN ('technical', 'account', 'attendance', 'feature', 'other')),
+    priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    status TEXT DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+    assigned_to INTEGER REFERENCES users(user_id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ticket_replies (
+    reply_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES support_tickets(ticket_id),
+    user_id INTEGER NOT NULL REFERENCES users(user_id),
+    message TEXT NOT NULL,
+    is_internal BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================================

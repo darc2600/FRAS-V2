@@ -124,4 +124,30 @@ export class ApiService {
   getAnalytics(): Observable<any> {
     return this.http.get<any>(`${this.backendUrl}/api/admin/analytics`);
   }
+
+  // Support ticket methods
+  getSupportTickets(status?: string, priority?: string): Observable<any[]> {
+    let url = `${this.backendUrl}/api/admin/support/tickets`;
+    const params: string[] = [];
+    if (status) params.push(`status=${status}`);
+    if (priority) params.push(`priority=${priority}`);
+    if (params.length > 0) url += '?' + params.join('&');
+    return this.http.get<any[]>(url);
+  }
+
+  updateSupportTicket(ticketId: number, updates: any): Observable<any> {
+    return this.http.put(`${this.backendUrl}/api/admin/support/tickets/${ticketId}`, updates);
+  }
+
+  getTicketReplies(ticketId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/admin/support/tickets/${ticketId}/replies`);
+  }
+
+  addTicketReply(ticketId: number, reply: any): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/admin/support/tickets/${ticketId}/replies`, reply);
+  }
+
+  submitSupportTicket(ticket: any): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/support/tickets`, ticket);
+  }
 }

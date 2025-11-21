@@ -55,13 +55,16 @@ INSERT OR IGNORE INTO permissions (permission_name, description, category) VALUE
 ('view_all_data', 'Access all attendance records and analytics', 'data'),
 ('manage_admins', 'Create and manage IT Admin accounts', 'administration'),
 ('content_management', 'Manage themes, logos, and content', 'content'),
-('audit_logs', 'View complete system audit logs', 'security');
+('audit_logs', 'View complete system audit logs', 'security'),
+('submit_support', 'Submit support tickets', 'support'),
+('manage_support', 'View and manage support tickets', 'support');
 
 -- Assign permissions to roles
 INSERT OR IGNORE INTO role_permissions (user_type, permission_id) VALUES
 -- Regular user permissions
 ((SELECT permission_id FROM permissions WHERE permission_name = 'view_own_attendance'), 'regular'),
 ((SELECT permission_id FROM permissions WHERE permission_name = 'mark_attendance'), 'regular'),
+((SELECT permission_id FROM permissions WHERE permission_name = 'submit_support'), 'regular'),
 
 -- IT Admin permissions
 ((SELECT permission_id FROM permissions WHERE permission_name = 'view_own_attendance'), 'it_admin'),
@@ -69,6 +72,8 @@ INSERT OR IGNORE INTO role_permissions (user_type, permission_id) VALUES
 ((SELECT permission_id FROM permissions WHERE permission_name = 'manage_users'), 'it_admin'),
 ((SELECT permission_id FROM permissions WHERE permission_name = 'reset_passwords'), 'it_admin'),
 ((SELECT permission_id FROM permissions WHERE permission_name = 'view_system_logs'), 'it_admin'),
+((SELECT permission_id FROM permissions WHERE permission_name = 'submit_support'), 'it_admin'),
+((SELECT permission_id FROM permissions WHERE permission_name = 'manage_support'), 'it_admin'),
 
 -- Super Admin permissions (all permissions)
 ((SELECT permission_id FROM permissions WHERE permission_name = 'view_own_attendance'), 'super_admin'),
@@ -80,7 +85,9 @@ INSERT OR IGNORE INTO role_permissions (user_type, permission_id) VALUES
 ((SELECT permission_id FROM permissions WHERE permission_name = 'view_all_data'), 'super_admin'),
 ((SELECT permission_id FROM permissions WHERE permission_name = 'manage_admins'), 'super_admin'),
 ((SELECT permission_id FROM permissions WHERE permission_name = 'content_management'), 'super_admin'),
-((SELECT permission_id FROM permissions WHERE permission_name = 'audit_logs'), 'super_admin');
+((SELECT permission_id FROM permissions WHERE permission_name = 'audit_logs'), 'super_admin'),
+((SELECT permission_id FROM permissions WHERE permission_name = 'submit_support'), 'super_admin'),
+((SELECT permission_id FROM permissions WHERE permission_name = 'manage_support'), 'super_admin');
 
 -- Insert default system settings
 INSERT OR IGNORE INTO system_settings (setting_key, setting_value, setting_type) VALUES

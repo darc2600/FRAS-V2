@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Request
 from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
@@ -6,6 +6,45 @@ import os
 import secrets
 import importlib
 from datetime import datetime
+
+# Support ticket models
+class SupportTicketCreate(BaseModel):
+    subject: str
+    description: str
+    category: str = "other"
+    priority: str = "medium"
+
+class SupportTicketUpdate(BaseModel):
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    assigned_to: Optional[int] = None
+
+class TicketReplyCreate(BaseModel):
+    message: str
+    is_internal: bool = False
+
+class SupportTicketResponse(BaseModel):
+    ticket_id: int
+    user_id: int
+    subject: str
+    description: str
+    category: str
+    priority: str
+    status: str
+    assigned_to: Optional[int]
+    created_at: str
+    updated_at: str
+    user_email: Optional[str] = None
+    assigned_email: Optional[str] = None
+
+class TicketReplyResponse(BaseModel):
+    reply_id: int
+    ticket_id: int
+    user_id: int
+    message: str
+    is_internal: bool
+    created_at: str
+    user_email: Optional[str] = None
 
 # Import passlib for password hashing
 try:
@@ -17,7 +56,7 @@ except Exception:
 	_HAS_PASSLIB = False
 
 # Import auth functions and JWT utilities
-from .auth import get_current_user_type, get_current_user_permissions, get_user_permissions
+from .auth import get_current_user_type, get_current_user_id, get_user_permissions
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
@@ -460,5 +499,259 @@ async def get_analytics(admin_type: str = Depends(require_admin_permission("view
 
             return analytics
 
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+# User endpoint for creating support tickets
+@router.post("/api/support/tickets")
+async def create_user_support_ticket(
+    ticket: SupportTicketCreate,
+    request: Request
+):
+    """Create a new support ticket (any authenticated user)"""
+    print("Endpoint called!")  # Debug print
+    try:
+        # Get token from Authorization header
+        auth_header = request.headers.get('authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            raise HTTPException(401, "Missing or invalid authorization header")
+
+        token = auth_header.split(' ')[1]
+
+        # Decode token manually
+        import jwt
+        JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me")
+        JWT_ALGORITHM = "HS256"
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+
+        if user_id is None:
+            raise HTTPException(400, "User ID not found in token")
+
+        print(f"Creating ticket for user_id: {user_id}, type: {type(user_id)}")
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            from datetime import datetime
+            now = datetime.now().isoformat()
+
+            cursor.execute("""
+                INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+
+            ticket_id = cursor.lastrowid
+            conn.commit()
+
+            return {"message": "Support ticket created successfully", "ticket_id": ticket_id}
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    except Exception as e:
+        print(f"Error creating ticket: {str(e)}")
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.get("/api/admin/support/tickets", response_model=List[SupportTicketResponse])
+async def get_support_tickets(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    user_type: str = Depends(get_current_user_type),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Get support tickets (users see their own, admins see all)"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT t.ticket_id, t.user_id, t.subject, t.description, t.category, t.priority, t.status,
+                       t.assigned_to, t.created_at, t.updated_at, u.email as user_email,
+                       a.email as assigned_email
+                FROM support_tickets t
+                JOIN users u ON t.user_id = u.user_id
+                LEFT JOIN users a ON t.assigned_to = a.user_id
+            """
+
+            params = []
+
+            # If not admin, only show user's own tickets
+            if user_type not in ['it_admin', 'super_admin']:
+                query += " WHERE t.user_id = ?"
+                params.append(current_user_id)
+            else:
+                # Admins can filter
+                conditions = []
+                if status:
+                    conditions.append("t.status = ?")
+                    params.append(status)
+                if priority:
+                    conditions.append("t.priority = ?")
+                    params.append(priority)
+
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY t.created_at DESC"
+
+            cursor.execute(query, params)
+            tickets = cursor.fetchall()
+
+            result = []
+            for row in tickets:
+                result.append({
+                    "ticket_id": row[0],
+                    "user_id": row[1],
+                    "subject": row[2],
+                    "description": row[3],
+                    "category": row[4],
+                    "priority": row[5],
+                    "status": row[6],
+                    "assigned_to": row[7],
+                    "created_at": str(row[8]),
+                    "updated_at": str(row[9]),
+                    "user_email": row[10],
+                    "assigned_email": row[11]
+                })
+
+            return result
+
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.put("/api/admin/support/tickets/{ticket_id}")
+async def update_support_ticket(
+    ticket_id: int,
+    update: SupportTicketUpdate,
+    user_type: str = Depends(require_admin_permission("manage_support"))
+):
+    """Update support ticket (admin only)"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Build update query
+            update_fields = []
+            params = []
+
+            if update.status:
+                update_fields.append("status = ?")
+                params.append(update.status)
+            if update.priority:
+                update_fields.append("priority = ?")
+                params.append(update.priority)
+            if update.assigned_to is not None:
+                update_fields.append("assigned_to = ?")
+                params.append(update.assigned_to)
+
+            if not update_fields:
+                raise HTTPException(400, "No fields to update")
+
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(ticket_id)
+
+            query = f"UPDATE support_tickets SET {', '.join(update_fields)} WHERE ticket_id = ?"
+            cursor.execute(query, params)
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                raise HTTPException(404, "Ticket not found")
+
+            return {"message": "Ticket updated successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.post("/api/admin/support/tickets/{ticket_id}/replies")
+async def create_ticket_reply(
+    ticket_id: int,
+    reply: TicketReplyCreate,
+    user_type: str = Depends(get_current_user_type),
+    user_id: int = Depends(get_current_user_id)
+):
+    """Add reply to support ticket"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Check if ticket exists and user has access
+            cursor.execute("SELECT user_id FROM support_tickets WHERE ticket_id = ?", (ticket_id,))
+            ticket = cursor.fetchone()
+            if not ticket:
+                raise HTTPException(404, "Ticket not found")
+
+            # Only ticket owner or admin can reply
+            if ticket[0] != user_id and user_type not in ['it_admin', 'super_admin']:
+                raise HTTPException(403, "Access denied")
+
+            cursor.execute("""
+                INSERT INTO ticket_replies (ticket_id, user_id, message, is_internal, created_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (ticket_id, user_id, reply.message, reply.is_internal))
+
+            reply_id = cursor.lastrowid
+
+            # Update ticket updated_at
+            cursor.execute("UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE ticket_id = ?", (ticket_id,))
+
+            conn.commit()
+
+            return {"message": "Reply added successfully", "reply_id": reply_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.get("/api/admin/support/tickets/{ticket_id}/replies", response_model=List[TicketReplyResponse])
+async def get_ticket_replies(
+    ticket_id: int,
+    user_type: str = Depends(get_current_user_type),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Get replies for a support ticket"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Check if user has access to this ticket
+            cursor.execute("SELECT user_id FROM support_tickets WHERE ticket_id = ?", (ticket_id,))
+            ticket = cursor.fetchone()
+            if not ticket:
+                raise HTTPException(404, "Ticket not found")
+
+            # Only ticket owner or admin can view replies
+            if ticket[0] != current_user_id and user_type not in ['it_admin', 'super_admin']:
+                raise HTTPException(403, "Access denied")
+
+            cursor.execute("""
+                SELECT r.reply_id, r.ticket_id, r.user_id, r.message, r.is_internal, r.created_at, u.email
+                FROM ticket_replies r
+                JOIN users u ON r.user_id = u.user_id
+                WHERE r.ticket_id = ?
+                ORDER BY r.created_at ASC
+            """, (ticket_id,))
+
+            replies = cursor.fetchall()
+
+            return [{
+                "reply_id": row[0],
+                "ticket_id": row[1],
+                "user_id": row[2],
+                "message": row[3],
+                "is_internal": bool(row[4]),
+                "created_at": row[5],
+                "user_email": row[6]
+            } for row in replies]
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")

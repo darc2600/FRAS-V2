@@ -1,0 +1,227 @@
+<div class="support-tickets-container">
+  <div class="header-section">
+    <h2>Support Tickets</h2>
+  </div>
+
+  <!-- Success/Error Messages -->
+  <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+  <div *ngIf="success" class="alert alert-success">{{ success }}</div>
+
+  <div class="tickets-layout" *ngIf="hasPermission('manage_support')">
+    <!-- Tickets List -->
+    <div class="tickets-panel">
+      <!-- Filters -->
+      <div class="filters-section card">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-group">
+                <label for="statusFilter">Status</label>
+                <select
+                  id="statusFilter"
+                  class="form-control"
+                  [(ngModel)]="statusFilter"
+                  (change)="applyFilters()">
+                  <option value="">All Statuses</option>
+                  <option *ngFor="let status of statuses" [value]="status">
+                    {{ status.replace('_', ' ') | titlecase }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label for="priorityFilter">Priority</label>
+                <select
+                  id="priorityFilter"
+                  class="form-control"
+                  [(ngModel)]="priorityFilter"
+                  (change)="applyFilters()">
+                  <option value="">All Priorities</option>
+                  <option *ngFor="let priority of priorities" [value]="priority">
+                    {{ priority | titlecase }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>&nbsp;</label>
+                <button class="btn btn-outline-secondary w-100" (click)="loadTickets()">
+                  <i class="fas fa-sync"></i> Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tickets List -->
+      <div class="tickets-list card">
+        <div class="card-header">
+          <h5>Tickets ({{ filteredTickets.length }})</h5>
+        </div>
+        <div class="card-body">
+          <div *ngIf="loading" class="text-center">
+            <div class="spinner-border" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+
+          <div *ngIf="!loading && filteredTickets.length === 0" class="text-center py-4">
+            <p class="text-muted">No tickets found matching your criteria.</p>
+          </div>
+
+          <div class="ticket-item" *ngFor="let ticket of filteredTickets"
+               [class.selected]="selectedTicket?.ticket_id === ticket.ticket_id"
+               (click)="selectTicket(ticket)">
+            <div class="ticket-header">
+              <h6>{{ ticket.subject }}</h6>
+              <div class="ticket-meta">
+                <span class="badge" [class]="getPriorityClass(ticket.priority)">
+                  {{ ticket.priority | titlecase }}
+                </span>
+                <span class="badge" [class]="getStatusClass(ticket.status)">
+                  {{ ticket.status.replace('_', ' ') | titlecase }}
+                </span>
+              </div>
+            </div>
+            <div class="ticket-info">
+              <small>
+                <strong>{{ ticket.user_email }}</strong> •
+                {{ ticket.created_at | date:'short' }} •
+                {{ ticket.category | titlecase }}
+              </small>
+            </div>
+            <div class="ticket-preview">
+              {{ ticket.description | slice:0:100 }}...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ticket Details -->
+    <div class="ticket-details-panel" *ngIf="selectedTicket">
+      <div class="card">
+        <div class="card-header">
+          <h5>{{ selectedTicket.subject }}</h5>
+          <div class="ticket-actions">
+            <button class="btn btn-sm btn-outline-primary" (click)="selectedTicket = null">
+              <i class="fas fa-times"></i> Close
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Ticket Info -->
+          <div class="ticket-info-section">
+            <div class="row">
+              <div class="col-md-6">
+                <p><strong>User:</strong> {{ selectedTicket.user_email }}</p>
+                <p><strong>Category:</strong> {{ selectedTicket.category | titlecase }}</p>
+              </div>
+              <div class="col-md-6">
+                <p><strong>Created:</strong> {{ selectedTicket.created_at | date:'medium' }}</p>
+                <p><strong>Updated:</strong> {{ selectedTicket.updated_at | date:'medium' }}</p>
+              </div>
+            </div>
+            <p><strong>Description:</strong></p>
+            <p>{{ selectedTicket.description }}</p>
+          </div>
+
+          <!-- Update Form -->
+          <div class="update-form card">
+            <div class="card-header">
+              <h6>Update Ticket</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Status</label>
+                    <select class="form-control" [(ngModel)]="updateForm.status">
+                      <option *ngFor="let status of statuses" [value]="status">
+                        {{ status.replace('_', ' ') | titlecase }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Priority</label>
+                    <select class="form-control" [(ngModel)]="updateForm.priority">
+                      <option *ngFor="let priority of priorities" [value]="priority">
+                        {{ priority | titlecase }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-primary w-100" (click)="updateTicket()">
+                      Update Ticket
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Replies -->
+          <div class="replies-section">
+            <h6>Replies</h6>
+            <div class="replies-list">
+              <div class="reply-item" *ngFor="let reply of replies">
+                <div class="reply-header">
+                  <strong>{{ reply.user_email }}</strong>
+                  <small>{{ reply.created_at | date:'medium' }}</small>
+                  <span *ngIf="reply.is_internal" class="badge badge-warning">Internal</span>
+                </div>
+                <div class="reply-content">
+                  {{ reply.message }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Add Reply -->
+            <div class="add-reply card">
+              <div class="card-body">
+                <div class="form-group">
+                  <label>Add Reply</label>
+                  <textarea
+                    class="form-control"
+                    [(ngModel)]="newReply.message"
+                    rows="3"
+                    placeholder="Type your reply..."></textarea>
+                </div>
+                <div class="form-check">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    id="isInternal"
+                    [(ngModel)]="newReply.is_internal">
+                  <label class="form-check-label" for="isInternal">
+                    Internal note (visible only to admins)
+                  </label>
+                </div>
+                <button
+                  class="btn btn-success mt-2"
+                  (click)="addReply()"
+                  [disabled]="!newReply.message.trim()">
+                  <i class="fas fa-reply"></i> Add Reply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- No Permission Message -->
+  <div *ngIf="!hasPermission('manage_support')" class="alert alert-warning">
+    <h5>Access Denied</h5>
+    <p>You don't have permission to manage support tickets.</p>
+  </div>
+</div>

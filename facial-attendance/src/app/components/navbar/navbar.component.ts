@@ -17,6 +17,8 @@ export class NavbarComponent implements OnInit {
   canResetPasswords = false;
   canConfigureSystem = false;
   canViewAnalytics = false;
+  canSubmitSupport = false;
+  canManageSupport = false;
 
   constructor(private authService: AuthService) {}
 
@@ -36,6 +38,8 @@ export class NavbarComponent implements OnInit {
         this.canResetPasswords = permissions.includes('reset_passwords') || isSuperAdmin;
         this.canConfigureSystem = (permissions.includes('system_admin') || permissions.includes('manage_content')) || isSuperAdmin;
         this.canViewAnalytics = permissions.includes('view_analytics') || isSuperAdmin;
+        this.canSubmitSupport = permissions.includes('submit_support');
+        this.canManageSupport = permissions.includes('manage_support') || isSuperAdmin;
       } else {
         // Reset all permissions
         this.canMonitor = false;
@@ -47,6 +51,8 @@ export class NavbarComponent implements OnInit {
         this.canResetPasswords = false;
         this.canConfigureSystem = false;
         this.canViewAnalytics = false;
+        this.canSubmitSupport = false;
+        this.canManageSupport = false;
       }
     });
   }

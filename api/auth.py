@@ -42,11 +42,16 @@ def get_current_user_type(credentials: HTTPAuthorizationCredentials = Depends(se
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_current_user_permissions(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Extract user permissions from JWT token"""
+def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Extract user ID from JWT token"""
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload.get("permissions", [])
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="User ID not found in token")
+        return int(user_id)  # Ensure it's an integer
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user ID in token")
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
