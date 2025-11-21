@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { CommonModule, KeyValuePipe, TitleCasePipe } from '@angular/common';
 import { ApiService } from '../api.service';
 import { AuthService } from '../auth.service';
 
@@ -10,6 +11,8 @@ interface SystemSetting {
 
 @Component({
   selector: 'app-system-settings',
+  standalone: true,
+  imports: [CommonModule, KeyValuePipe, TitleCasePipe],
   templateUrl: './system-settings.component.html',
   styleUrls: ['./system-settings.component.css']
 })

@@ -19,8 +19,6 @@ import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.compo
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
 import { ProfileSidebarComponent } from './components/profile-sidebar/profile-sidebar.component';
 import { AuthInterceptor } from './auth.interceptor';
-import { UserManagementComponent } from './user-management/user-management.component';
-import { SystemSettingsComponent } from './system-settings/system-settings.component';
 
 @NgModule({
   declarations: [
@@ -34,9 +32,7 @@ import { SystemSettingsComponent } from './system-settings/system-settings.compo
     RoomScheduleEditorComponent,
     ProfileSidebarComponent,
     LoginComponent,
-    RegistrationComponent,
-    UserManagementComponent,
-    SystemSettingsComponent
+    RegistrationComponent
   ],
   imports: [
   BrowserModule,

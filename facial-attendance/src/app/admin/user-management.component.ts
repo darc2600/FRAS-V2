@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { ApiService } from '../api.service';
 import { AuthService } from '../auth.service';
 
@@ -12,6 +13,8 @@ interface User {
 
 @Component({
   selector: 'app-user-management',
+  standalone: true,
+  imports: [CommonModule],
   templateUrl: './user-management.component.html',
   styleUrls: ['./user-management.component.css']
 })

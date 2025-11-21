@@ -324,13 +324,13 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
 # Enable CORS for Angular frontend
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:4200"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:4200"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Scheduler for marking absents
 # scheduler = AsyncIOScheduler()
@@ -620,10 +620,24 @@ async def test_endpoint():
 
 # Include other API routers
 # Temporarily disabled for debugging
-for module_name in ['admin', 'auth']:  # Re-enabling auth and admin
-    try:
-        module = __import__(f'api.{module_name}', fromlist=['router'])
-        if hasattr(module, 'router'):
-            app.include_router(module.router)
-    except Exception as e:
-        print(f"Warning: could not include {module_name} router: {e}")
+# for module_name in ['admin', 'auth']:  # Re-enabling auth and admin
+#     try:
+#         module = __import__(f'api.{module_name}', fromlist=['router'])
+#         if hasattr(module, 'router'):
+#             app.include_router(module.router)
+#     except Exception as e:
+#         print(f"Warning: could not include {module_name} router: {e}")
+
+# Try direct imports
+# try:
+#     from api import auth, admin
+#     app.include_router(auth.router)
+#     app.include_router(admin.router)
+#     print("✅ Auth and admin routers loaded successfully")
+# except Exception as e:
+#     print(f"❌ Error loading routers: {e}")
+
+# Add a simple test endpoint
+@app.get("/test")
+async def test_endpoint():
+    return {"message": "Server is running with CORS enabled!"}
