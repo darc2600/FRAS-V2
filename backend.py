@@ -277,7 +277,7 @@ def init_db():
         conn.commit()
 
 # Initialize database on startup
-# init_db()
+init_db()
 
 # -----------------------
 # FastAPI app setup
@@ -633,9 +633,9 @@ try:
     from api import auth, admin
     app.include_router(auth.router)
     app.include_router(admin.router)
-    print("✅ Auth and admin routers loaded successfully")
+    print("Auth and admin routers loaded successfully")
 except Exception as e:
-    print(f"❌ Error loading routers: {e}")
+    print(f"Error loading routers: {e}")
 
 # Add a simple test endpoint
 @app.get("/test")

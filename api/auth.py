@@ -110,8 +110,10 @@ def _get_user_auth(email: str):
 			# Map role to user_type
 			user_type_map = {
 				'student': 'regular',
-				'instructor': 'it_admin', 
-				'admin': 'super_admin'
+				'instructor': 'regular', 
+				'admin': 'it_admin',
+				'it_admin': 'it_admin',
+				'super_admin': 'super_admin'
 			}
 			user_type = user_type_map.get(role, 'regular')
 			return (password, user_type, user_id, reference_id)

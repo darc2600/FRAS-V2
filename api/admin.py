@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Body
 from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
@@ -32,6 +32,7 @@ class UserResponse(BaseModel):
     last_name: Optional[str] = None
     is_active: bool
     created_at: Optional[str]
+    updated_at: Optional[str] = None  # Explicit None default
 
 class CreateUserRequest(BaseModel):
     email: str
@@ -48,6 +49,8 @@ class UpdateUserRequest(BaseModel):
 # Dependency to check admin permissions
 def require_admin_permission(permission: str):
     def dependency(user_type: str = Depends(get_current_user_type)):
+        if user_type == 'super_admin':
+            return user_type  # Super admin has all permissions
         permissions = get_user_permissions(user_type)
         if permission not in permissions:
             raise HTTPException(
@@ -66,12 +69,19 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
 
+            # Map database role to frontend user_type for display
+            role_to_user_type = {
+                'instructor': 'instructor',  # Show as Instructor instead of regular
+                'it_admin': 'it_admin',
+                'super_admin': 'super_admin'
+            }
+
             # Get users from users table with joined data
             users = []
 
             # Instructors
             cursor.execute("""
-                SELECT u.user_id, u.email, u.role, i.first_name, i.last_name, u.created_at
+                SELECT u.user_id, u.email, u.role, i.first_name, i.last_name, u.created_at, u.updated_at
                 FROM users u
                 JOIN instructors i ON u.reference_id = i.instructor_id
                 WHERE u.role = 'instructor'
@@ -80,16 +90,17 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                 users.append({
                     "id": row[0],
                     "email": row[1],
-                    "user_type": row[2],
+                    "user_type": role_to_user_type.get(row[2], row[2]),
                     "first_name": row[3],
                     "last_name": row[4],
                     "is_active": True,
-                    "created_at": row[5]
+                    "created_at": row[5],
+                    "updated_at": row[6] if row[6] else row[5]  # Simplified fallback
                 })
 
             # IT Admins
             cursor.execute("""
-                SELECT u.user_id, u.email, u.role, ia.first_name, ia.last_name, u.created_at
+                SELECT u.user_id, u.email, u.role, ia.first_name, ia.last_name, u.created_at, u.updated_at
                 FROM users u
                 JOIN it_admins ia ON u.reference_id = ia.it_admin_id
                 WHERE u.role = 'it_admin'
@@ -98,16 +109,17 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                 users.append({
                     "id": row[0],
                     "email": row[1],
-                    "user_type": row[2],
+                    "user_type": role_to_user_type.get(row[2], row[2]),
                     "first_name": row[3],
                     "last_name": row[4],
                     "is_active": True,
-                    "created_at": row[5]
+                    "created_at": row[5],
+                    "updated_at": row[6] if row[6] and row[6] != "" else row[5]  # Use created_at if updated_at is None or empty
                 })
 
             # Super Admins
             cursor.execute("""
-                SELECT u.user_id, u.email, u.role, sa.first_name, sa.last_name, u.created_at
+                SELECT u.user_id, u.email, u.role, sa.first_name, sa.last_name, u.created_at, u.updated_at
                 FROM users u
                 JOIN super_admins sa ON u.reference_id = sa.super_admin_id
                 WHERE u.role = 'super_admin'
@@ -116,11 +128,12 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                 users.append({
                     "id": row[0],
                     "email": row[1],
-                    "user_type": row[2],
+                    "user_type": role_to_user_type.get(row[2], row[2]),
                     "first_name": row[3],
                     "last_name": row[4],
                     "is_active": True,
-                    "created_at": row[5]
+                    "created_at": row[5],
+                    "updated_at": row[6] if row[6] and row[6] != "" else row[5]  # Use created_at if updated_at is None or empty
                 })
 
             return users
@@ -135,14 +148,22 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
 
+            # Map frontend user_type to backend user_type
+            user_type_mapping = {
+                'instructor': 'instructor',
+                'it_admin': 'it_admin',
+                'super_admin': 'super_admin'
+            }
+            backend_user_type = user_type_mapping.get(user_data.user_type, user_data.user_type)
+
             # Basic validation
-            if user_data.user_type not in ['instructor', 'it_admin', 'super_admin']:
+            if backend_user_type not in ['instructor', 'it_admin', 'super_admin']:
                 raise HTTPException(status_code=400, detail="Invalid user type")
 
             # Check permissions
-            if user_data.user_type == 'super_admin' and admin_type != 'super_admin':
+            if backend_user_type == 'super_admin' and admin_type != 'super_admin':
                 raise HTTPException(status_code=403, detail="Only Super Admin can create super admin accounts")
-            if user_data.user_type == 'it_admin' and admin_type not in ['it_admin', 'super_admin']:
+            if backend_user_type == 'it_admin' and admin_type not in ['it_admin', 'super_admin']:
                 raise HTTPException(status_code=403, detail="Only IT Admin or Super Admin can create IT admin accounts")
 
             # Check if email already exists
@@ -157,7 +178,7 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
 
             # Create user in appropriate data table
             reference_id = None
-            if user_data.user_type == 'instructor':
+            if backend_user_type == 'instructor':
                 # Create instructor account
                 cursor.execute("""
                     INSERT INTO instructors (instructor_number, last_name, first_name, email, dept_id, created_at)
@@ -165,7 +186,7 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
                 """, (f"INS{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
                 reference_id = cursor.lastrowid
 
-            elif user_data.user_type == 'it_admin':
+            elif backend_user_type == 'it_admin':
                 # Create IT admin account
                 cursor.execute("""
                     INSERT INTO it_admins (employee_number, last_name, first_name, email, dept_id, created_at)
@@ -173,7 +194,7 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
                 """, (f"IT{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
                 reference_id = cursor.lastrowid
 
-            elif user_data.user_type == 'super_admin':
+            elif backend_user_type == 'super_admin':
                 # Create super admin account
                 cursor.execute("""
                     INSERT INTO super_admins (employee_number, last_name, first_name, email, dept_id, created_at)
@@ -185,7 +206,7 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
             cursor.execute("""
                 INSERT INTO users (email, password, role, reference_id, created_at)
                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (user_data.email, hashed_password, user_data.user_type, reference_id))
+            """, (user_data.email, hashed_password, backend_user_type, reference_id))
 
             user_id = cursor.lastrowid
             conn.commit()
@@ -222,17 +243,158 @@ async def update_user(
 
 @router.post("/api/admin/reset-password")
 async def reset_password(
-    email: str,
+    request: dict = Body(),
     admin_type: str = Depends(require_admin_permission("reset_passwords"))
 ):
     """Reset user password (IT Admin and Super Admin only)"""
+    print("DEBUG: reset_password called")
     try:
-        # For now, just return success
-        # In real implementation, generate reset token and send email
-        return {"message": f"Password reset initiated for {email}"}
+        print(f"DEBUG: Received request: {request}")
+        email = request.get('email')
+        new_password = request.get('new_password')
+        print(f"DEBUG: email={email}, new_password={new_password}")
 
+        if not email:
+            raise HTTPException(400, "Email is required")
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Check if user exists
+            cursor.execute("SELECT user_id FROM users WHERE email = ?", (email,))
+            user = cursor.fetchone()
+            print(f"DEBUG: User found: {user}")
+            if not user:
+                raise HTTPException(404, "User not found")
+
+            # Hash new password if provided, otherwise generate a temporary one
+            if new_password:
+                if len(new_password) < 6:
+                    raise HTTPException(400, "Password must be at least 6 characters long")
+                hashed_password = new_password  # Store plain text for now
+                # if _HAS_PASSLIB and bcrypt:
+                #     hashed_password = bcrypt.hash(new_password)
+            else:
+                # Generate temporary password
+                temp_password = secrets.token_urlsafe(8)
+                hashed_password = temp_password
+                # if _HAS_PASSLIB and bcrypt:
+                #     hashed_password = bcrypt.hash(temp_password)
+
+            print(f"DEBUG: Updating password for {email} to {hashed_password}")
+            # Update password
+            cursor.execute("UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE email = ?",
+                         (hashed_password, email))
+            conn.commit()
+            print(f"DEBUG: Password updated successfully")
+
+            return {"message": f"Password reset successfully for {email}"}
+
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"DEBUG: Exception: {str(e)}")
         raise HTTPException(500, f"Error: {str(e)}")
+
+@router.delete("/api/admin/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    admin_type: str = Depends(require_admin_permission("manage_users"))
+):
+    """Delete a user (IT Admin and Super Admin only)"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Get user info first
+            cursor.execute("SELECT role, reference_id FROM users WHERE user_id = ?", (user_id,))
+            user = cursor.fetchone()
+            if not user:
+                raise HTTPException(404, "User not found")
+
+            role, reference_id = user
+
+            # Prevent deleting super admins unless you're a super admin
+            if role == 'super_admin' and admin_type != 'super_admin':
+                raise HTTPException(403, "Cannot delete super admin accounts")
+
+            # Delete from role-specific table first
+            if role == 'instructor':
+                cursor.execute("DELETE FROM instructors WHERE instructor_id = ?", (reference_id,))
+            elif role == 'it_admin':
+                cursor.execute("DELETE FROM it_admins WHERE it_admin_id = ?", (reference_id,))
+            elif role == 'super_admin':
+                cursor.execute("DELETE FROM super_admins WHERE super_admin_id = ?", (reference_id,))
+
+            # Delete from users table
+            cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+            conn.commit()
+
+            return {"message": "User deleted successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.post("/api/admin/users/bulk")
+async def bulk_user_operation(
+    request: dict,
+    admin_type: str = Depends(require_admin_permission("manage_users"))
+):
+    """Perform bulk operations on users (IT Admin and Super Admin only)"""
+    try:
+        operation = request.get('operation')
+        user_ids = request.get('user_ids', [])
+
+        if not operation or not user_ids:
+            raise HTTPException(400, "Operation and user_ids are required")
+
+        if operation not in ['activate', 'deactivate', 'delete']:
+            raise HTTPException(400, "Invalid operation")
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            if operation == 'delete':
+                # Check for super admin restrictions
+                if admin_type != 'super_admin':
+                    placeholders = ','.join('?' * len(user_ids))
+                    cursor.execute(f"SELECT role FROM users WHERE user_id IN ({placeholders})", user_ids)
+                    roles = [row[0] for row in cursor.fetchall()]
+                    if 'super_admin' in roles:
+                        raise HTTPException(403, "Cannot delete super admin accounts")
+
+                # Delete from role-specific tables first
+                for user_id in user_ids:
+                    cursor.execute("SELECT role, reference_id FROM users WHERE user_id = ?", (user_id,))
+                    user = cursor.fetchone()
+                    if user:
+                        role, reference_id = user
+                        if role == 'instructor':
+                            cursor.execute("DELETE FROM instructors WHERE instructor_id = ?", (reference_id,))
+                        elif role == 'it_admin':
+                            cursor.execute("DELETE FROM it_admins WHERE it_admin_id = ?", (reference_id,))
+                        elif role == 'super_admin':
+                            cursor.execute("DELETE FROM super_admins WHERE super_admin_id = ?", (reference_id,))
+
+                # Delete from users table
+                placeholders = ','.join('?' * len(user_ids))
+                cursor.execute(f"DELETE FROM users WHERE user_id IN ({placeholders})", user_ids)
+
+            elif operation in ['activate', 'deactivate']:
+                # For now, we'll assume all users are active
+                # In a real implementation, you'd have an is_active column
+                pass
+
+            conn.commit()
+
+            return {"message": f"Bulk {operation} completed for {len(user_ids)} users"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
 
 @router.get("/api/admin/system-settings")
 async def get_system_settings(admin_type: str = Depends(require_admin_permission("system_config"))):

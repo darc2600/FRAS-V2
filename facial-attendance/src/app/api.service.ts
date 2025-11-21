@@ -92,12 +92,25 @@ export class ApiService {
     return this.http.get<any[]>(`${this.backendUrl}/api/admin/users`);
   }
 
+  createUser(userData: any): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/admin/users`, userData);
+  }
+
   updateUser(userId: number, userData: any): Observable<any> {
     return this.http.put(`${this.backendUrl}/api/admin/users/${userId}`, userData);
   }
 
-  resetPassword(email: string): Observable<any> {
-    return this.http.post(`${this.backendUrl}/api/admin/reset-password`, { email });
+  deleteUser(userId: number): Observable<any> {
+    return this.http.delete(`${this.backendUrl}/api/admin/users/${userId}`);
+  }
+
+  resetPassword(email: string, newPassword?: string): Observable<any> {
+    const payload = newPassword ? { email, new_password: newPassword } : { email };
+    return this.http.post(`${this.backendUrl}/api/admin/reset-password`, payload);
+  }
+
+  bulkUserOperation(operation: string, userIds: number[]): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/admin/users/bulk`, { operation, user_ids: userIds });
   }
 
   getSystemSettings(): Observable<any> {

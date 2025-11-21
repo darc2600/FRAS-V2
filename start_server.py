@@ -11,7 +11,11 @@ try:
     print("✅ Backend imported successfully")
 
     print("Starting FRAS Backend Server...")
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
+    config = uvicorn.Config(app, host="127.0.0.1", port=8000, reload=False, log_level="info")
+    server = uvicorn.Server(config)
+
+    print("Server configured, starting...")
+    server.run()
 
 except Exception as e:
     print(f"❌ Error starting server: {e}")

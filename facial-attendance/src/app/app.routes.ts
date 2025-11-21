@@ -8,6 +8,7 @@ import { RegistrationComponent } from './registration/registration.component';
 import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.component';
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
 import { UserManagementComponent } from './admin/user-management.component';
+import { PasswordResetComponent } from './admin/password-reset.component';
 import { SystemSettingsComponent } from './admin/system-settings.component';
 import { AnalyticsComponent } from './admin/analytics.component';
 import { AuthGuard, AdminGuard, AnalyticsGuard } from './auth.guard';
@@ -25,6 +26,7 @@ export const routes: Routes = [
 
   // Admin routes (no longer using AdminLayoutComponent)
   { path: 'admin/users', component: UserManagementComponent, canActivate: [AdminGuard] },
+  { path: 'admin/password-reset', component: PasswordResetComponent, canActivate: [AdminGuard] },
   { path: 'admin/analytics', component: AnalyticsComponent, canActivate: [AnalyticsGuard] },
   { path: 'admin/settings', component: SystemSettingsComponent, canActivate: [SuperAdminGuard] },
 
