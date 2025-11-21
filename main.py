@@ -1,4 +1,4 @@
-from backend import app
+from minimal_backend import app
 import uvicorn
 
 if __name__ == "__main__":
