@@ -43,14 +43,14 @@ export class AdminGuard implements CanActivate {
 @Injectable({
   providedIn: 'root'
 })
-export class InstructorGuard implements CanActivate {
+export class AnalyticsGuard implements CanActivate {
   constructor(
     private authService: AuthService,
     private router: Router
   ) {}
 
   canActivate(): boolean {
-    if (this.authService.isAuthenticated() && this.authService.isInstructor()) {
+    if (this.authService.isAuthenticated() && this.authService.hasPermission('view_analytics')) {
       return true;
     } else {
       this.router.navigate(['/login']);

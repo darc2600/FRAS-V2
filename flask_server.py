@@ -80,11 +80,33 @@ def login():
     if not valid:
         return jsonify({'error': 'Invalid credentials'}), 401
 
+    # Get user permissions based on role
+    permissions = []
+    try:
+        with sqlite3.connect(DB_PATH) as perm_conn:
+            perm_cursor = perm_conn.cursor()
+            perm_cursor.execute("""
+                SELECT p.permission_name
+                FROM permissions p
+                JOIN role_permissions rp ON p.permission_id = rp.permission_id
+                WHERE rp.user_type = ?
+            """, (user_type,))
+            permission_rows = perm_cursor.fetchall()
+            permissions = [row[0] for row in permission_rows]
+            print(f"DEBUG: Fetched {len(permissions)} permissions for {user_type}: {permissions}")
+    except Exception as e:
+        print(f"Error fetching permissions: {e}")
+        # Fallback to basic permissions
+        permissions = ["read", "write"]
+        print(f"DEBUG: Using fallback permissions: {permissions}")
+
+    print(f"DEBUG: Final permissions for {user_type}: {permissions}")
+
     access_token = create_access_token({
         "sub": email,
         "user_type": user_type,
         "user_id": user_id,
-        "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
+        "permissions": permissions
     })
 
     return jsonify({
@@ -92,7 +114,7 @@ def login():
         "token_type": "bearer",
         "user_type": user_type,
         "user_id": user_id,
-        "permissions": ["read"] if user_type == "student" else ["read", "write", "admin"]
+        "permissions": permissions
     })
 
 @app.route('/api/user/register', methods=['POST', 'OPTIONS'])

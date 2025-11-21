@@ -7,11 +7,10 @@ import { LoginComponent } from './login/login.component';
 import { RegistrationComponent } from './registration/registration.component';
 import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.component';
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
-import { AdminLayoutComponent } from './admin/admin-layout.component';
 import { UserManagementComponent } from './admin/user-management.component';
 import { SystemSettingsComponent } from './admin/system-settings.component';
 import { AnalyticsComponent } from './admin/analytics.component';
-import { AuthGuard, AdminGuard, InstructorGuard } from './auth.guard';
+import { AuthGuard, AdminGuard, AnalyticsGuard } from './auth.guard';
 import { SuperAdminGuard } from './super-admin.guard';
 
 
@@ -24,18 +23,10 @@ export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'registration', component: RegistrationComponent },
 
-  // Admin section with nested routing
-  {
-    path: 'admin',
-    component: AdminLayoutComponent,
-    canActivate: [AdminGuard],
-    children: [
-      { path: '', redirectTo: 'users', pathMatch: 'full' },
-      { path: 'users', component: UserManagementComponent },
-      { path: 'settings', component: SystemSettingsComponent, canActivate: [SuperAdminGuard] },
-      { path: 'analytics', component: AnalyticsComponent, canActivate: [SuperAdminGuard] },
-    ]
-  },
+  // Admin routes (no longer using AdminLayoutComponent)
+  { path: 'admin/users', component: UserManagementComponent, canActivate: [AdminGuard] },
+  { path: 'admin/analytics', component: AnalyticsComponent, canActivate: [AnalyticsGuard] },
+  { path: 'admin/settings', component: SystemSettingsComponent, canActivate: [SuperAdminGuard] },
 
   // Admin-only routes (keeping these for backward compatibility)
   { path: 'upload-schedule', component: ScheduleUploadComponent, canActivate: [AdminGuard] },

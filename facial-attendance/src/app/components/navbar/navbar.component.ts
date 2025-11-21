@@ -15,6 +15,7 @@ export class NavbarComponent implements OnInit {
   canEditSchedule = false;
   canManageUsers = false;
   canConfigureSystem = false;
+  canViewAnalytics = false;
 
   constructor(private authService: AuthService) {}
 
@@ -23,7 +24,7 @@ export class NavbarComponent implements OnInit {
       if (user) {
         const permissions = user.permissions || [];
 
-        // Check specific permissions
+        // Check specific permissions based on database permissions
         this.canMonitor = permissions.includes('mark_attendance');
         this.canViewLogs = permissions.includes('view_attendance_logs');
         this.canRegister = permissions.includes('register_students');
@@ -31,6 +32,7 @@ export class NavbarComponent implements OnInit {
         this.canEditSchedule = permissions.includes('manage_rooms_schedule');
         this.canManageUsers = permissions.includes('manage_users');
         this.canConfigureSystem = permissions.includes('system_admin') || permissions.includes('manage_content');
+        this.canViewAnalytics = permissions.includes('view_analytics');
       } else {
         // Reset all permissions
         this.canMonitor = false;
@@ -40,6 +42,7 @@ export class NavbarComponent implements OnInit {
         this.canEditSchedule = false;
         this.canManageUsers = false;
         this.canConfigureSystem = false;
+        this.canViewAnalytics = false;
       }
     });
   }
