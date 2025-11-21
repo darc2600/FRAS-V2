@@ -177,6 +177,88 @@ def seed_database():
         for student_id in range(1, 6):
             cursor.execute("INSERT INTO enrollments (student_id, class_id) VALUES (?, ?)", (student_id, class_id))
 
+        # Seed permissions table
+        permissions = [
+            ('view_own_schedule', 'View personal schedule', 'schedule'),
+            ('view_attendance_logs', 'View attendance logs', 'attendance'),
+            ('mark_attendance', 'Mark attendance using facial recognition', 'attendance'),
+            ('register_students', 'Register new students', 'registration'),
+            ('manage_users', 'Create and manage user accounts', 'user_management'),
+            ('manage_rooms_schedule', 'Edit room and schedule configurations', 'administration'),
+            ('system_admin', 'Full system administration access', 'administration'),
+            ('view_analytics', 'View system analytics and reports', 'analytics'),
+            ('manage_content', 'Manage system content and settings', 'content')
+        ]
+        
+        for perm_code, perm_name, category in permissions:
+            cursor.execute("INSERT OR IGNORE INTO permissions (permission_code, permission_name, category) VALUES (?, ?, ?)", 
+                         (perm_code, perm_name, category))
+
+        # Seed role_permissions table
+        role_permissions = [
+            ('instructor', 11),  # view_own_schedule
+            ('instructor', 12),  # view_attendance_logs
+            ('instructor', 13),  # mark_attendance
+            ('instructor', 14),  # register_students
+            ('it_admin', 11),    # view_own_schedule
+            ('it_admin', 12),    # view_attendance_logs
+            ('it_admin', 13),    # mark_attendance
+            ('it_admin', 14),    # register_students
+            ('it_admin', 15),    # manage_users
+            ('it_admin', 16),    # manage_rooms_schedule
+            ('it_admin', 18),    # view_analytics
+            ('super_admin', 11), # view_own_schedule
+            ('super_admin', 12), # view_attendance_logs
+            ('super_admin', 13), # mark_attendance
+            ('super_admin', 14), # register_students
+            ('super_admin', 15), # manage_users
+            ('super_admin', 16), # manage_rooms_schedule
+            ('super_admin', 17), # system_admin
+            ('super_admin', 18), # view_analytics
+            ('super_admin', 19), # manage_content
+        ]
+        
+        for role, perm_id in role_permissions:
+            cursor.execute("INSERT OR IGNORE INTO role_permissions (user_type, permission_id) VALUES (?, ?)", (role, perm_id))
+
+        # Seed system_settings table with default values
+        system_settings = [
+            ('system_name', 'FRAS - Facial Recognition Attendance System'),
+            ('version', '1.0.0'),
+            ('maintenance_mode', 'false'),
+            ('max_upload_size', '10485760'),  # 10MB
+            ('session_timeout', '3600'),  # 1 hour
+            ('face_recognition_threshold', '0.6'),
+            ('backup_frequency', 'daily'),
+            ('log_retention_days', '90'),
+            ('email_notifications', 'true')
+        ]
+        
+        for setting_key, setting_value in system_settings:
+            cursor.execute("INSERT OR IGNORE INTO system_settings (setting_key, setting_value) VALUES (?, ?)", 
+                         (setting_key, setting_value))
+
+        # Create test users for each role
+        # Note: Passwords are hashed versions of 'password123'
+        test_users = [
+            ('test.instructor@fras.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeCt1uAjhZzX8IwCe', 'instructor', 1),  # instructor_id = 1
+            ('test.itadmin@fras.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeCt1uAjhZzX8IwCe', 'it_admin', 1),    # it_admin_id = 1
+            ('test.superadmin@fras.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeCt1uAjhZzX8IwCe', 'super_admin', 1)  # super_admin_id = 1
+        ]
+        
+        for email, password, role, ref_id in test_users:
+            cursor.execute("INSERT OR IGNORE INTO users (email, password, role, reference_id) VALUES (?, ?, ?, ?)", 
+                         (email, password, role, ref_id))
+
+        # Create corresponding entries in role-specific tables if they don't exist
+        # IT Admin
+        cursor.execute("INSERT OR IGNORE INTO it_admins (employee_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", 
+                     ('IT001', 'Test', 'Admin', 'test.itadmin@fras.com', 1))
+        
+        # Super Admin  
+        cursor.execute("INSERT OR IGNORE INTO super_admins (employee_number, last_name, first_name, email, dept_id) VALUES (?, ?, ?, ?, ?)", 
+                     ('SUPER001', 'Test', 'SuperAdmin', 'test.superadmin@fras.com', 1))
+
         conn.commit()
         print("Mapúa database seeded successfully!")
 
@@ -201,8 +283,20 @@ def seed_database():
         print(f"✓ Classes: {cursor.fetchone()[0]}")
         cursor.execute("SELECT COUNT(*) FROM enrollments")
         print(f"✓ Enrollments: {cursor.fetchone()[0]}")
+        cursor.execute("SELECT COUNT(*) FROM permissions")
+        print(f"✓ Permissions: {cursor.fetchone()[0]}")
+        cursor.execute("SELECT COUNT(*) FROM role_permissions")
+        print(f"✓ Role Permissions: {cursor.fetchone()[0]}")
+        cursor.execute("SELECT COUNT(*) FROM users")
+        print(f"✓ Users: {cursor.fetchone()[0]}")
+        cursor.execute("SELECT COUNT(*) FROM system_settings")
+        print(f"✓ System Settings: {cursor.fetchone()[0]}")
 
         print("\nNote: attendance_logs table is left empty for the FRAS system to populate.")
+        print("Test accounts created:")
+        print("  Instructor: test.instructor@fras.com / password123")
+        print("  IT Admin: test.itadmin@fras.com / password123") 
+        print("  Super Admin: test.superadmin@fras.com / password123")
 
 if __name__ == "__main__":
     seed_database()
