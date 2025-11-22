@@ -97,6 +97,32 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
+def get_user_permissions(user_type: str) -> list:
+    """Get permissions for a user type from the database."""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT p.permission_name
+                FROM permissions p
+                JOIN role_permissions rp ON p.permission_id = rp.permission_id
+                WHERE rp.user_type = ?
+            """, (user_type,))
+            permissions = cursor.fetchall()
+            return [row[0] for row in permissions]
+    except Exception as e:
+        print(f"Error getting permissions for {user_type}: {e}")
+        # Fallback permissions based on user type
+        if user_type == 'super_admin':
+            return ['view_own_attendance', 'mark_attendance', 'manage_users', 'reset_passwords', 
+                   'view_system_logs', 'system_config', 'view_all_data', 'manage_admins', 
+                   'content_management', 'audit_logs', 'submit_support', 'manage_support']
+        elif user_type == 'it_admin':
+            return ['view_own_attendance', 'mark_attendance', 'manage_users', 'reset_passwords', 
+                   'view_system_logs', 'submit_support', 'manage_support']
+        else:  # regular
+            return ['view_own_attendance', 'mark_attendance', 'submit_support']
+
 
 def _get_user_auth(email: str):
 	"""Get user authentication data from users table."""

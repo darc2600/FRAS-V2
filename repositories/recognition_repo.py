@@ -2,10 +2,22 @@ import os
 import shutil
 from fastapi import UploadFile
 from deepface import DeepFace
-from datetime import datetime
+from datetime import datetime, timedelta
 from models.recognition import RecognitionResponse
 from services.db import get_connection
 from services.s3_utils import download_student_folder
+
+
+def get_system_setting(setting_key: str, default_value: str = "") -> str:
+    """Get a system setting value from the database"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT setting_value FROM system_settings WHERE setting_key = ?", (setting_key,))
+            result = cursor.fetchone()
+            return result[0] if result else default_value
+    except Exception:
+        return default_value
 
 
 class RecognitionRepository:
@@ -60,9 +72,22 @@ class RecognitionRepository:
                 for student_id, img_path in student_faces.items():
                     try:
                         print(f"[DEBUG] Comparing temp image {temp_path} with {img_path} for student {student_id}")
-                        result = DeepFace.verify(img1_path=temp_path, img2_path=img_path, model_name="ArcFace", enforce_detection=False)
+                        
+                        # Get configurable recognition settings
+                        min_face_confidence = float(get_system_setting('min_face_confidence', '0.8'))
+                        recognition_model = get_system_setting('face_detection_model', 'retinaface')
+                        
+                        result = DeepFace.verify(
+                            img1_path=temp_path, 
+                            img2_path=img_path, 
+                            model_name="ArcFace",
+                            detector_backend=recognition_model,
+                            enforce_detection=False
+                        )
                         print(f"[DEBUG] DeepFace result for {student_id}: {result}")
-                        if result["verified"]:
+                        
+                        # Check if recognition meets minimum confidence
+                        if result["verified"] and result.get("distance", 1.0) <= (1.0 - min_face_confidence):
                             # Get class details for attendance status
                             cursor.execute('''
                                 SELECT day_of_week, start_time, end_time FROM classes WHERE class_id = ?
@@ -103,16 +128,21 @@ class RecognitionRepository:
                                 print(f"[DEBUG] Outside class hours: now={now}, class_start={class_start}, class_end={class_end}")
                                 continue
                             
+                            # Get configurable attendance thresholds
+                            late_threshold = int(get_system_setting('late_threshold_minutes', '15'))
+                            absent_threshold = int(get_system_setting('absent_threshold_minutes', '30'))
+                            grace_period = int(get_system_setting('attendance_grace_period_minutes', '5'))
+                            
                             delta = (now - class_start).total_seconds() / 60.0
-                            if 0 <= delta <= 15:
+                            if -grace_period <= delta <= late_threshold:
                                 status_name = "Present"
-                                print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= 15 mins)")
-                            elif 15 < delta <= 30:
+                                print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= {late_threshold} mins)")
+                            elif late_threshold < delta <= absent_threshold:
                                 status_name = "Late"
-                                print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start (15-30 mins)")
+                                print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start ({late_threshold}-{absent_threshold} mins)")
                             else:
                                 status_name = "Absent"
-                                print(f"[DEBUG] Marked as Absent: delta={delta:.2f} mins since class start (> 30 mins)")
+                                print(f"[DEBUG] Marked as Absent: delta={delta:.2f} mins since class start (> {absent_threshold} mins)")
                             
                             # Get status_id from attendance_status_types table
                             cursor.execute('''
@@ -131,11 +161,14 @@ class RecognitionRepository:
                             name_row = cursor.fetchone()
                             student_name = name_row[0] if name_row else "Unknown"
                             
-                            # Check for duplicate attendance
+                            # Check for duplicate attendance within time window
+                            duplicate_window = int(get_system_setting('duplicate_prevention_window_minutes', '5'))
+                            window_start = (now - timedelta(minutes=duplicate_window)).strftime("%Y-%m-%d %H:%M:%S")
+                            
                             cursor.execute("""
                                 SELECT 1 FROM attendance_logs
-                                WHERE student_id = ? AND class_id = ? AND DATE(timestamp) = ?
-                            """, (student_id, class_id, attendance_date))
+                                WHERE student_id = ? AND class_id = ? AND timestamp >= ?
+                            """, (student_id, class_id, window_start))
                             
                             if cursor.fetchone() is None:
                                 cursor.execute("""
@@ -174,6 +207,11 @@ class RecognitionRepository:
             return RecognitionResponse(status="failed", message="No match found")
 
     async def mark_absents(self, class_id: int, date: str):
+        # Check if auto-absent is enabled
+        auto_absent_enabled = get_system_setting('auto_absent_enabled', 'true').lower() == 'true'
+        if not auto_absent_enabled:
+            return {"message": "Auto-absent is disabled"}
+            
         with get_connection() as conn:
             cursor = conn.cursor()
             
@@ -205,8 +243,8 @@ class RecognitionRepository:
             absent_count = 0
             for student_id, last_name in enrolled_students:
                 if student_id not in attended_students:
-                    # Insert absent record
-                    timestamp = f"{date} 23:59:59"  # End of day
+                    # Insert absent record with configurable timestamp
+                    timestamp = f"{date} 23:59:59"  # End of day (could be made configurable)
                     cursor.execute('''
                         INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id)
                         VALUES (?, ?, ?, ?)

@@ -15,41 +15,125 @@
   <div *ngIf="!loading" class="settings-form">
     <div class="row">
       <div class="col-md-8">
-        <div class="card">
+        <!-- Attendance Policies -->
+        <div class="card mb-4">
           <div class="card-header">
-            <h5>Configuration Settings</h5>
+            <h5>📅 Attendance Policies</h5>
           </div>
           <div class="card-body">
-            <div *ngFor="let setting of settings | keyvalue" class="setting-item mb-3">
-              <label class="form-label">{{ setting.key | titlecase }}</label>
+            <div *ngFor="let setting of getSettingsByCategory('attendance')" class="setting-item mb-3">
+              <label class="form-label">{{ getSettingDisplayName(setting.key) }}</label>
+              <small class="text-muted d-block mb-1">{{ getSettingDescription(setting.key) }}</small>
 
-              <!-- Boolean Settings -->
-              <div *ngIf="isBooleanSetting(setting.value)" class="form-check">
+              <div *ngIf="isBooleanSetting(setting)" class="form-check">
                 <input
                   type="checkbox"
                   class="form-check-input"
-                  [checked]="setting.value.value === 'true'"
+                  [checked]="setting.value === 'true'"
                   (change)="onBooleanSettingChange(setting.key, $event)"
                   [disabled]="!hasPermission('system_config')">
                 <label class="form-check-label">
-                  {{ setting.value.value === 'true' ? 'Enabled' : 'Disabled' }}
+                  {{ setting.value === 'true' ? 'Enabled' : 'Disabled' }}
                 </label>
               </div>
 
               <input
-                *ngIf="isNumberSetting(setting.value)"
+                *ngIf="isNumberSetting(setting)"
                 type="number"
                 class="form-control"
-                [value]="setting.value.value"
+                [value]="setting.value"
+                (blur)="onTextSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')"
+                [min]="getSettingMin(setting.key)"
+                [max]="getSettingMax(setting.key)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Recognition Settings -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>👤 Face Recognition Settings</h5>
+          </div>
+          <div class="card-body">
+            <div *ngFor="let setting of getSettingsByCategory('recognition')" class="setting-item mb-3">
+              <label class="form-label">{{ getSettingDisplayName(setting.key) }}</label>
+              <small class="text-muted d-block mb-1">{{ getSettingDescription(setting.key) }}</small>
+
+              <select
+                *ngIf="setting.key === 'face_detection_model'"
+                class="form-control"
+                [value]="setting.value"
+                (change)="onTextSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')">
+                <option value="retinaface">RetinaFace (Recommended)</option>
+                <option value="mtcnn">MTCNN</option>
+                <option value="opencv">OpenCV</option>
+              </select>
+
+              <input
+                *ngIf="isNumberSetting(setting) && setting.key !== 'face_detection_model'"
+                type="number"
+                class="form-control"
+                [value]="setting.value"
+                (blur)="onTextSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')"
+                [min]="getSettingMin(setting.key)"
+                [max]="getSettingMax(setting.key)"
+                [step]="getSettingStep(setting.key)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Automation Settings -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>⚙️ Automation Settings</h5>
+          </div>
+          <div class="card-body">
+            <div *ngFor="let setting of getSettingsByCategory('automation')" class="setting-item mb-3">
+              <label class="form-label">{{ getSettingDisplayName(setting.key) }}</label>
+              <small class="text-muted d-block mb-1">{{ getSettingDescription(setting.key) }}</small>
+
+              <div *ngIf="isBooleanSetting(setting)" class="form-check">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="setting.value === 'true'"
+                  (change)="onBooleanSettingChange(setting.key, $event)"
+                  [disabled]="!hasPermission('system_config')">
+                <label class="form-check-label">
+                  {{ setting.value === 'true' ? 'Enabled' : 'Disabled' }}
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Other Settings -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>🎨 System Configuration</h5>
+          </div>
+          <div class="card-body">
+            <div *ngFor="let setting of getSettingsByCategory('system')" class="setting-item mb-3">
+              <label class="form-label">{{ getSettingDisplayName(setting.key) }}</label>
+              <small class="text-muted d-block mb-1">{{ getSettingDescription(setting.key) }}</small>
+
+              <textarea
+                *ngIf="setting.key === 'welcome_message' || setting.key === 'user_guide'"
+                class="form-control"
+                rows="3"
+                [value]="setting.value"
                 (blur)="onTextSettingChange(setting.key, $event)"
                 [disabled]="!hasPermission('system_config')">
+              </textarea>
 
-              <!-- Text Settings -->
               <input
-                *ngIf="isTextSetting(setting.value)"
+                *ngIf="setting.key !== 'welcome_message' && setting.key !== 'user_guide'"
                 type="text"
                 class="form-control"
-                [value]="setting.value.value"
+                [value]="setting.value"
                 (blur)="onTextSettingChange(setting.key, $event)"
                 [disabled]="!hasPermission('system_config')">
             </div>
@@ -65,6 +149,7 @@
           </div>
           <div class="card-body">
             <button
+              type="button"
               *ngIf="hasPermission('view_all_data')"
               (click)="getAnalytics()"
               class="btn btn-primary w-100 mb-3">
