@@ -11,16 +11,22 @@ import jwt
 from datetime import datetime, timedelta
 
 # Optional imports for secure password hashing / verification
-# not sure how this works but bot suggested it
 try:
-	_pb = importlib.import_module("passlib.hash")
-	bcrypt = getattr(_pb, "bcrypt")
-	pbkdf2_sha256 = getattr(_pb, "pbkdf2_sha256")
+	from passlib.hash import bcrypt, pbkdf2_sha256
 	_HAS_PASSLIB = True
-except Exception:
-	bcrypt = None
-	pbkdf2_sha256 = None
-	_HAS_PASSLIB = False
+except ImportError:
+	try:
+		# Fallback to bcrypt package directly
+		import bcrypt as bcrypt_pkg
+		bcrypt = None  # We'll handle this in verification
+		pbkdf2_sha256 = None
+		_HAS_PASSLIB = False
+		_HAS_BCRYPT = True
+	except ImportError:
+		bcrypt = None
+		pbkdf2_sha256 = None
+		_HAS_PASSLIB = False
+		_HAS_BCRYPT = False
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
@@ -222,9 +228,13 @@ async def login(payload: LoginRequest):
 				valid = pbkdf2_sha256.verify(payload.password, stored_password)
 			elif bcrypt is not None and stored_password.startswith('$2b$'):
 				valid = bcrypt.verify(payload.password, stored_password)
+			elif _HAS_BCRYPT and stored_password.startswith('$2b$'):
+				# Use bcrypt package directly
+				valid = bcrypt_pkg.checkpw(payload.password.encode('utf-8'), stored_password.encode('utf-8'))
 			else:
 				valid = False
-		except Exception:
+		except Exception as e:
+			print(f"Password verification error: {e}")
 			valid = False
 	else:
 		# Plaintext password (fallback for existing users)
