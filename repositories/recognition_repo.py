@@ -6,9 +6,13 @@ from datetime import datetime
 from models.recognition import RecognitionResponse
 from services.db import get_connection
 from services.s3_utils import download_student_folder
+from services.settings_service import get_settings_service
 
 
 class RecognitionRepository:
+    def __init__(self):
+        self.settings = get_settings_service()
+
     async def recognize_face(self, file: UploadFile, class_id: int) -> RecognitionResponse:
         temp_path = f"temp_{file.filename}"
         with open(temp_path, "wb") as buffer:
@@ -60,7 +64,19 @@ class RecognitionRepository:
                 for student_id, img_path in student_faces.items():
                     try:
                         print(f"[DEBUG] Comparing temp image {temp_path} with {img_path} for student {student_id}")
-                        result = DeepFace.verify(img1_path=temp_path, img2_path=img_path, model_name="ArcFace", enforce_detection=False)
+
+                        # Use settings for face recognition parameters
+                        model_name = self.settings.face_recognition_model
+                        threshold = self.settings.recognition_threshold
+                        enforce_detection = self.settings.face_detection_confidence > 0.5  # Convert to boolean
+
+                        result = DeepFace.verify(
+                            img1_path=temp_path,
+                            img2_path=img_path,
+                            model_name=model_name,
+                            enforce_detection=enforce_detection,
+                            threshold=threshold
+                        )
                         print(f"[DEBUG] DeepFace result for {student_id}: {result}")
                         if result["verified"]:
                             # Get class details for attendance status
@@ -104,15 +120,20 @@ class RecognitionRepository:
                                 continue
                             
                             delta = (now - class_start).total_seconds() / 60.0
-                            if 0 <= delta <= 15:
+
+                            # Use configurable attendance thresholds from settings
+                            late_threshold = self.settings.late_threshold_minutes
+                            absent_threshold = self.settings.absent_threshold_minutes
+
+                            if 0 <= delta <= late_threshold:
                                 status_name = "Present"
-                                print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= 15 mins)")
-                            elif 15 < delta <= 30:
+                                print(f"[DEBUG] Marked as Present: delta={delta:.2f} mins since class start (<= {late_threshold} mins)")
+                            elif late_threshold < delta <= absent_threshold:
                                 status_name = "Late"
-                                print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start (15-30 mins)")
+                                print(f"[DEBUG] Marked as Late: delta={delta:.2f} mins since class start ({late_threshold}-{absent_threshold} mins)")
                             else:
                                 status_name = "Absent"
-                                print(f"[DEBUG] Marked as Absent: delta={delta:.2f} mins since class start (> 30 mins)")
+                                print(f"[DEBUG] Marked as Absent: delta={delta:.2f} mins since class start (> {absent_threshold} mins)")
                             
                             # Get status_id from attendance_status_types table
                             cursor.execute('''

@@ -15,13 +15,14 @@
   <div *ngIf="!loading" class="settings-form">
     <div class="row">
       <div class="col-md-8">
-        <div class="card">
+        <!-- Settings by Category -->
+        <div *ngFor="let category of getCategoryKeys()" class="card mb-4">
           <div class="card-header">
-            <h5>Configuration Settings</h5>
+            <h5>{{ getCategoryDisplayName(category) }}</h5>
           </div>
           <div class="card-body">
-            <div *ngFor="let setting of settings | keyvalue" class="setting-item mb-3">
-              <label class="form-label">{{ setting.key | titlecase }}</label>
+            <div *ngFor="let setting of categorizedSettings[category] | keyvalue" class="setting-item mb-3">
+              <label class="form-label">{{ formatSettingKey(setting.key) }}</label>
 
               <!-- Boolean Settings -->
               <div *ngIf="isBooleanSetting(setting.value)" class="form-check">
@@ -36,12 +37,28 @@
                 </label>
               </div>
 
+              <!-- Select Settings -->
+              <select
+                *ngIf="isSelectSetting(setting.value)"
+                class="form-select"
+                [value]="setting.value.value"
+                (change)="onSelectSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')">
+                <option *ngFor="let option of setting.value.options" [value]="option">
+                  {{ option | titlecase }}
+                </option>
+              </select>
+
+              <!-- Number Settings -->
               <input
                 *ngIf="isNumberSetting(setting.value)"
                 type="number"
                 class="form-control"
                 [value]="setting.value.value"
-                (blur)="onTextSettingChange(setting.key, $event)"
+                [min]="setting.value.min"
+                [max]="setting.value.max"
+                [step]="setting.value.step || 1"
+                (blur)="onNumberSettingChange(setting.key, $event)"
                 [disabled]="!hasPermission('system_config')">
 
               <!-- Text Settings -->
