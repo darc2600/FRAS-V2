@@ -11,7 +11,7 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from fastapi import FastAPI, Depends, UploadFile, File, Form, Request, HTTPException
-from typing import List
+from typing import List, Dict
 import secrets
 import jwt
 from datetime import datetime, timedelta
@@ -42,6 +42,9 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
+
+# Import admin permission function
+from api.admin import require_admin_permission
 
 # -----------------------
 # Database setup
@@ -326,7 +329,7 @@ app = FastAPI()
 # Enable CORS for Angular frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],
+    allow_origins=["http://localhost:4200", "http://localhost:61146", "http://127.0.0.1:4200", "http://127.0.0.1:61146"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -343,18 +346,43 @@ async def mark_daily_absents():
     attendance_date = now.strftime("%Y-%m-%d")
     current_time = now.strftime("%H:%M")
     print(f"[SCHEDULER] Current day: {current_day}, date: {attendance_date}, time: {current_time}")
-    
+
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
-        
+
         # Get classes for today that have ended
         cursor.execute('''
-            SELECT class_id, end_time FROM classes 
+            SELECT class_id, end_time FROM classes
             WHERE day_of_week = ? AND end_time < ?
         ''', (current_day, current_time))
         ended_classes = cursor.fetchall()
         print(f"[SCHEDULER] Ended classes: {ended_classes}")
-        
+
+        for class_id, end_time_str in ended_classes:
+            # Mark absents for this class and date
+            from repositories.recognition_repo import RecognitionRepository
+            repo = RecognitionRepository()
+            result = await repo.mark_absents(class_id, attendance_date)
+            print(f"[SCHEDULER] Marked absents for class {class_id} on {attendance_date}: {result}")
+    """Mark absents for classes that have ended today."""
+    print("[SCHEDULER] Running mark_daily_absents")
+    now = datetime.now()
+    current_day = now.strftime("%A")
+    attendance_date = now.strftime("%Y-%m-%d")
+    current_time = now.strftime("%H:%M")
+    print(f"[SCHEDULER] Current day: {current_day}, date: {attendance_date}, time: {current_time}")
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        # Get classes for today that have ended
+        cursor.execute('''
+            SELECT class_id, end_time FROM classes
+            WHERE day_of_week = ? AND end_time < ?
+        ''', (current_day, current_time))
+        ended_classes = cursor.fetchall()
+        print(f"[SCHEDULER] Ended classes: {ended_classes}")
+
         for class_id, end_time_str in ended_classes:
             # Mark absents for this class and date
             from repositories.recognition_repo import RecognitionRepository
@@ -365,16 +393,19 @@ async def mark_daily_absents():
 # Start scheduler on startup
 # @app.on_event("startup")
 # async def startup_event():
-#     scheduler.add_job(mark_daily_absents, CronTrigger(hour=23, minute=0))  # Daily at 11 PM
+#     from services.attendance_service import mark_automatic_absents
+#     # Run automatic absent marking every 45 minutes during class hours (7 AM - 10 PM)
+#     scheduler.add_job(mark_automatic_absents, CronTrigger(minute="*/45", hour="7-22"))
+#     # Keep daily cleanup job at 11 PM
+#     scheduler.add_job(mark_daily_absents, CronTrigger(hour=23, minute=0))
 #     scheduler.start()
+#     print("[SCHEDULER] Started automatic absent marking every 45 minutes (7 AM - 10 PM)")
 #     print("[SCHEDULER] Started daily absent marking job at 11 PM")
 
 # @app.on_event("shutdown")
 # async def shutdown_event():
 #     scheduler.shutdown()
-#     print("[SCHEDULER] Stopped scheduler")
-
-# Tag metadata for grouping in Swagger UI
+#     print("[SCHEDULER] Stopped scheduler")# Tag metadata for grouping in Swagger UI
 tags_metadata = [
     {"name": "Rooms", "description": "Room listing and related endpoints."},
     {"name": "Courses", "description": "Course listing and related endpoints."},
@@ -639,14 +670,18 @@ try:
     print("Attempting to import admin module...")
     from api import admin
     print("Admin module imported, including router...")
-    # app.include_router(admin.router)
-    print("Admin router disabled for debugging")
+    app.include_router(admin.router)
+    print("Admin router enabled")
     
     print("Auth router loaded successfully")
 except Exception as e:
     print(f"Error loading routers: {e}")
     import traceback
     traceback.print_exc()
+
+@app.post("/test-bulk")
+async def update_system_settings_bulk():
+    return {"message": "Test endpoint works"}
 
 # Add support ticket endpoint
 from pydantic import BaseModel

@@ -24,7 +24,7 @@
                   (change)="applyFilters()">
                   <option value="">All Statuses</option>
                   <option *ngFor="let status of statuses" [value]="status">
-                    {{ status.replace('_', ' ') | titlecase }}
+                    {{ formatStatus(status) }}
                   </option>
                 </select>
               </div>
@@ -82,7 +82,7 @@
                   {{ ticket.priority | titlecase }}
                 </span>
                 <span class="badge" [class]="getStatusClass(ticket.status)">
-                  {{ ticket.status.replace('_', ' ') | titlecase }}
+                  {{ formatStatus(ticket.status) }}
                 </span>
               </div>
             </div>
@@ -141,7 +141,7 @@
                     <label>Status</label>
                     <select class="form-control" [(ngModel)]="updateForm.status">
                       <option *ngFor="let status of statuses" [value]="status">
-                        {{ status.replace('_', ' ') | titlecase }}
+                        {{ formatStatus(status) }}
                       </option>
                     </select>
                   </div>

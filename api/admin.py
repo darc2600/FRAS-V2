@@ -1,11 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Body, Request
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import sqlite3
 import os
 import secrets
 import importlib
 from datetime import datetime
+from services.settings_service import get_settings_service
+from services.attendance_service import mark_automatic_absents
 
 # Support ticket models
 class SupportTicketCreate(BaseModel):
@@ -441,10 +443,41 @@ async def get_system_settings(admin_type: str = Depends(require_admin_permission
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT setting_key, setting_value, setting_type FROM system_settings")
+            cursor.execute("""
+                SELECT setting_key, setting_value, setting_type, category, options,
+                       min_value, max_value, step_value
+                FROM system_settings
+            """)
             settings = cursor.fetchall()
 
-            return {row[0]: {"value": row[1], "type": row[2]} for row in settings}
+            result = {}
+            for row in settings:
+                setting_key, setting_value, setting_type, category, options, min_value, max_value, step_value = row
+
+                setting_data = {
+                    "value": setting_value,
+                    "type": setting_type,
+                    "display_name": setting_key.replace('_', ' ').title()
+                }
+
+                if category:
+                    setting_data["category"] = category
+
+                if options:
+                    setting_data["options"] = options.split(',')
+
+                if min_value is not None:
+                    setting_data["min"] = min_value
+
+                if max_value is not None:
+                    setting_data["max"] = max_value
+
+                if step_value is not None:
+                    setting_data["step"] = step_value
+
+                result[setting_key] = setting_data
+
+            return result
 
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
@@ -465,7 +498,36 @@ async def update_system_setting(
             """, (setting_key, setting_value))
             conn.commit()
 
+            # Invalidate settings cache to ensure changes take effect immediately
+            settings_service = get_settings_service()
+            settings_service.invalidate_cache()
+
             return {"message": f"Setting {setting_key} updated successfully"}
+
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.put("/api/admin/system-settings/bulk")
+async def update_system_settings_bulk(
+    updates: List[Dict[str, str]] = Body(...),
+    admin_type: str = Depends(require_admin_permission("system_config"))
+):
+    """Update multiple system settings (Super Admin only)"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            for update in updates:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                """, (update['key'], update['value']))
+            conn.commit()
+
+            # Invalidate settings cache to ensure changes take effect immediately
+            settings_service = get_settings_service()
+            settings_service.invalidate_cache()
+
+            return {"message": f"Successfully updated {len(updates)} settings"}
 
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
@@ -501,6 +563,16 @@ async def get_analytics(admin_type: str = Depends(require_admin_permission("view
 
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.post("/api/admin/mark-automatic-absents")
+async def trigger_automatic_absent_marking(admin_type: str = Depends(require_admin_permission("manage_users"))):
+    """Manually trigger automatic absent marking for ongoing classes (Super Admin only)"""
+    try:
+        result = await mark_automatic_absents()
+        return {"message": "Automatic absent marking completed", "result": "Success"}
+
+    except Exception as e:
+        raise HTTPException(500, f"Error during automatic absent marking: {str(e)}")
 
 # User endpoint for creating support tickets
 @router.post("/api/support/tickets")

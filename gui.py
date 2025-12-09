@@ -5,6 +5,7 @@ import os
 import sqlite3
 from datetime import datetime
 from deepface import DeepFace
+from services.settings_service import get_settings_service
 
 # Initialize database
 def init_db():
@@ -50,9 +51,18 @@ def start_attendance(course_code, section):
 
         cv2.imwrite("current_frame.jpg", frame)
 
+        # Get settings for face recognition
+        settings = get_settings_service()
+
         for student_id, img_path in student_faces.items():
             try:
-                result = DeepFace.verify(img1_path="current_frame.jpg", img2_path=img_path, model_name="ArcFace", enforce_detection=False)
+                result = DeepFace.verify(
+                    img1_path="current_frame.jpg",
+                    img2_path=img_path,
+                    model_name=settings.face_recognition_model,
+                    enforce_detection=settings.face_detection_confidence > 0.5,
+                    threshold=settings.recognition_threshold
+                )
                 if result["verified"]:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     cursor.execute("""

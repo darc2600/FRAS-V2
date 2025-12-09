@@ -7,6 +7,16 @@ interface SystemSetting {
   key: string;
   value: string;
   type: string;
+  category?: string;
+  options?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  display_name?: string;
+}
+
+interface CategorizedSettings {
+  [category: string]: { [key: string]: SystemSetting };
 }
 
 @Component({
@@ -18,9 +28,32 @@ interface SystemSetting {
 })
 export class SystemSettingsComponent implements OnInit {
   settings: { [key: string]: SystemSetting } = {};
+  categorizedSettings: CategorizedSettings = {};
   loading = false;
   error = '';
   success = '';
+
+  // Pending changes system
+  pendingChanges: { [key: string]: string } = {};
+  showConfirmModal = false;
+  savingChanges = false;
+  markingAbsents = false;
+
+  // Category definitions with display names
+  categories = {
+    facial_recognition: 'Facial Recognition',
+    attendance: 'Attendance Logic',
+    image_processing: 'Image Processing',
+    performance: 'Performance',
+    security: 'Security & Privacy',
+    ux: 'User Experience',
+    hardware: 'Hardware & Devices',
+    system: 'System Configuration',
+    theme: 'Theme & Appearance',
+    content: 'Content & Messages',
+    logo: 'Branding',
+    config: 'General Configuration'
+  };
 
   constructor(
     private apiService: ApiService,
@@ -37,18 +70,11 @@ export class SystemSettingsComponent implements OnInit {
 
     this.apiService.getSystemSettings().subscribe({
       next: (settings) => {
-        // Convert the settings object to the expected format
-        this.settings = {};
-        Object.keys(settings).forEach(key => {
-          this.settings[key] = {
-            key: key,
-            value: settings[key].value,
-            type: settings[key].type
-          };
-        });
+        this.settings = settings;
+        this.categorizeSettings();
         this.loading = false;
       },
-      error: (err: any) => {
+      error: (err) => {
         this.error = 'Failed to load system settings: ' + (err.error?.message || err.message);
         this.loading = false;
         // Fallback to demo data for development
@@ -56,8 +82,25 @@ export class SystemSettingsComponent implements OnInit {
           'max_attendance_retention_days': { key: 'max_attendance_retention_days', value: '365', type: 'number' },
           'enable_face_recognition': { key: 'enable_face_recognition', value: 'true', type: 'boolean' },
           'session_timeout_minutes': { key: 'session_timeout_minutes', value: '1440', type: 'number' },
+          'backup_frequency_hours': { key: 'backup_frequency_hours', value: '24', type: 'number' }
         };
+        this.categorizeSettings();
       }
+    });
+  }
+
+  categorizeSettings(): void {
+    this.categorizedSettings = {};
+
+    Object.keys(this.settings).forEach(key => {
+      const setting = this.settings[key];
+      const category = setting.category || 'config'; // Default to 'config' if no category
+
+      if (!this.categorizedSettings[category]) {
+        this.categorizedSettings[category] = {};
+      }
+
+      this.categorizedSettings[category][key] = setting;
     });
   }
 
@@ -65,14 +108,103 @@ export class SystemSettingsComponent implements OnInit {
     this.error = '';
     this.success = '';
 
-    this.apiService.updateSystemSetting(key, value).subscribe({
-      next: () => {
-        this.settings[key].value = value;
-        this.success = `Setting ${key} updated successfully`;
+    // Stage the change instead of saving immediately
+    const currentValue = this.settings[key]?.value;
+    if (currentValue !== value) {
+      this.pendingChanges[key] = value;
+    } else {
+      // If setting back to original value, remove from pending changes
+      delete this.pendingChanges[key];
+    }
+  }
+
+  hasPendingChanges(): boolean {
+    return Object.keys(this.pendingChanges).length > 0;
+  }
+
+  getPendingChangesCount(): number {
+    return Object.keys(this.pendingChanges).length;
+  }
+
+  getPendingChangeValue(key: string): string {
+    return this.pendingChanges[key] || this.settings[key]?.value || '';
+  }
+
+  isSettingModified(key: string): boolean {
+    return key in this.pendingChanges;
+  }
+
+  savePendingChanges(): void {
+    console.log('savePendingChanges called');
+    if (!this.hasPendingChanges()) {
+      console.log('No pending changes');
+      return;
+    }
+
+    console.log('Pending changes:', this.pendingChanges);
+    this.savingChanges = true;
+    this.error = '';
+    this.success = '';
+
+    // Save all pending changes in bulk
+    const updates = Object.entries(this.pendingChanges).map(([key, value]) => ({
+      key: key,
+      value: value
+    }));
+
+    console.log('Updates to send:', updates);
+    this.apiService.updateSettings(updates).subscribe({
+      next: (response) => {
+        console.log('API response:', response);
+        this.success = `Successfully updated ${this.getPendingChangesCount()} setting(s)`;
+        this.pendingChanges = {};
+        this.showConfirmModal = false;
+        // Refresh settings to get updated values
+        this.loadSettings();
       },
-      error: (err: any) => {
-        this.error = 'Failed to update setting: ' + (err.error?.message || err.message);
+      error: (err) => {
+        console.error('API error:', err);
+        this.error = 'Failed to save settings: ' + (err.error?.message || err.message);
+      },
+      complete: () => {
+        this.savingChanges = false;
       }
+    });
+  }
+
+  cancelPendingChanges(): void {
+    this.pendingChanges = {};
+    this.showConfirmModal = false;
+    this.error = '';
+    this.success = '';
+  }
+
+  openConfirmModal(): void {
+    console.log('openConfirmModal called');
+    if (this.hasPendingChanges()) {
+      console.log('Has pending changes, showing modal');
+      this.showConfirmModal = true;
+      console.log('showConfirmModal set to:', this.showConfirmModal);
+    } else {
+      console.log('No pending changes, not showing modal');
+    }
+  }
+
+  closeConfirmModal(): void {
+    console.log('closeConfirmModal called');
+    this.showConfirmModal = false;
+    console.log('showConfirmModal set to:', this.showConfirmModal);
+  }
+
+  getPendingChangesList(): any[] {
+    return Object.keys(this.pendingChanges).map(key => {
+      const setting = this.settings[key];
+      return {
+        key: key,
+        displayName: setting ? setting.display_name || key : key,
+        currentValue: setting ? this.formatSettingValue(setting) : '',
+        newValue: this.formatSettingValue({ ...setting, value: this.pendingChanges[key] })
+      };
     });
   }
 
@@ -95,14 +227,6 @@ export class SystemSettingsComponent implements OnInit {
     return currentUser ? currentUser.permissions.includes(permission) : false;
   }
 
-  isBooleanSetting(setting: SystemSetting): boolean {
-    return setting.type === 'boolean';
-  }
-
-  isNumberSetting(setting: SystemSetting): boolean {
-    return setting.type === 'number';
-  }
-
   onBooleanSettingChange(key: string, event: Event): void {
     const target = event.target as HTMLInputElement;
     this.updateSetting(key, target.checked ? 'true' : 'false');
@@ -113,157 +237,106 @@ export class SystemSettingsComponent implements OnInit {
     this.updateSetting(key, target.value);
   }
 
+  isBooleanSetting(setting: SystemSetting): boolean {
+    return setting.type === 'boolean';
+  }
+
+  isNumberSetting(setting: SystemSetting): boolean {
+    return setting.type === 'number';
+  }
+
+  isSelectSetting(setting: SystemSetting): boolean {
+    return setting.type === 'select';
+  }
+
   isTextSetting(setting: SystemSetting): boolean {
-    return setting.type === 'text' || setting.type === 'string';
+    return !setting.type || setting.type === 'text' || setting.type === 'string' || setting.type === 'config' || setting.type === 'theme' || setting.type === 'content' || setting.type === 'logo';
   }
 
-  // Helper methods for organized display
-  getSettingsByCategory(category: string): SystemSetting[] {
-    const categoryMappings: { [key: string]: string[] } = {
-      'attendance': [
-        'absent_threshold_minutes',
-        'late_threshold_minutes',
-        'attendance_grace_period_minutes',
-        'auto_absent_delay_hours',
-        'duplicate_prevention_window_minutes',
-        'allow_makeup_attendance',
-        'makeup_deadline_hours'
-      ],
-      'recognition': [
-        'recognition_threshold',
-        'min_face_confidence',
-        'face_detection_model',
-        'max_recognition_attempts',
-        'image_compression_quality',
-        'image_max_size'
-      ],
-      'automation': [
-        'auto_absent_enabled'
-      ],
-      'system': [
-        'system_name',
-        'theme_primary_color',
-        'theme_secondary_color',
-        'system_logo_url',
-        'welcome_message',
-        'user_guide'
-      ]
-    };
+  getCategoryKeys(): string[] {
+    return Object.keys(this.categorizedSettings).sort((a, b) => {
+      // Define priority order for categories
+      const priorityOrder = ['facial_recognition', 'attendance', 'system', 'performance', 'security', 'ux', 'hardware', 'image_processing'];
+      const aIndex = priorityOrder.indexOf(a);
+      const bIndex = priorityOrder.indexOf(b);
 
-    const settingKeys = categoryMappings[category] || [];
-    return Object.values(this.settings).filter(setting => settingKeys.includes(setting.key));
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+
+      return a.localeCompare(b);
+    });
   }
 
-  getSettingsByType(type: string): SystemSetting[] {
-    return Object.values(this.settings).filter(setting => setting.type === type);
+  getCategoryDisplayName(category: string): string {
+    return this.categories[category as keyof typeof this.categories] || category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 
-  getSettingDisplayName(key: string): string {
-    const displayNames: { [key: string]: string } = {
-      // Attendance settings
-      'absent_threshold_minutes': 'Absent Threshold (minutes)',
-      'late_threshold_minutes': 'Late Threshold (minutes)',
-      'attendance_grace_period_minutes': 'Attendance Grace Period (minutes)',
-      'auto_absent_delay_hours': 'Auto-Absent Delay (hours)',
-      'duplicate_prevention_window_minutes': 'Duplicate Prevention Window (minutes)',
-      'allow_makeup_attendance': 'Allow Makeup Attendance',
-      'makeup_deadline_hours': 'Makeup Deadline (hours)',
-
-      // Recognition settings
-      'recognition_threshold': 'Recognition Threshold',
-      'min_face_confidence': 'Minimum Face Confidence',
-      'face_detection_model': 'Face Detection Model',
-      'max_recognition_attempts': 'Max Recognition Attempts',
-      'image_compression_quality': 'Image Compression Quality (%)',
-      'image_max_size': 'Image Max Size (pixels)',
-
-      // Automation settings
-      'auto_absent_enabled': 'Auto-Absent Enabled',
-
-      // System settings
-      'system_name': 'System Name',
-      'theme_primary_color': 'Primary Theme Color',
-      'theme_secondary_color': 'Secondary Theme Color',
-      'system_logo_url': 'System Logo URL',
-      'welcome_message': 'Welcome Message',
-      'user_guide': 'User Guide'
-    };
-    return displayNames[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  formatSettingKey(key: string): string {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 
-  getSettingDescription(key: string): string {
-    const descriptions: { [key: string]: string } = {
-      // Attendance settings
-      'absent_threshold_minutes': 'Minutes after class start to mark as absent',
-      'late_threshold_minutes': 'Minutes after class start to mark as late',
-      'attendance_grace_period_minutes': 'Extra time before class starts for early attendance',
-      'auto_absent_delay_hours': 'Hours after class end to wait before marking unenrolled students as absent',
-      'duplicate_prevention_window_minutes': 'Minutes to prevent duplicate attendance marks',
-      'allow_makeup_attendance': 'Allow marking attendance after class has ended',
-      'makeup_deadline_hours': 'Hours after class end when makeup attendance is allowed',
-
-      // Recognition settings
-      'recognition_threshold': 'Minimum confidence score for face recognition (0.0-1.0)',
-      'min_face_confidence': 'Minimum confidence for face detection (0.0-1.0)',
-      'face_detection_model': 'Algorithm used for detecting faces in images',
-      'max_recognition_attempts': 'Maximum failed recognition attempts before fallback',
-      'image_compression_quality': 'JPEG compression quality for stored face images (1-100)',
-      'image_max_size': 'Maximum dimension for face images in pixels',
-
-      // Automation settings
-      'auto_absent_enabled': 'Automatically mark unenrolled students as absent',
-
-      // System settings
-      'system_name': 'Display name for the FRAS system',
-      'theme_primary_color': 'Primary color for the user interface',
-      'theme_secondary_color': 'Secondary color for the user interface',
-      'system_logo_url': 'URL path to the system logo image',
-      'welcome_message': 'Message displayed on the login/welcome page',
-      'user_guide': 'Instructions for users on how to use the system'
-    };
-    return descriptions[key] || '';
+  onSelectSettingChange(key: string, event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.updateSetting(key, target.value);
   }
 
-  getSettingMin(key: string): number | null {
-    const mins: { [key: string]: number } = {
-      'absent_threshold_minutes': 1,
-      'late_threshold_minutes': 1,
-      'attendance_grace_period_minutes': 0,
-      'auto_absent_delay_hours': 0,
-      'duplicate_prevention_window_minutes': 1,
-      'makeup_deadline_hours': 1,
-      'recognition_threshold': 0.1,
-      'min_face_confidence': 0.1,
-      'max_recognition_attempts': 1,
-      'image_compression_quality': 1,
-      'image_max_size': 100
-    };
-    return mins[key] || null;
+  onNumberSettingChange(key: string, event: Event): void {
+    const target = event.target as HTMLInputElement;
+    const value = target.value;
+    const setting = this.settings[key];
+
+    // Basic validation
+    if (setting.min !== undefined && parseFloat(value) < setting.min) {
+      this.error = `Value must be at least ${setting.min}`;
+      return;
+    }
+    if (setting.max !== undefined && parseFloat(value) > setting.max) {
+      this.error = `Value must be at most ${setting.max}`;
+      return;
+    }
+
+    this.updateSetting(key, value);
   }
 
-  getSettingMax(key: string): number | null {
-    const maxs: { [key: string]: number } = {
-      'absent_threshold_minutes': 480,
-      'late_threshold_minutes': 480,
-      'attendance_grace_period_minutes': 60,
-      'auto_absent_delay_hours': 168,
-      'duplicate_prevention_window_minutes': 60,
-      'makeup_deadline_hours': 168,
-      'recognition_threshold': 1.0,
-      'min_face_confidence': 1.0,
-      'max_recognition_attempts': 10,
-      'image_compression_quality': 100,
-      'image_max_size': 2048
-    };
-    return maxs[key] || null;
+  formatSettingValue(setting: SystemSetting): string {
+    if (!setting) return '';
+
+    switch (setting.type) {
+      case 'boolean':
+        return setting.value === 'true' ? 'Yes' : 'No';
+      case 'number':
+        return setting.value;
+      case 'select':
+        return setting.value;
+      case 'text':
+        return setting.value;
+      default:
+        return setting.value;
+    }
   }
 
-  getSettingStep(key: string): number {
-    const steps: { [key: string]: number } = {
-      'recognition_threshold': 0.1,
-      'min_face_confidence': 0.1,
-      'image_compression_quality': 5
-    };
-    return steps[key] || 1;
+  markAutomaticAbsents(): void {
+    this.error = '';
+    this.success = '';
+    this.markingAbsents = true;
+
+    this.apiService.markAutomaticAbsents().subscribe({
+      next: (response) => {
+        this.success = 'Automatic absent marking completed successfully';
+        this.markingAbsents = false;
+      },
+      error: (error) => {
+        this.error = 'Failed to mark automatic absents: ' + error.message;
+        this.markingAbsents = false;
+      }
+    });
+  }
+
+  getAutoAbsentThreshold(): string {
+    const setting = this.settings['auto_mark_absent_after_minutes'];
+    return setting ? setting.value : '45';
   }
 }

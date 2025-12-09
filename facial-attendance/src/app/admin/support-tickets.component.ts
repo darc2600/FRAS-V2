@@ -178,4 +178,8 @@ export class SupportTicketsComponent implements OnInit {
     const currentUser = this.authService.getCurrentUser();
     return currentUser ? currentUser.permissions.includes(permission) : false;
   }
+
+  formatStatus(status: string): string {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
 }
