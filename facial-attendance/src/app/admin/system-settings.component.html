@@ -13,6 +13,56 @@
 
   <!-- Settings Form -->
   <div *ngIf="!loading" class="settings-form">
+    <!-- Admin Actions -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">Admin Actions</h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <button
+              class="btn btn-warning w-100"
+              (click)="markAutomaticAbsents()"
+              [disabled]="markingAbsents"
+              *ngIf="hasPermission('manage_users')">
+              <i class="fas fa-user-times"></i>
+              <span *ngIf="!markingAbsents">Mark Automatic Absents</span>
+              <span *ngIf="markingAbsents">Processing...</span>
+            </button>
+            <small class="text-muted d-block mt-1">
+              Automatically mark students as absent for ongoing classes past the threshold
+            </small>
+          </div>
+          <div class="col-md-6">
+            <div class="alert alert-info mb-0">
+              <small>
+                <strong>Auto Absent Threshold:</strong> {{ getAutoAbsentThreshold() }} minutes after class start<br>
+                <strong>Next Run:</strong> Every 45 minutes during class hours (7 AM - 10 PM)
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Changes Banner -->
+    <div *ngIf="hasPendingChanges()" class="alert alert-warning">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <strong>{{ getPendingChangesCount() }} setting(s) modified</strong> - Changes will take effect after saving
+        </div>
+        <div>
+          <button class="btn btn-success btn-sm me-2" (click)="openConfirmModal()" [disabled]="savingChanges">
+            <i class="fas fa-save"></i> Save Changes
+          </button>
+          <button class="btn btn-secondary btn-sm" (click)="cancelPendingChanges()">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="row">
       <div class="col-md-8">
         <!-- Settings by Category -->
@@ -29,11 +79,12 @@
                 <input
                   type="checkbox"
                   class="form-check-input"
-                  [checked]="setting.value.value === 'true'"
+                  [checked]="getPendingChangeValue(setting.key) === 'true'"
                   (change)="onBooleanSettingChange(setting.key, $event)"
-                  [disabled]="!hasPermission('system_config')">
+                  [disabled]="!hasPermission('system_config')"
+                  [class.modified]="isSettingModified(setting.key)">
                 <label class="form-check-label">
-                  {{ setting.value.value === 'true' ? 'Enabled' : 'Disabled' }}
+                  {{ getPendingChangeValue(setting.key) === 'true' ? 'Enabled' : 'Disabled' }}
                 </label>
               </div>
 
@@ -41,9 +92,10 @@
               <select
                 *ngIf="isSelectSetting(setting.value)"
                 class="form-select"
-                [value]="setting.value.value"
+                [value]="getPendingChangeValue(setting.key)"
                 (change)="onSelectSettingChange(setting.key, $event)"
-                [disabled]="!hasPermission('system_config')">
+                [disabled]="!hasPermission('system_config')"
+                [class.modified]="isSettingModified(setting.key)">
                 <option *ngFor="let option of setting.value.options" [value]="option">
                   {{ option | titlecase }}
                 </option>
@@ -54,21 +106,23 @@
                 *ngIf="isNumberSetting(setting.value)"
                 type="number"
                 class="form-control"
-                [value]="setting.value.value"
+                [value]="getPendingChangeValue(setting.key)"
                 [min]="setting.value.min"
                 [max]="setting.value.max"
                 [step]="setting.value.step || 1"
-                (blur)="onNumberSettingChange(setting.key, $event)"
-                [disabled]="!hasPermission('system_config')">
+                (input)="onNumberSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')"
+                [class.modified]="isSettingModified(setting.key)">
 
               <!-- Text Settings -->
               <input
                 *ngIf="isTextSetting(setting.value)"
                 type="text"
                 class="form-control"
-                [value]="setting.value.value"
-                (blur)="onTextSettingChange(setting.key, $event)"
-                [disabled]="!hasPermission('system_config')">
+                [value]="getPendingChangeValue(setting.key)"
+                (input)="onTextSettingChange(setting.key, $event)"
+                [disabled]="!hasPermission('system_config')"
+                [class.modified]="isSettingModified(setting.key)">
             </div>
           </div>
         </div>
@@ -106,6 +160,51 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal-backdrop fade show" *ngIf="showConfirmModal"></div>
+<div class="modal fade" id="confirmSaveModal" tabindex="-1" aria-labelledby="confirmSaveModalLabel" aria-hidden="true" *ngIf="showConfirmModal" [ngClass]="{'show': showConfirmModal}" [style.display]="showConfirmModal ? 'block' : 'none'">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmSaveModalLabel">Confirm Settings Changes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" (click)="closeConfirmModal()"></button>
+      </div>
+      <div class="modal-body">
+        <p>You are about to save the following setting changes:</p>
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Setting</th>
+                <th>Current Value</th>
+                <th>New Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let change of getPendingChangesList()">
+                <td>{{ change.displayName }}</td>
+                <td class="text-muted">{{ change.currentValue }}</td>
+                <td class="text-success fw-bold">{{ change.newValue }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle"></i>
+          <strong>Note:</strong> Some changes may require a system restart to take full effect.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" (click)="closeConfirmModal()">Cancel</button>
+        <button type="button" class="btn btn-success" (click)="savePendingChanges()" [disabled]="savingChanges">
+          <span *ngIf="savingChanges" class="spinner-border spinner-border-sm me-2" role="status"></span>
+          <i class="fas fa-save"></i> Save Changes
+        </button>
       </div>
     </div>
   </div>

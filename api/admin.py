@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Body, Request
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import sqlite3
 import os
 import secrets
 import importlib
 from datetime import datetime
 from services.settings_service import get_settings_service
+from services.attendance_service import mark_automatic_absents
 
 # Support ticket models
 class SupportTicketCreate(BaseModel):
@@ -455,7 +456,8 @@ async def get_system_settings(admin_type: str = Depends(require_admin_permission
 
                 setting_data = {
                     "value": setting_value,
-                    "type": setting_type
+                    "type": setting_type,
+                    "display_name": setting_key.replace('_', ' ').title()
                 }
 
                 if category:
@@ -505,6 +507,31 @@ async def update_system_setting(
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
 
+@router.put("/api/admin/system-settings/bulk")
+async def update_system_settings_bulk(
+    updates: List[Dict[str, str]] = Body(...),
+    admin_type: str = Depends(require_admin_permission("system_config"))
+):
+    """Update multiple system settings (Super Admin only)"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            for update in updates:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                """, (update['key'], update['value']))
+            conn.commit()
+
+            # Invalidate settings cache to ensure changes take effect immediately
+            settings_service = get_settings_service()
+            settings_service.invalidate_cache()
+
+            return {"message": f"Successfully updated {len(updates)} settings"}
+
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
 @router.get("/api/admin/analytics")
 async def get_analytics(admin_type: str = Depends(require_admin_permission("view_all_data"))):
     """Get system analytics (Super Admin only)"""
@@ -536,6 +563,16 @@ async def get_analytics(admin_type: str = Depends(require_admin_permission("view
 
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
+
+@router.post("/api/admin/mark-automatic-absents")
+async def trigger_automatic_absent_marking(admin_type: str = Depends(require_admin_permission("manage_users"))):
+    """Manually trigger automatic absent marking for ongoing classes (Super Admin only)"""
+    try:
+        result = await mark_automatic_absents()
+        return {"message": "Automatic absent marking completed", "result": "Success"}
+
+    except Exception as e:
+        raise HTTPException(500, f"Error during automatic absent marking: {str(e)}")
 
 # User endpoint for creating support tickets
 @router.post("/api/support/tickets")

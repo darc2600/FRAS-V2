@@ -152,13 +152,31 @@ class RecognitionRepository:
                             name_row = cursor.fetchone()
                             student_name = name_row[0] if name_row else "Unknown"
                             
-                            # Check for duplicate attendance
+                            # Check for duplicate attendance within buffer time
                             cursor.execute("""
-                                SELECT 1 FROM attendance_logs
+                                SELECT timestamp FROM attendance_logs
                                 WHERE student_id = ? AND class_id = ? AND DATE(timestamp) = ?
+                                ORDER BY timestamp DESC LIMIT 1
                             """, (student_id, class_id, attendance_date))
                             
-                            if cursor.fetchone() is None:
+                            last_attendance_row = cursor.fetchone()
+                            buffer_minutes = self.settings.attendance_buffer_minutes
+                            
+                            if last_attendance_row is None:
+                                should_insert = True
+                                print(f"[DEBUG] No previous attendance for student {student_id} in class {class_id} today")
+                            else:
+                                last_timestamp_str = last_attendance_row[0]
+                                last_timestamp = datetime.strptime(last_timestamp_str, "%Y-%m-%d %H:%M:%S")
+                                time_diff = (now - last_timestamp).total_seconds() / 60.0
+                                if time_diff < buffer_minutes:
+                                    should_insert = False
+                                    print(f"[DEBUG] Duplicate attendance blocked: last check-in {time_diff:.2f} mins ago (< {buffer_minutes} mins buffer)")
+                                else:
+                                    should_insert = True
+                                    print(f"[DEBUG] Allowing attendance: {time_diff:.2f} mins since last check-in (>= {buffer_minutes} mins buffer)")
+                            
+                            if should_insert:
                                 cursor.execute("""
                                     INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id)
                                     VALUES (?, ?, ?, ?)
@@ -166,7 +184,7 @@ class RecognitionRepository:
                                 conn.commit()
                                 print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id}")
                             
-                            # Set recognized variables (always, even if attendance was already logged)
+                            # Set recognized variables (always, even if attendance was blocked by buffer)
                             recognized_id = student_id
                             recognized_name = student_name
                             recognized_status = status_name

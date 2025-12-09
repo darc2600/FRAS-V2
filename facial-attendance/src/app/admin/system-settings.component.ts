@@ -12,6 +12,7 @@ interface SystemSetting {
   min?: number;
   max?: number;
   step?: number;
+  display_name?: string;
 }
 
 interface CategorizedSettings {
@@ -31,6 +32,12 @@ export class SystemSettingsComponent implements OnInit {
   loading = false;
   error = '';
   success = '';
+
+  // Pending changes system
+  pendingChanges: { [key: string]: string } = {};
+  showConfirmModal = false;
+  savingChanges = false;
+  markingAbsents = false;
 
   // Category definitions with display names
   categories = {
@@ -101,14 +108,103 @@ export class SystemSettingsComponent implements OnInit {
     this.error = '';
     this.success = '';
 
-    this.apiService.updateSystemSetting(key, value).subscribe({
-      next: () => {
-        this.settings[key].value = value;
-        this.success = `Setting ${key} updated successfully`;
+    // Stage the change instead of saving immediately
+    const currentValue = this.settings[key]?.value;
+    if (currentValue !== value) {
+      this.pendingChanges[key] = value;
+    } else {
+      // If setting back to original value, remove from pending changes
+      delete this.pendingChanges[key];
+    }
+  }
+
+  hasPendingChanges(): boolean {
+    return Object.keys(this.pendingChanges).length > 0;
+  }
+
+  getPendingChangesCount(): number {
+    return Object.keys(this.pendingChanges).length;
+  }
+
+  getPendingChangeValue(key: string): string {
+    return this.pendingChanges[key] || this.settings[key]?.value || '';
+  }
+
+  isSettingModified(key: string): boolean {
+    return key in this.pendingChanges;
+  }
+
+  savePendingChanges(): void {
+    console.log('savePendingChanges called');
+    if (!this.hasPendingChanges()) {
+      console.log('No pending changes');
+      return;
+    }
+
+    console.log('Pending changes:', this.pendingChanges);
+    this.savingChanges = true;
+    this.error = '';
+    this.success = '';
+
+    // Save all pending changes in bulk
+    const updates = Object.entries(this.pendingChanges).map(([key, value]) => ({
+      key: key,
+      value: value
+    }));
+
+    console.log('Updates to send:', updates);
+    this.apiService.updateSettings(updates).subscribe({
+      next: (response) => {
+        console.log('API response:', response);
+        this.success = `Successfully updated ${this.getPendingChangesCount()} setting(s)`;
+        this.pendingChanges = {};
+        this.showConfirmModal = false;
+        // Refresh settings to get updated values
+        this.loadSettings();
       },
       error: (err) => {
-        this.error = 'Failed to update setting: ' + (err.error?.message || err.message);
+        console.error('API error:', err);
+        this.error = 'Failed to save settings: ' + (err.error?.message || err.message);
+      },
+      complete: () => {
+        this.savingChanges = false;
       }
+    });
+  }
+
+  cancelPendingChanges(): void {
+    this.pendingChanges = {};
+    this.showConfirmModal = false;
+    this.error = '';
+    this.success = '';
+  }
+
+  openConfirmModal(): void {
+    console.log('openConfirmModal called');
+    if (this.hasPendingChanges()) {
+      console.log('Has pending changes, showing modal');
+      this.showConfirmModal = true;
+      console.log('showConfirmModal set to:', this.showConfirmModal);
+    } else {
+      console.log('No pending changes, not showing modal');
+    }
+  }
+
+  closeConfirmModal(): void {
+    console.log('closeConfirmModal called');
+    this.showConfirmModal = false;
+    console.log('showConfirmModal set to:', this.showConfirmModal);
+  }
+
+  getPendingChangesList(): any[] {
+    return Object.keys(this.pendingChanges).map(key => {
+      const setting = this.settings[key];
+      return {
+        key: key,
+        displayName: setting ? setting.display_name || key : key,
+        currentValue: setting ? this.formatSettingValue(setting) : '',
+        newValue: this.formatSettingValue({ ...setting, value: this.pendingChanges[key] })
+      };
     });
   }
 
@@ -154,7 +250,7 @@ export class SystemSettingsComponent implements OnInit {
   }
 
   isTextSetting(setting: SystemSetting): boolean {
-    return setting.type === 'text' || setting.type === 'string' || setting.type === 'config' || setting.type === 'theme' || setting.type === 'content' || setting.type === 'logo';
+    return !setting.type || setting.type === 'text' || setting.type === 'string' || setting.type === 'config' || setting.type === 'theme' || setting.type === 'content' || setting.type === 'logo';
   }
 
   getCategoryKeys(): string[] {
@@ -203,5 +299,44 @@ export class SystemSettingsComponent implements OnInit {
     }
 
     this.updateSetting(key, value);
+  }
+
+  formatSettingValue(setting: SystemSetting): string {
+    if (!setting) return '';
+
+    switch (setting.type) {
+      case 'boolean':
+        return setting.value === 'true' ? 'Yes' : 'No';
+      case 'number':
+        return setting.value;
+      case 'select':
+        return setting.value;
+      case 'text':
+        return setting.value;
+      default:
+        return setting.value;
+    }
+  }
+
+  markAutomaticAbsents(): void {
+    this.error = '';
+    this.success = '';
+    this.markingAbsents = true;
+
+    this.apiService.markAutomaticAbsents().subscribe({
+      next: (response) => {
+        this.success = 'Automatic absent marking completed successfully';
+        this.markingAbsents = false;
+      },
+      error: (error) => {
+        this.error = 'Failed to mark automatic absents: ' + error.message;
+        this.markingAbsents = false;
+      }
+    });
+  }
+
+  getAutoAbsentThreshold(): string {
+    const setting = this.settings['auto_mark_absent_after_minutes'];
+    return setting ? setting.value : '45';
   }
 }

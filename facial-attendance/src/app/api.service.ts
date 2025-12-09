@@ -114,15 +114,29 @@ export class ApiService {
   }
 
   getSystemSettings(): Observable<any> {
-    return this.http.get<any>(`${this.backendUrl}/api/admin/system-settings`);
+    const timestamp = new Date().getTime();
+    return this.http.get<any>(`${this.backendUrl}/api/admin/system-settings?t=${timestamp}`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
   }
 
   updateSystemSetting(key: string, value: string): Observable<any> {
     return this.http.put(`${this.backendUrl}/api/admin/system-settings`, { setting_key: key, setting_value: value });
   }
 
+  updateSettings(updates: { key: string; value: any }[]): Observable<any> {
+    return this.http.put(`${this.backendUrl}/api/admin/system-settings/bulk`, updates);
+  }
+
   getAnalytics(): Observable<any> {
     return this.http.get<any>(`${this.backendUrl}/api/admin/analytics`);
+  }
+
+  markAutomaticAbsents(): Observable<any> {
+    return this.http.post(`${this.backendUrl}/api/admin/mark-automatic-absents`, {});
   }
 
   // Support ticket methods

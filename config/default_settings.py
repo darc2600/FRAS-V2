@@ -17,13 +17,6 @@ DEFAULT_SYSTEM_SETTINGS = {
         "options": ["ArcFace", "Facenet", "VGG-Face", "DeepFace"],
         "description": "Facial recognition model to use for face verification"
     },
-    "face_detection_model": {
-        "value": "opencv",
-        "type": "select",
-        "category": "facial_recognition",
-        "options": ["opencv", "mtcnn", "dlib", "retinaface"],
-        "description": "Face detection model for locating faces in images"
-    },
     "recognition_threshold": {
         "value": "0.6",
         "type": "number",
@@ -57,12 +50,6 @@ DEFAULT_SYSTEM_SETTINGS = {
         "min": 1,
         "max": 5,
         "description": "Maximum number of faces to process per image (prevents multiple recognition)"
-    },
-    "anti_spoofing_enabled": {
-        "value": "false",
-        "type": "boolean",
-        "category": "facial_recognition",
-        "description": "Enable detection of fake faces/photos (requires compatible model)"
     },
     "liveness_detection_enabled": {
         "value": "false",
@@ -254,12 +241,6 @@ DEFAULT_SYSTEM_SETTINGS = {
         "max": 2555,
         "description": "Days to retain face images before automatic deletion"
     },
-    "anonymize_face_data": {
-        "value": "false",
-        "type": "boolean",
-        "category": "security",
-        "description": "Remove identifiable features from stored face data"
-    },
     "gdpr_compliance_enabled": {
         "value": "true",
         "type": "boolean",
@@ -286,12 +267,6 @@ DEFAULT_SYSTEM_SETTINGS = {
         "max": 100,
         "description": "Maximum failed attempts allowed per hour per user"
     },
-    "two_factor_auth_required": {
-        "value": "false",
-        "type": "boolean",
-        "category": "security",
-        "description": "Require two-factor authentication for admin access"
-    },
 
     # User Experience Settings
     "real_time_feedback_enabled": {
@@ -300,41 +275,11 @@ DEFAULT_SYSTEM_SETTINGS = {
         "category": "ux",
         "description": "Show recognition results immediately to users"
     },
-    "voice_feedback_enabled": {
-        "value": "false",
-        "type": "boolean",
-        "category": "ux",
-        "description": "Provide audio feedback for recognition results"
-    },
-    "notification_email_enabled": {
-        "value": "true",
-        "type": "boolean",
-        "category": "ux",
-        "description": "Send email notifications for attendance events"
-    },
-    "notification_sms_enabled": {
-        "value": "false",
-        "type": "boolean",
-        "category": "ux",
-        "description": "Send SMS notifications for attendance events"
-    },
-    "parent_notification_enabled": {
-        "value": "false",
-        "type": "boolean",
-        "category": "ux",
-        "description": "Send notifications to parents about student attendance"
-    },
     "instructor_alerts_enabled": {
         "value": "true",
         "type": "boolean",
         "category": "ux",
         "description": "Send alerts to instructors about attendance issues"
-    },
-    "student_self_service_enabled": {
-        "value": "true",
-        "type": "boolean",
-        "category": "ux",
-        "description": "Allow students to view their own attendance records"
     },
     "attendance_report_frequency": {
         "value": "daily",
@@ -365,12 +310,6 @@ DEFAULT_SYSTEM_SETTINGS = {
         "type": "boolean",
         "category": "hardware",
         "description": "Support multiple cameras for attendance tracking"
-    },
-    "camera_calibration_required": {
-        "value": "false",
-        "type": "boolean",
-        "category": "hardware",
-        "description": "Require camera calibration before use"
     },
     "device_authentication_required": {
         "value": "true",
@@ -416,12 +355,6 @@ DEFAULT_SYSTEM_SETTINGS = {
         "max": 2555,
         "description": "Maximum days to retain attendance records"
     },
-    "offline_mode_enabled": {
-        "value": "true",
-        "type": "boolean",
-        "category": "system",
-        "description": "Allow system to function without internet connectivity"
-    },
     "sync_interval_minutes": {
         "value": "15",
         "type": "number",
@@ -429,12 +362,6 @@ DEFAULT_SYSTEM_SETTINGS = {
         "min": 5,
         "max": 1440,
         "description": "How often to sync data with central server"
-    },
-    "weekend_attendance_allowed": {
-        "value": "false",
-        "type": "boolean",
-        "category": "system",
-        "description": "Allow attendance marking on weekends"
     },
     "holiday_attendance_allowed": {
         "value": "false",
@@ -444,18 +371,8 @@ DEFAULT_SYSTEM_SETTINGS = {
     },
 }
 
-# Legacy theme/content settings (keeping for backward compatibility)
-LEGACY_SETTINGS = {
-    "theme_primary_color": {"value": "#007bff", "type": "theme", "category": "theme"},
-    "theme_secondary_color": {"value": "#6c757d", "type": "theme", "category": "theme"},
-    "system_logo_url": {"value": "/assets/logo.png", "type": "logo", "category": "logo"},
-    "system_name": {"value": "FRAS - Facial Recognition Attendance System", "type": "config", "category": "config"},
-    "welcome_message": {"value": "Welcome to FRAS", "type": "content", "category": "content"},
-    "user_guide": {"value": "Please follow the attendance marking procedure.", "type": "content", "category": "content"},
-}
-
 # Combine all settings
-ALL_DEFAULT_SETTINGS = {**DEFAULT_SYSTEM_SETTINGS, **LEGACY_SETTINGS}
+ALL_DEFAULT_SETTINGS = DEFAULT_SYSTEM_SETTINGS
 
 def get_default_setting(key: str):
     """Get a default setting by key"""

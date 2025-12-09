@@ -107,7 +107,6 @@ class SettingsService:
         # Hardcoded defaults for critical settings
         defaults = {
             "face_recognition_model": "ArcFace",
-            "face_detection_model": "opencv",
             "recognition_threshold": 0.6,
             "face_detection_confidence": 0.8,
             "min_face_size_pixels": 50,
@@ -116,10 +115,10 @@ class SettingsService:
             "absent_threshold_minutes": 30,
             "early_arrival_grace_minutes": 10,
             "attendance_buffer_minutes": 2,
+            "auto_mark_absent_after_minutes": 45,
             "recognition_timeout_seconds": 30,
             "max_concurrent_recognitions": 5,
             "enable_face_recognition": True,
-            "anti_spoofing_enabled": False,
             "liveness_detection_enabled": False,
             "cache_embeddings_enabled": True,
             "audit_log_enabled": True,
@@ -167,10 +166,6 @@ class SettingsService:
         return self.get_str_setting("face_recognition_model", "ArcFace")
 
     @property
-    def face_detection_model(self) -> str:
-        return self.get_str_setting("face_detection_model", "opencv")
-
-    @property
     def recognition_threshold(self) -> float:
         return self.get_float_setting("recognition_threshold", 0.6)
 
@@ -203,6 +198,10 @@ class SettingsService:
         return self.get_int_setting("attendance_buffer_minutes", 2)
 
     @property
+    def auto_mark_absent_after_minutes(self) -> int:
+        return self.get_int_setting("auto_mark_absent_after_minutes", 45)
+
+    @property
     def recognition_timeout_seconds(self) -> int:
         return self.get_int_setting("recognition_timeout_seconds", 30)
 
@@ -213,10 +212,6 @@ class SettingsService:
     @property
     def enable_face_recognition(self) -> bool:
         return self.get_bool_setting("enable_face_recognition", True)
-
-    @property
-    def anti_spoofing_enabled(self) -> bool:
-        return self.get_bool_setting("anti_spoofing_enabled", False)
 
     @property
     def liveness_detection_enabled(self) -> bool:
