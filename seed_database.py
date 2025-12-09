@@ -179,43 +179,43 @@ def seed_database():
 
         # Seed permissions table
         permissions = [
-            ('view_own_schedule', 'View personal schedule', 'schedule'),
-            ('view_attendance_logs', 'View attendance logs', 'attendance'),
-            ('mark_attendance', 'Mark attendance using facial recognition', 'attendance'),
-            ('register_students', 'Register new students', 'registration'),
-            ('manage_users', 'Create and manage user accounts', 'user_management'),
-            ('manage_rooms_schedule', 'Edit room and schedule configurations', 'administration'),
-            ('system_admin', 'Full system administration access', 'administration'),
-            ('view_analytics', 'View system analytics and reports', 'analytics'),
-            ('manage_content', 'Manage system content and settings', 'content')
+            ('View personal schedule', 'schedule', 'Ability to view personal class schedule'),
+            ('View attendance logs', 'attendance', 'Ability to view attendance logs'),
+            ('Mark attendance using facial recognition', 'attendance', 'Ability to mark attendance using facial recognition'),
+            ('Register new students', 'registration', 'Ability to register new students'),
+            ('Create and manage user accounts', 'user_management', 'Ability to create and manage user accounts'),
+            ('Edit room and schedule configurations', 'administration', 'Ability to edit room and schedule configurations'),
+            ('Full system administration access', 'administration', 'Full system administration access'),
+            ('View system analytics and reports', 'analytics', 'Ability to view system analytics and reports'),
+            ('Manage system content and settings', 'content', 'Ability to manage system content and settings')
         ]
-        
-        for perm_code, perm_name, category in permissions:
-            cursor.execute("INSERT OR IGNORE INTO permissions (permission_code, permission_name, category) VALUES (?, ?, ?)", 
-                         (perm_code, perm_name, category))
+
+        for perm_name, category, description in permissions:
+            cursor.execute("INSERT OR IGNORE INTO permissions (permission_name, description, category) VALUES (?, ?, ?)",
+                         (perm_name, description, category))
 
         # Seed role_permissions table
         role_permissions = [
-            ('instructor', 11),  # view_own_schedule
-            ('instructor', 12),  # view_attendance_logs
-            ('instructor', 13),  # mark_attendance
-            ('instructor', 14),  # register_students
-            ('it_admin', 11),    # view_own_schedule
-            ('it_admin', 12),    # view_attendance_logs
-            ('it_admin', 13),    # mark_attendance
-            ('it_admin', 14),    # register_students
-            ('it_admin', 15),    # manage_users
-            ('it_admin', 16),    # manage_rooms_schedule
-            ('it_admin', 18),    # view_analytics
-            ('super_admin', 11), # view_own_schedule
-            ('super_admin', 12), # view_attendance_logs
-            ('super_admin', 13), # mark_attendance
-            ('super_admin', 14), # register_students
-            ('super_admin', 15), # manage_users
-            ('super_admin', 16), # manage_rooms_schedule
-            ('super_admin', 17), # system_admin
-            ('super_admin', 18), # view_analytics
-            ('super_admin', 19), # manage_content
+            ('instructor', 1),  # View personal schedule
+            ('instructor', 2),  # View attendance logs
+            ('instructor', 3),  # Mark attendance using facial recognition
+            ('instructor', 4),  # Register new students
+            ('it_admin', 1),    # View personal schedule
+            ('it_admin', 2),    # View attendance logs
+            ('it_admin', 3),    # Mark attendance using facial recognition
+            ('it_admin', 4),    # Register new students
+            ('it_admin', 5),    # Create and manage user accounts
+            ('it_admin', 6),    # Edit room and schedule configurations
+            ('it_admin', 8),    # View system analytics and reports
+            ('super_admin', 1), # View personal schedule
+            ('super_admin', 2), # View attendance logs
+            ('super_admin', 3), # Mark attendance using facial recognition
+            ('super_admin', 4), # Register new students
+            ('super_admin', 5), # Create and manage user accounts
+            ('super_admin', 6), # Edit room and schedule configurations
+            ('super_admin', 7), # Full system administration access
+            ('super_admin', 8), # View system analytics and reports
+            ('super_admin', 9), # Manage system content and settings
         ]
         
         for role, perm_id in role_permissions:

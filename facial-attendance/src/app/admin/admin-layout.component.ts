@@ -52,6 +52,13 @@ export class AdminLayoutComponent implements OnInit {
       icon: 'fas fa-chart-bar',
       permission: 'view_analytics',
       show: () => this.canViewAllData
+    },
+    {
+      label: 'Attendance Reports',
+      route: '/admin/attendance-reports',
+      icon: 'fas fa-file-alt',
+      permission: 'view_analytics',
+      show: () => this.canViewAllData
     }
   ];
 

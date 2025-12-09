@@ -1,0 +1,21 @@
+.card {
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.form-label {
+  font-weight: 600;
+}
+
+.btn-primary {
+  background-color: #2563eb;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #1e40af;
+}
+
+.form-control, .form-select {
+  border-radius: 8px;
+}

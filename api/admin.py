@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body, Request
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Request, Response
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import sqlite3
@@ -827,3 +827,996 @@ async def get_ticket_replies(
         raise
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
+
+# Attendance Export Report Endpoints
+class AttendanceExportRequest(BaseModel):
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    student_ids: Optional[List[int]] = None
+    status_filter: Optional[List[str]] = None  # ['Present', 'Absent', 'Late', 'Excused']
+    course_code: Optional[str] = None
+    section: Optional[str] = None
+    instructor_id: Optional[int] = None
+    export_format: str = "json"  # json, csv, excel, pdf
+
+class AttendanceRecord(BaseModel):
+    student_id: str
+    student_name: str
+    date: str
+    time_in: Optional[str]
+    status: str
+
+class ClassSummary(BaseModel):
+    total_students: int
+    present_count: int
+    absent_count: int
+    late_count: int
+    excused_count: int
+    attendance_percentage: float
+    needs_attention: List[str]  # Students with >3 absences
+
+class AttendanceReport(BaseModel):
+    report_title: str
+    generated_at: str
+    exported_by: str
+    date_range: str
+    records: List[AttendanceRecord]
+    class_summary: ClassSummary
+
+class ProfessorReport(BaseModel):
+    professor_name: str
+    classes: List[AttendanceReport]
+    consolidated_summary: ClassSummary
+
+@router.post("/api/admin/attendance/export")
+async def export_attendance_report(
+    request: AttendanceExportRequest,
+    admin_type: str = Depends(require_admin_permission("view_all_data"))
+):
+    """Generate attendance export report (Super Admin only)"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Build the main query
+            base_query = """
+                SELECT
+                    s.student_number as student_id,
+                    (s.last_name || ', ' || s.first_name) as student_name,
+                    DATE(a.timestamp) as date,
+                    TIME(a.timestamp) as time_in,
+                    ast.status_name as status,
+                    c.course_id,
+                    c.section,
+                    i.instructor_id,
+                    (i.last_name || ', ' || i.first_name) as instructor_name,
+                    co.course_code,
+                    co.course_name
+                FROM attendance_logs a
+                JOIN students s ON a.student_id = s.student_id
+                JOIN attendance_status_types ast ON a.status_id = ast.status_id
+                JOIN classes c ON a.class_id = c.class_id
+                JOIN instructors i ON c.instructor_id = i.instructor_id
+                JOIN courses co ON c.course_id = co.course_id
+                WHERE 1=1
+            """
+
+            params = []
+
+            # Apply filters
+            if request.date_from:
+                base_query += " AND DATE(a.timestamp) >= ?"
+                params.append(request.date_from)
+
+            if request.date_to:
+                base_query += " AND DATE(a.timestamp) <= ?"
+                params.append(request.date_to)
+
+            if request.student_ids:
+                placeholders = ','.join('?' * len(request.student_ids))
+                base_query += f" AND s.student_id IN ({placeholders})"
+                params.extend(request.student_ids)
+
+            if request.status_filter:
+                placeholders = ','.join('?' * len(request.status_filter))
+                base_query += f" AND ast.status_name IN ({placeholders})"
+                params.extend(request.status_filter)
+
+            if request.course_code:
+                base_query += " AND co.course_code = ?"
+                params.append(request.course_code)
+
+            if request.section:
+                base_query += " AND c.section = ?"
+                params.append(request.section)
+
+            if request.instructor_id:
+                base_query += " AND i.instructor_id = ?"
+                params.append(request.instructor_id)
+
+            base_query += " ORDER BY a.timestamp DESC"
+
+            cursor.execute(base_query, params)
+            rows = cursor.fetchall()
+
+            # Process results
+            records = []
+            for row in rows:
+                records.append({
+                    "student_id": row[0] or "N/A",
+                    "student_name": row[1] or "N/A",
+                    "date": row[2] or "N/A",
+                    "time_in": row[3] or "N/A",
+                    "status": row[4] or "N/A"
+                })
+
+            # Generate class summary
+            if records:
+                # Count by status
+                status_counts = {}
+                student_absences = {}
+
+                for record in records:
+                    status = record["status"]
+                    student_id = record["student_id"]
+
+                    if status not in status_counts:
+                        status_counts[status] = 0
+                    status_counts[status] += 1
+
+                    # Track absences per student
+                    if status == "Absent":
+                        if student_id not in student_absences:
+                            student_absences[student_id] = 0
+                        student_absences[student_id] += 1
+
+                # Get unique students count
+                unique_students = len(set(r["student_id"] for r in records))
+
+                present_count = status_counts.get("Present", 0)
+                absent_count = status_counts.get("Absent", 0)
+                late_count = status_counts.get("Late", 0)
+                excused_count = status_counts.get("Excused", 0)
+
+                total_records = len(records)
+                attendance_percentage = (present_count / total_records * 100) if total_records > 0 else 0
+
+                # Flag students with >3 absences
+                needs_attention = [student_id for student_id, absences in student_absences.items() if absences > 3]
+
+                class_summary = {
+                    "total_students": unique_students,
+                    "present_count": present_count,
+                    "absent_count": absent_count,
+                    "late_count": late_count,
+                    "excused_count": excused_count,
+                    "attendance_percentage": round(attendance_percentage, 2),
+                    "needs_attention": needs_attention
+                }
+            else:
+                class_summary = {
+                    "total_students": 0,
+                    "present_count": 0,
+                    "absent_count": 0,
+                    "late_count": 0,
+                    "excused_count": 0,
+                    "attendance_percentage": 0.0,
+                    "needs_attention": []
+                }
+
+            # Get professor name for export
+            cursor.execute("SELECT (last_name || ', ' || first_name) FROM instructors WHERE instructor_id = ?", (request.instructor_id,))
+            professor_row = cursor.fetchone()
+            professor_name = professor_row[0] if professor_row else "System Admin"
+
+            # Create report
+            from datetime import datetime
+            report = {
+                "report_title": f"Attendance Report - {request.course_code or 'All Classes'}",
+                "generated_at": datetime.now().isoformat(),
+                "exported_by": professor_name,
+                "date_range": f"{request.date_from or 'N/A'} to {request.date_to or 'N/A'}",
+                "records": records,
+                "class_summary": class_summary
+            }
+
+            # Handle different export formats
+            if request.export_format == "csv":
+                csv_content = generate_csv_report(report)
+                return Response(
+                    content=csv_content,
+                    media_type="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=attendance_report.csv"}
+                )
+            elif request.export_format == "excel":
+                excel_content = generate_excel_report(report)
+                return Response(
+                    content=excel_content,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename=attendance_report.xlsx"}
+                )
+            elif request.export_format == "pdf":
+                pdf_content = generate_pdf_report(report)
+                return Response(
+                    content=pdf_content,
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename=attendance_report.pdf"}
+                )
+            else:
+                return report
+
+    except Exception as e:
+        raise HTTPException(500, f"Error generating report: {str(e)}")
+
+@router.post("/api/admin/attendance/export/professor")
+async def export_professor_attendance_report(
+    request: AttendanceExportRequest,
+    admin_type: str = Depends(require_admin_permission("view_all_data"))
+):
+    """Generate consolidated attendance report for all classes handled by a professor"""
+    try:
+        if not request.instructor_id:
+            raise HTTPException(400, "instructor_id is required for professor reports")
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+
+            # Get all classes for this professor
+            cursor.execute("""
+                SELECT c.class_id, co.course_code, co.course_name, c.section
+                FROM classes c
+                JOIN courses co ON c.course_id = co.course_id
+                WHERE c.instructor_id = ?
+            """, (request.instructor_id,))
+
+            classes = cursor.fetchall()
+
+            if not classes:
+                raise HTTPException(404, "No classes found for this professor")
+
+            # Get professor name
+            cursor.execute("SELECT (last_name || ', ' || first_name) FROM instructors WHERE instructor_id = ?", (request.instructor_id,))
+            professor_row = cursor.fetchone()
+            professor_name = professor_row[0] if professor_row else "Unknown Professor"
+
+            # Generate report for each class
+            class_reports = []
+            consolidated_stats = {
+                "total_students": 0,
+                "present_count": 0,
+                "absent_count": 0,
+                "late_count": 0,
+                "excused_count": 0,
+                "needs_attention": []
+            }
+
+            for class_info in classes:
+                class_id, course_code, course_name, section = class_info
+
+                # Create request for this specific class
+                class_request = AttendanceExportRequest(
+                    date_from=request.date_from,
+                    date_to=request.date_to,
+                    student_ids=request.student_ids,
+                    status_filter=request.status_filter,
+                    course_code=course_code,
+                    section=section,
+                    instructor_id=request.instructor_id,
+                    export_format="json"
+                )
+
+                # Get class report (reuse the logic above)
+                class_report = await export_attendance_report(class_request, admin_type)
+                class_reports.append(class_report)
+
+                # Accumulate consolidated stats
+                summary = class_report["class_summary"]
+                consolidated_stats["total_students"] += summary["total_students"]
+                consolidated_stats["present_count"] += summary["present_count"]
+                consolidated_stats["absent_count"] += summary["absent_count"]
+                consolidated_stats["late_count"] += summary["late_count"]
+                consolidated_stats["excused_count"] += summary["excused_count"]
+                consolidated_stats["needs_attention"].extend(summary["needs_attention"])
+
+            # Calculate consolidated attendance percentage
+            total_records = (consolidated_stats["present_count"] + consolidated_stats["absent_count"] +
+                           consolidated_stats["late_count"] + consolidated_stats["excused_count"])
+            consolidated_stats["attendance_percentage"] = (
+                consolidated_stats["present_count"] / total_records * 100
+            ) if total_records > 0 else 0.0
+
+            # Remove duplicates from needs_attention
+            consolidated_stats["needs_attention"] = list(set(consolidated_stats["needs_attention"]))
+
+            professor_report = {
+                "professor_name": professor_name,
+                "generated_at": datetime.now().isoformat(),
+                "exported_by": "System Admin",
+                "date_range": f"{request.date_from or 'N/A'} to {request.date_to or 'N/A'}",
+                "classes": class_reports,
+                "consolidated_summary": consolidated_stats
+            }
+
+            # Handle export formats
+            if request.export_format == "csv":
+                csv_content = generate_professor_csv_report(professor_report)
+                return Response(
+                    content=csv_content,
+                    media_type="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=professor_attendance_report.csv"}
+                )
+            elif request.export_format == "excel":
+                excel_content = generate_professor_excel_report(professor_report)
+                return Response(
+                    content=excel_content,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename=professor_attendance_report.xlsx"}
+                )
+            elif request.export_format == "pdf":
+                pdf_content = generate_professor_pdf_report(professor_report)
+                return Response(
+                    content=pdf_content,
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename=professor_attendance_report.pdf"}
+                )
+            else:
+                return professor_report
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Error generating professor report: {str(e)}")
+
+# Export format helper functions
+def generate_csv_report(report: dict) -> str:
+    """Generate CSV format report"""
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([report["report_title"]])
+    writer.writerow([f"Generated: {report['generated_at']}"])
+    writer.writerow([f"Exported by: {report['exported_by']}"])
+    writer.writerow([f"Date Range: {report['date_range']}"])
+    writer.writerow([])
+
+    # Data headers
+    writer.writerow(["Student ID", "Student Name", "Date", "Time In", "Status"])
+
+    # Data rows
+    for record in report["records"]:
+        writer.writerow([
+            record["student_id"],
+            record["student_name"],
+            record["date"],
+            record["time_in"],
+            record["status"]
+        ])
+
+    # Summary
+    writer.writerow([])
+    writer.writerow(["SUMMARY"])
+    summary = report["class_summary"]
+    writer.writerow([f"Total Students: {summary['total_students']}"])
+    writer.writerow([f"Present: {summary['present_count']}"])
+    writer.writerow([f"Absent: {summary['absent_count']}"])
+    writer.writerow([f"Late: {summary['late_count']}"])
+    writer.writerow([f"Excused: {summary['excused_count']}"])
+    writer.writerow([f"Attendance Percentage: {summary['attendance_percentage']}%"])
+
+    if summary["needs_attention"]:
+        writer.writerow([])
+        writer.writerow(["Students Needing Attention (>3 absences):"])
+        for student in summary["needs_attention"]:
+            writer.writerow([student])
+
+    return output.getvalue()
+
+def generate_excel_report(report: dict):
+    """Generate Excel format report using openpyxl"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    import io
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Attendance Report"
+
+    # Header
+    ws['A1'] = report["report_title"]
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A2'] = f"Generated: {report['generated_at']}"
+    ws['A3'] = f"Exported by: {report['exported_by']}"
+    ws['A4'] = f"Date Range: {report['date_range']}"
+
+    # Data headers
+    ws['A6'] = "Student ID"
+    ws['B6'] = "Student Name"
+    ws['C6'] = "Date"
+    ws['D6'] = "Time In"
+    ws['E6'] = "Status"
+
+    # Style headers
+    for col in ['A', 'B', 'C', 'D', 'E']:
+        ws[f'{col}6'].font = Font(bold=True)
+
+    # Data rows
+    row = 7
+    for record in report["records"]:
+        ws[f'A{row}'] = record["student_id"]
+        ws[f'B{row}'] = record["student_name"]
+        ws[f'C{row}'] = record["date"]
+        ws[f'D{row}'] = record["time_in"]
+        ws[f'E{row}'] = record["status"]
+        row += 1
+
+    # Summary section
+    summary_row = row + 2
+    ws[f'A{summary_row}'] = "SUMMARY"
+    ws[f'A{summary_row}'].font = Font(bold=True)
+
+    summary = report["class_summary"]
+    ws[f'A{summary_row + 1}'] = f"Total Students: {summary['total_students']}"
+    ws[f'A{summary_row + 2}'] = f"Present: {summary['present_count']}"
+    ws[f'A{summary_row + 3}'] = f"Absent: {summary['absent_count']}"
+    ws[f'A{summary_row + 4}'] = f"Late: {summary['late_count']}"
+    ws[f'A{summary_row + 5}'] = f"Excused: {summary['excused_count']}"
+    ws[f'A{summary_row + 6}'] = f"Attendance Percentage: {summary['attendance_percentage']}%"
+
+    if summary["needs_attention"]:
+        attention_row = summary_row + 8
+        ws[f'A{attention_row}'] = "Students Needing Attention (>3 absences):"
+        ws[f'A{attention_row}'].font = Font(bold=True)
+        for i, student in enumerate(summary["needs_attention"]):
+            ws[f'A{attention_row + i + 1}'] = student
+
+    # Auto-adjust column widths
+    for col in ['A', 'B', 'C', 'D', 'E']:
+        ws.column_dimensions[col].width = 15
+
+    # Save to bytes
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+def generate_pdf_report(report: dict):
+    """Generate PDF format report using reportlab"""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    import io
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Title
+    title = Paragraph(report["report_title"], styles['Title'])
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+
+    # Metadata
+    meta_text = f"""
+    Generated: {report['generated_at']}<br/>
+    Exported by: {report['exported_by']}<br/>
+    Date Range: {report['date_range']}
+    """
+    meta = Paragraph(meta_text, styles['Normal'])
+    elements.append(meta)
+    elements.append(Spacer(1, 12))
+
+    # Data table
+    if report["records"]:
+        data = [["Student ID", "Student Name", "Date", "Time In", "Status"]]
+        for record in report["records"]:
+            data.append([
+                record["student_id"],
+                record["student_name"],
+                record["date"],
+                record["time_in"],
+                record["status"]
+            ])
+
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(table)
+        elements.append(Spacer(1, 12))
+
+    # Summary
+    summary = report["class_summary"]
+    summary_title = Paragraph("SUMMARY", styles['Heading2'])
+    elements.append(summary_title)
+    elements.append(Spacer(1, 6))
+
+    summary_text = f"""
+    Total Students: {summary['total_students']}<br/>
+    Present: {summary['present_count']}<br/>
+    Absent: {summary['absent_count']}<br/>
+    Late: {summary['late_count']}<br/>
+    Excused: {summary['excused_count']}<br/>
+    Attendance Percentage: {summary['attendance_percentage']}%
+    """
+    summary_para = Paragraph(summary_text, styles['Normal'])
+    elements.append(summary_para)
+
+    if summary["needs_attention"]:
+        elements.append(Spacer(1, 12))
+        attention_title = Paragraph("Students Needing Attention (>3 absences):", styles['Heading3'])
+        elements.append(attention_title)
+        for student in summary["needs_attention"]:
+            elements.append(Paragraph(f"• {student}", styles['Normal']))
+
+    doc.build(elements)
+    output.seek(0)
+    return output.getvalue()
+
+def generate_professor_csv_report(professor_report: dict) -> str:
+    """Generate CSV format professor report"""
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([f"Professor: {professor_report['professor_name']}"])
+    writer.writerow([])
+
+    for class_report in professor_report["classes"]:
+        writer.writerow([f"Class: {class_report['report_title']}"])
+        writer.writerow(["Student ID", "Student Name", "Date", "Time In", "Status"])
+
+        for record in class_report["records"]:
+            writer.writerow([
+                record["student_id"],
+                record["student_name"],
+                record["date"],
+                record["time_in"],
+                record["status"]
+            ])
+
+        writer.writerow([])
+
+    # Consolidated summary
+    writer.writerow(["CONSOLIDATED SUMMARY"])
+    summary = professor_report["consolidated_summary"]
+    writer.writerow([f"Total Students: {summary['total_students']}"])
+    writer.writerow([f"Present: {summary['present_count']}"])
+    writer.writerow([f"Absent: {summary['absent_count']}"])
+    writer.writerow([f"Late: {summary['late_count']}"])
+    writer.writerow([f"Excused: {summary['excused_count']}"])
+    writer.writerow([f"Attendance Percentage: {summary['attendance_percentage']}%"])
+
+    return output.getvalue()
+
+def generate_professor_excel_report(professor_report: dict):
+    """Generate Excel format professor report using openpyxl"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    import io
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Professor Attendance Report"
+
+    # Header
+    ws['A1'] = f"Professor: {professor_report['professor_name']}"
+    ws['A1'].font = Font(bold=True, size=14)
+
+    row = 3
+    for class_report in professor_report["classes"]:
+        ws[f'A{row}'] = f"Class: {class_report['report_title']}"
+        ws[f'A{row}'].font = Font(bold=True)
+        row += 1
+
+        # Data headers
+        ws[f'A{row}'] = "Student ID"
+        ws[f'B{row}'] = "Student Name"
+        ws[f'C{row}'] = "Date"
+        ws[f'D{row}'] = "Time In"
+        ws[f'E{row}'] = "Status"
+
+        # Style headers
+        for col in ['A', 'B', 'C', 'D', 'E']:
+            ws[f'{col}{row}'].font = Font(bold=True)
+        row += 1
+
+        # Data rows
+        for record in class_report["records"]:
+            ws[f'A{row}'] = record["student_id"]
+            ws[f'B{row}'] = record["student_name"]
+            ws[f'C{row}'] = record["date"]
+            ws[f'D{row}'] = record["time_in"]
+            ws[f'E{row}'] = record["status"]
+            row += 1
+
+        row += 2  # Space between classes
+
+    # Consolidated summary
+    summary_row = row + 1
+    ws[f'A{summary_row}'] = "CONSOLIDATED SUMMARY"
+    ws[f'A{summary_row}'].font = Font(bold=True, size=12)
+
+    summary = professor_report["consolidated_summary"]
+    ws[f'A{summary_row + 1}'] = f"Total Students: {summary['total_students']}"
+    ws[f'A{summary_row + 2}'] = f"Present: {summary['present_count']}"
+    ws[f'A{summary_row + 3}'] = f"Absent: {summary['absent_count']}"
+    ws[f'A{summary_row + 4}'] = f"Late: {summary['late_count']}"
+    ws[f'A{summary_row + 5}'] = f"Excused: {summary['excused_count']}"
+    ws[f'A{summary_row + 6}'] = f"Attendance Percentage: {summary['attendance_percentage']}%"
+
+    # Auto-adjust column widths
+    for col in ['A', 'B', 'C', 'D', 'E']:
+        ws.column_dimensions[col].width = 15
+
+    # Save to bytes
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+def generate_professor_pdf_report(professor_report: dict):
+    """Generate PDF format professor report using reportlab"""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet
+    import io
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Title
+    title = Paragraph(f"PROFESSOR ATTENDANCE REPORT<br/>Professor: {professor_report['professor_name']}", styles['Title'])
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+
+    for class_report in professor_report["classes"]:
+        # Class header
+        class_title = Paragraph(f"Class: {class_report['report_title']}", styles['Heading2'])
+        elements.append(class_title)
+        elements.append(Spacer(1, 6))
+
+        date_range = Paragraph(f"Date Range: {class_report['date_range']}", styles['Normal'])
+        elements.append(date_range)
+        elements.append(Spacer(1, 12))
+
+        # Data table
+        if class_report["records"]:
+            data = [["Student ID", "Student Name", "Date", "Time In", "Status"]]
+            for record in class_report["records"]:
+                data.append([
+                    record["student_id"],
+                    record["student_name"],
+                    record["date"],
+                    record["time_in"],
+                    record["status"]
+                ])
+
+            table = Table(data)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ]))
+            elements.append(table)
+
+        # Class summary
+        summary = class_report["class_summary"]
+        summary_text = f"Class Summary - Students: {summary['total_students']}, Attendance: {summary['attendance_percentage']}%"
+        summary_para = Paragraph(summary_text, styles['Italic'])
+        elements.append(summary_para)
+        elements.append(Spacer(1, 12))
+
+    # Consolidated summary
+    elements.append(PageBreak())
+    consolidated_title = Paragraph("CONSOLIDATED SUMMARY", styles['Heading1'])
+    elements.append(consolidated_title)
+    elements.append(Spacer(1, 12))
+
+    summary = professor_report["consolidated_summary"]
+    summary_text = f"""
+    Total Students: {summary['total_students']}<br/>
+    Present: {summary['present_count']}, Absent: {summary['absent_count']}<br/>
+    Late: {summary['late_count']}, Excused: {summary['excused_count']}<br/>
+    Overall Attendance: {summary['attendance_percentage']}%
+    """
+    summary_para = Paragraph(summary_text, styles['Normal'])
+    elements.append(summary_para)
+
+    doc.build(elements)
+    output.seek(0)
+    return output.getvalue()
+
+
+def generate_csv_report(report: dict) -> str:
+    """Generate CSV report from attendance data"""
+    import io
+    output = io.StringIO()
+
+    # Write report header
+    output.write(f"Attendance Report: {report['report_title']}\n")
+    output.write(f"Generated: {report['generated_at']}\n")
+    output.write(f"Exported by: {report['exported_by']}\n")
+    output.write(f"Date Range: {report['date_range']}\n")
+    output.write("\n")
+
+    # Write class summary
+    summary = report['class_summary']
+    output.write("CLASS SUMMARY\n")
+    output.write(f"Total Students: {summary['total_students']}\n")
+    output.write(f"Present: {summary['present_count']}, Absent: {summary['absent_count']}\n")
+    output.write(f"Late: {summary['late_count']}, Excused: {summary['excused_count']}\n")
+    output.write(f"Attendance Percentage: {summary['attendance_percentage']}%\n")
+    if summary['needs_attention']:
+        output.write(f"Students Needing Attention: {', '.join(summary['needs_attention'])}\n")
+    output.write("\n")
+
+    # Group records by date
+    from collections import defaultdict
+    records_by_date = defaultdict(list)
+    for record in report['records']:
+        records_by_date[record['date']].append(record)
+
+    # Sort dates
+    sorted_dates = sorted(records_by_date.keys(), reverse=True)
+
+    # Write records header
+    output.write("ATTENDANCE RECORDS\n")
+    output.write("Student ID,Student Name,Date,Time In,Status\n")
+
+    # Write records grouped by date
+    for date in sorted_dates:
+        # Date separator
+        from datetime import datetime
+        try:
+            formatted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%A, %B %d, %Y')
+        except:
+            formatted_date = date
+        output.write(f"\n--- {formatted_date} ({len(records_by_date[date])} records) ---\n")
+
+        # Records for this date
+        for record in records_by_date[date]:
+            output.write(f"{record['student_id']},{record['student_name']},{record['date']},{record['time_in']},{record['status']}\n")
+
+    return output.getvalue()
+
+
+def generate_excel_report(report: dict) -> bytes:
+    """Generate Excel report from attendance data"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        from io import BytesIO
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Attendance Report"
+
+        # Report header
+        ws['A1'] = f"Attendance Report: {report['report_title']}"
+        ws['A2'] = f"Generated: {report['generated_at']}"
+        ws['A3'] = f"Exported by: {report['exported_by']}"
+        ws['A4'] = f"Date Range: {report['date_range']}"
+        ws['A5'] = ""
+
+        # Class summary
+        ws['A7'] = "CLASS SUMMARY"
+        ws['A8'] = f"Total Students: {report['class_summary']['total_students']}"
+        ws['A9'] = f"Present: {report['class_summary']['present_count']}"
+        ws['A10'] = f"Absent: {report['class_summary']['absent_count']}"
+        ws['A11'] = f"Late: {report['class_summary']['late_count']}"
+        ws['A12'] = f"Excused: {report['class_summary']['excused_count']}"
+        ws['A13'] = f"Attendance Percentage: {report['class_summary']['attendance_percentage']}%"
+        ws['A14'] = ""
+
+        # Group records by date
+        from collections import defaultdict
+        records_by_date = defaultdict(list)
+        for record in report['records']:
+            records_by_date[record['date']].append(record)
+
+        # Sort dates
+        sorted_dates = sorted(records_by_date.keys(), reverse=True)
+
+        # Records header
+        current_row = 16
+        ws[f'A{current_row}'] = "Student ID"
+        ws[f'B{current_row}'] = "Student Name"
+        ws[f'C{current_row}'] = "Date"
+        ws[f'D{current_row}'] = "Time In"
+        ws[f'E{current_row}'] = "Status"
+
+        # Make header bold
+        for col in ['A', 'B', 'C', 'D', 'E']:
+            ws[f'{col}{current_row}'].font = Font(bold=True)
+
+        current_row += 1
+
+        # Write records grouped by date
+        for date in sorted_dates:
+            # Date separator
+            from datetime import datetime
+            try:
+                formatted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%A, %B %d, %Y')
+            except:
+                formatted_date = date
+
+            # Date header row
+            ws[f'A{current_row}'] = f"--- {formatted_date} ({len(records_by_date[date])} records) ---"
+            ws[f'A{current_row}'].font = Font(bold=True)
+            ws[f'A{current_row}'].fill = PatternFill(start_color="FFE6E6FA", end_color="FFE6E6FA", fill_type="solid")
+            current_row += 1
+
+            # Records for this date
+            for record in records_by_date[date]:
+                ws[f'A{current_row}'] = record['student_id']
+                ws[f'B{current_row}'] = record['student_name']
+                ws[f'C{current_row}'] = record['date']
+                ws[f'D{current_row}'] = record['time_in']
+                ws[f'E{current_row}'] = record['status']
+                current_row += 1
+
+        # Auto-adjust column widths
+        for col in ['A', 'B', 'C', 'D', 'E']:
+            max_length = 0
+            for row in range(1, current_row):
+                cell_value = str(ws[f'{col}{row}'].value or '')
+                max_length = max(max_length, len(cell_value))
+            ws.column_dimensions[col].width = min(max_length + 2, 30)
+
+        # Save to bytes
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output.getvalue()
+
+    except ImportError:
+        # Fallback if openpyxl is not available
+        return generate_csv_report(report).encode('utf-8')
+
+
+def generate_pdf_report(report: dict) -> bytes:
+    """Generate PDF report from attendance data"""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet
+        from io import BytesIO
+
+        output = BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=letter)
+        styles = getSampleStyleSheet()
+        elements = []
+
+        # Title
+        title = Paragraph(f"<b>Attendance Report: {report['report_title']}</b>", styles['Title'])
+        elements.append(title)
+        elements.append(Spacer(1, 12))
+
+        # Report info
+        info_text = f"""
+        <b>Generated:</b> {report['generated_at']}<br/>
+        <b>Exported by:</b> {report['exported_by']}<br/>
+        <b>Date Range:</b> {report['date_range']}
+        """
+        info = Paragraph(info_text, styles['Normal'])
+        elements.append(info)
+        elements.append(Spacer(1, 12))
+
+        # Class summary
+        summary_title = Paragraph("<b>Class Summary</b>", styles['Heading2'])
+        elements.append(summary_title)
+        elements.append(Spacer(1, 6))
+
+        summary = report['class_summary']
+        summary_data = [
+            ['Total Students', summary['total_students']],
+            ['Present', summary['present_count']],
+            ['Absent', summary['absent_count']],
+            ['Late', summary['late_count']],
+            ['Excused', summary['excused_count']],
+            ['Attendance Rate', f"{summary['attendance_percentage']}%"]
+        ]
+
+        summary_table = Table(summary_data, colWidths=[200, 100])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 12))
+
+        # Records
+        records_title = Paragraph("<b>Attendance Records</b>", styles['Heading2'])
+        elements.append(records_title)
+        elements.append(Spacer(1, 6))
+
+        # Group records by date
+        from collections import defaultdict
+        records_by_date = defaultdict(list)
+        for record in report['records']:
+            records_by_date[record['date']].append(record)
+
+        # Sort dates
+        sorted_dates = sorted(records_by_date.keys(), reverse=True)
+
+        # Table headers
+        headers = ['Student ID', 'Student Name', 'Time In', 'Status']
+        records_data = [headers]
+
+        # Add records grouped by date
+        for date in sorted_dates:
+            # Date separator
+            from datetime import datetime
+            try:
+                formatted_date = datetime.strptime(date, '%Y-%m-%d').strftime('%A, %B %d, %Y')
+            except:
+                formatted_date = date
+
+            # Add date header row
+            date_header = [f"--- {formatted_date} ({len(records_by_date[date])} records) ---", "", "", ""]
+            records_data.append(date_header)
+
+            # Records for this date
+            for record in records_by_date[date]:
+                records_data.append([
+                    record['student_id'],
+                    record['student_name'],
+                    record['time_in'],
+                    record['status']
+                ])
+
+        records_table = Table(records_data, colWidths=[80, 150, 80, 80])
+        records_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            # Style date separator rows
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey, lambda x: x[0] % len(headers) == 1 and records_data[x[0]][0].startswith('---')),
+            ('SPAN', (0, 1), (-1, 1), lambda x: x[0] % len(headers) == 1 and records_data[x[0]][0].startswith('---')),
+        ]))
+        elements.append(records_table)
+
+        doc.build(elements)
+        output.seek(0)
+        return output.getvalue()
+
+    except ImportError:
+        # Fallback if reportlab is not available
+        return generate_csv_report(report).encode('utf-8')

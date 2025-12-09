@@ -13,11 +13,12 @@ export class AuthInterceptor implements HttpInterceptor {
 
     // Clone the request and add the authorization header if token exists
     if (token) {
-      request = request.clone({
+      const clonedRequest = request.clone({
         setHeaders: {
           Authorization: `Bearer ${token}`
         }
       });
+      return next.handle(clonedRequest);
     }
 
     return next.handle(request);

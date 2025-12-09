@@ -12,6 +12,7 @@ import { PasswordResetComponent } from './admin/password-reset.component';
 import { SystemSettingsComponent } from './admin/system-settings.component';
 import { AnalyticsComponent } from './admin/analytics.component';
 import { SupportTicketsComponent } from './admin/support-tickets.component';
+import { AttendanceReportsComponent } from './admin/attendance-reports/attendance-reports.component';
 import { SubmitSupportComponent } from './submit-support.component';
 import { AuthGuard, AdminGuard, AnalyticsGuard } from './auth.guard';
 import { SuperAdminGuard } from './super-admin.guard';
@@ -32,6 +33,7 @@ export const routes: Routes = [
   { path: 'admin/analytics', component: AnalyticsComponent, canActivate: [AnalyticsGuard] },
   { path: 'admin/settings', component: SystemSettingsComponent, canActivate: [SuperAdminGuard] },
   { path: 'admin/support-tickets', component: SupportTicketsComponent, canActivate: [AdminGuard] },
+  { path: 'admin/attendance-reports', component: AttendanceReportsComponent, canActivate: [AnalyticsGuard] },
 
   // User support routes
   { path: 'submit-support', component: SubmitSupportComponent, canActivate: [AuthGuard] },

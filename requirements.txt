@@ -9,3 +9,5 @@ passlib[bcrypt]
 pydantic
 python-multipart
 apscheduler
+openpyxl
+reportlab

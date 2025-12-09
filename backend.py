@@ -637,6 +637,43 @@ async def get_student_by_number(student_number: str):
         else:
             return None
 
+@app.get("/api/students", tags=["Students"])
+async def get_all_students():
+    """Get all students for dropdown selection"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT student_id, student_number, last_name, first_name, email FROM students ORDER BY last_name, first_name")
+        students = cursor.fetchall()
+        return [{
+            "id": student[0],
+            "student_number": student[1],
+            "name": f"{student[2]}, {student[3]}",
+            "email": student[4]
+        } for student in students]
+
+@app.get("/api/classes", tags=["Classes"])
+async def get_all_classes():
+    """Get all classes for dropdown selection"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT c.class_id, co.course_code, c.section, c.room_id, c.instructor_id,
+                   i.first_name || ' ' || i.last_name as instructor_name
+            FROM classes c
+            LEFT JOIN courses co ON c.course_id = co.course_id
+            LEFT JOIN instructors i ON c.instructor_id = i.instructor_id
+            ORDER BY co.course_code, c.section
+        """)
+        classes = cursor.fetchall()
+        return [{
+            "id": cls[0],
+            "course_code": cls[1],
+            "section": cls[2],
+            "room_id": cls[3],
+            "instructor_id": cls[4],
+            "instructor_name": cls[5] or "Unknown"
+        } for cls in classes]
+
 # --- Debug Endpoint ---
 @app.get("/test", tags=["Debug"])
 async def test_endpoint():

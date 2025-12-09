@@ -63,6 +63,10 @@ export class ApiService {
     return this.http.get<any[]>(`${this.backendUrl}/api/courses`);
   }
 
+  getClasses(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/classes`);
+  }
+
   getSectionsForCourse(courseCode: string): Observable<string[]> {
     return this.http.get<string[]>(`${this.backendUrl}/api/courses/${courseCode}/sections`);
   }
@@ -85,6 +89,10 @@ export class ApiService {
 
   getStudentByNumber(studentNumber: string): Observable<any> {
     return this.http.get(`${this.backendUrl}/api/students/${studentNumber}`);
+  }
+
+  getStudents(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.backendUrl}/api/students`);
   }
 
   // Admin API methods
@@ -163,5 +171,17 @@ export class ApiService {
 
   submitSupportTicket(ticket: any): Observable<any> {
     return this.http.post(`${this.backendUrl}/api/support/tickets`, ticket);
+  }
+
+  // Generic methods for API calls
+  post(endpoint: string, data: any): Observable<any> {
+    return this.http.post(`${this.backendUrl}${endpoint}`, data);
+  }
+
+  // Generic methods for file downloads
+  postBlob(endpoint: string, data: any): Observable<Blob> {
+    return this.http.post(`${this.backendUrl}${endpoint}`, data, {
+      responseType: 'blob'
+    });
   }
 }
