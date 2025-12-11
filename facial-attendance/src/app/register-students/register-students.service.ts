@@ -13,7 +13,7 @@ export class RegisterStudentsService {
   private readonly baseUrl = 'http://127.0.0.1:8000/api';
   constructor(private http: HttpClient) {}
   registerStudent(formData: FormData): Observable<any> {
-    return this.http.post(`${this.baseUrl}/registration`, formData, {
+    return this.http.post(`${this.baseUrl}/register`, formData, {
       reportProgress: true,
       observe: 'events',
     });
