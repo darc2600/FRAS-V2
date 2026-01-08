@@ -688,11 +688,12 @@ async def test_endpoint():
 
 # Include other API routers
 # Temporarily disabled for debugging
-for module_name in ['admin', 'auth']:  # Re-enabling auth and admin
+for module_name in ['admin', 'auth', 'recognition', 'capture', 'registration', 'attendance', 'schedule']:
     try:
         module = __import__(f'api.{module_name}', fromlist=['router'])
         if hasattr(module, 'router'):
             app.include_router(module.router)
+            print(f"✅ {module_name} router included")
     except Exception as e:
         print(f"Warning: could not include {module_name} router: {e}")
 
@@ -710,7 +711,13 @@ try:
     app.include_router(admin.router)
     print("Admin router enabled")
     
-    print("Auth router loaded successfully")
+    print("Attempting to import recognition module...")
+    from api import recognition
+    print("Recognition module imported, including router...")
+    app.include_router(recognition.router)
+    print("Recognition router enabled")
+    
+    print("All routers loaded successfully")
 except Exception as e:
     print(f"Error loading routers: {e}")
     import traceback

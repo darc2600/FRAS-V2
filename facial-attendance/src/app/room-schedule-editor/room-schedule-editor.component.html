@@ -1,6 +1,15 @@
 
 <div class="room-schedule-editor-main">
-  <div class="editor-header">Scheduler Editor</div>
+  <div class="editor-header">
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <span>Scheduler Editor</span>
+      <div class="current-datetime" style="font-size: 14px; font-weight: normal;">
+        <span>📅 {{ currentDateTime | date: 'EEE, MMM d, y' }}</span>
+        <span style="margin-left: 1rem;">🕐 {{ currentDateTime | date: 'h:mm a' }}</span>
+        <span style="margin-left: 1rem; color: #ffc107;" *ngIf="currentTimeSlotIndex >= 0">⏰ Current: {{ timeSlots[currentTimeSlotIndex] }}</span>
+      </div>
+    </div>
+  </div>
   <div class="editor-inputs">
     <div class="editor-field">
       <label>Room Number</label>
@@ -73,14 +82,20 @@
       <thead>
         <tr>
           <th></th>
-          <th *ngFor="let day of days">{{ day }}</th>
+          <th *ngFor="let day of days; let col = index" [class.current-day]="isCurrentDay(col)">
+            {{ day }}
+            <div *ngIf="isCurrentDay(col)" class="day-indicator">📍 TODAY</div>
+          </th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let slot of timeSlots; let row = index">
-          <td class="time-label">{{ slot }}</td>
-          <td *ngFor="let day of days; let col = index">
-            <div class="cell" [class.filled]="grid[row][col].courseCode">
+        <tr *ngFor="let slot of timeSlots; let row = index" [class.current-timeslot]="isCurrentTimeSlot(row)">
+          <td class="time-label" [class.current-timeslot]="isCurrentTimeSlot(row)">
+            {{ slot }}
+            <div *ngIf="isCurrentTimeSlot(row)" class="time-indicator">⏱️ NOW</div>
+          </td>
+          <td *ngFor="let day of days; let col = index" [class.current-cell]="isCurrentTimeSlot(row) && isCurrentDay(col)">
+            <div class="cell" [class.filled]="grid[row][col].courseCode" [class.current]="isCurrentTimeSlot(row) && isCurrentDay(col)">
               <ng-container *ngIf="grid[row][col].courseCode">
                 <div class="cell-content">
                   <b>{{ grid[row][col].courseCode }}</b><br>

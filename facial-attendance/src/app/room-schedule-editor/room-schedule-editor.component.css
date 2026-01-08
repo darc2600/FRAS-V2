@@ -300,6 +300,47 @@
   box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
+/* Current time and day highlighting */
+.current-day {
+  background: #fff9e6 !important;
+  font-weight: bold;
+  color: #ff9800;
+  position: relative;
+}
+
+.day-indicator {
+  font-size: 0.75em;
+  color: #ff9800;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+.current-timeslot {
+  background: #fff3e0 !important;
+  font-weight: bold;
+}
+
+.time-indicator {
+  font-size: 0.75em;
+  color: #ff5722;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+.current-cell {
+  background: #ffe0b2 !important;
+}
+
+.cell.current {
+  background: #ffb74d !important;
+  border: 3px solid #ff9800 !important;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.4) !important;
+}
+
+.cell.current:hover {
+  background: #ffa726 !important;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .schedule-grid th, .schedule-grid td {

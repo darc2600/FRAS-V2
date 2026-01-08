@@ -177,12 +177,14 @@ class RecognitionRepository:
                                     print(f"[DEBUG] Allowing attendance: {time_diff:.2f} mins since last check-in (>= {buffer_minutes} mins buffer)")
                             
                             if should_insert:
+                                # Create a descriptive note
+                                notes = f"Face recognized at {now.strftime('%H:%M:%S')} - {status_name}"
                                 cursor.execute("""
-                                    INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id)
-                                    VALUES (?, ?, ?, ?)
-                                """, (student_id, class_id, timestamp, status_id))
+                                    INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)
+                                    VALUES (?, ?, ?, ?, ?)
+                                """, (student_id, class_id, timestamp, status_id, notes))
                                 conn.commit()
-                                print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id}")
+                                print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id} with notes: {notes}")
                             
                             # Set recognized variables (always, even if attendance was blocked by buffer)
                             recognized_id = student_id
@@ -246,10 +248,11 @@ class RecognitionRepository:
                 if student_id not in attended_students:
                     # Insert absent record
                     timestamp = f"{date} 23:59:59"  # End of day
+                    notes = f"Auto-generated for {date}"
                     cursor.execute('''
-                        INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id)
-                        VALUES (?, ?, ?, ?)
-                    ''', (student_id, class_id, timestamp, absent_status_id))
+                        INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (student_id, class_id, timestamp, absent_status_id, notes))
                     absent_count += 1
                     print(f"[DEBUG] Marked student {student_id} ({last_name}) as Absent for class {class_id} on {date}")
             
