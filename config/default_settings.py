@@ -92,7 +92,7 @@ DEFAULT_SYSTEM_SETTINGS = {
         "description": "Additional grace period after late threshold"
     },
     "attendance_buffer_minutes": {
-        "value": "2",
+        "value": "5",
         "type": "number",
         "category": "attendance",
         "min": 0,

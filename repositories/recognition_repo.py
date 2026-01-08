@@ -60,15 +60,20 @@ class RecognitionRepository:
                 
                 print(f"[DEBUG] Student faces to compare: {student_faces}")
                 
+                # Sort by student_id for consistent matching order (prevents random mismatches)
+                sorted_student_faces = sorted(student_faces.items(), key=lambda x: x[0])
+                
                 # Compare faces
-                for student_id, img_path in student_faces.items():
+                for student_id, img_path in sorted_student_faces:
                     try:
                         print(f"[DEBUG] Comparing temp image {temp_path} with {img_path} for student {student_id}")
 
                         # Use settings for face recognition parameters
                         model_name = self.settings.face_recognition_model
                         threshold = self.settings.recognition_threshold
-                        enforce_detection = self.settings.face_detection_confidence > 0.5  # Convert to boolean
+                        # IMPORTANT: Always use enforce_detection=False to avoid false rejections
+                        # with slightly poor quality images. This prevents "no match found" errors.
+                        enforce_detection = False
 
                         result = DeepFace.verify(
                             img1_path=temp_path,
@@ -177,14 +182,14 @@ class RecognitionRepository:
                                     print(f"[DEBUG] Allowing attendance: {time_diff:.2f} mins since last check-in (>= {buffer_minutes} mins buffer)")
                             
                             if should_insert:
-                                # Create a descriptive note
-                                notes = f"Face recognized at {now.strftime('%H:%M:%S')} - {status_name}"
+                                # Create descriptive note
+                                note = f"Face recognized at {now.strftime('%H:%M:%S')} - {status_name}"
                                 cursor.execute("""
                                     INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)
                                     VALUES (?, ?, ?, ?, ?)
-                                """, (student_id, class_id, timestamp, status_id, notes))
+                                """, (student_id, class_id, timestamp, status_id, note))
                                 conn.commit()
-                                print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id} with notes: {notes}")
+                                print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id}")
                             
                             # Set recognized variables (always, even if attendance was blocked by buffer)
                             recognized_id = student_id
@@ -248,11 +253,11 @@ class RecognitionRepository:
                 if student_id not in attended_students:
                     # Insert absent record
                     timestamp = f"{date} 23:59:59"  # End of day
-                    notes = f"Auto-generated for {date}"
+                    note = f"Auto-marked absent on {date} - No attendance recorded during class"
                     cursor.execute('''
                         INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)
                         VALUES (?, ?, ?, ?, ?)
-                    ''', (student_id, class_id, timestamp, absent_status_id, notes))
+                    ''', (student_id, class_id, timestamp, absent_status_id, note))
                     absent_count += 1
                     print(f"[DEBUG] Marked student {student_id} ({last_name}) as Absent for class {class_id} on {date}")
             

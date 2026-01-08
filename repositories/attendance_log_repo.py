@@ -14,10 +14,14 @@ class AttendanceLogRepository:
                 raise ValueError(f"Invalid status: {status}")
             status_id = status_row[0]
             
+            # Create descriptive note
+            from datetime import datetime
+            note = f"Manually recorded as {status} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
             cursor.execute('''
-                INSERT INTO attendance_logs (student_id, class_id, status_id)
-                VALUES (?, ?, ?)
-            ''', (student_id, class_id, status_id))
+                INSERT INTO attendance_logs (student_id, class_id, status_id, notes)
+                VALUES (?, ?, ?, ?)
+            ''', (student_id, class_id, status_id, note))
             conn.commit()
             try:
                 return cursor.lastrowid
