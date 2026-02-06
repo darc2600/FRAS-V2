@@ -221,4 +221,52 @@ export class AttendanceLogsComponent implements OnInit {
     const d = new Date(dt);
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   }
+
+  exportToCSV() {
+    if (this.logs.length === 0) {
+      alert('No attendance records to export.');
+      return;
+    }
+
+    // Create CSV header
+    const headers = ['#', 'Student Number', 'Name', 'Date', 'Time', 'Status'];
+    const csvContent: string[] = [headers.join(',')];
+
+    // Add data rows
+    let rowNumber = 1;
+    Object.keys(this.groupedLogs).forEach(date => {
+      this.groupedLogs[date].forEach(log => {
+        const time = this.formatDateTime(log.time);
+        const [dateStr, timeStr] = time.split(' ');
+        const row = [
+          rowNumber++,
+          log.studentNumber,
+          `"${log.studentName || log.name}"`, // Wrap in quotes to handle commas in names
+          dateStr,
+          timeStr,
+          log.status.charAt(0).toUpperCase() + log.status.slice(1)
+        ];
+        csvContent.push(row.join(','));
+      });
+    });
+
+    // Create blob and download
+    const csvString = csvContent.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    // Generate filename with course, section, and date range
+    const dateRange = this.isDateRangeMode
+      ? `${this.startDate}_to_${this.endDate}`
+      : this.selectedDate;
+    const filename = `Attendance_${this.courseCode}_${this.section}_${dateRange}.csv`;
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }

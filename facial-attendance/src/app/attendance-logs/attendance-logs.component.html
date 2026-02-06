@@ -86,6 +86,9 @@
         <span>Attendance Records</span>
         <span class="log-date" *ngIf="!isDateRangeMode">{{ selectedDate | date:'mediumDate' }}</span>
         <span class="log-date" *ngIf="isDateRangeMode">{{ startDate | date:'mediumDate' }} - {{ endDate | date:'mediumDate' }}</span>
+        <button class="export-btn" (click)="exportToCSV()" title="Export attendance data to CSV">
+          <span>📥 Export Data</span>
+        </button>
       </div>
       <div *ngFor="let date of objectKeys(groupedLogs)" class="date-section">
         <h4 class="date-header">{{ date | date:'fullDate' }}</h4>
