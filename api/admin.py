@@ -61,7 +61,17 @@ except Exception:
 # Import auth functions and JWT utilities
 from .auth import get_current_user_type, get_current_user_id, get_user_permissions
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
+_env_db = os.environ.get('SQLITE_DB_PATH')
+if _env_db:
+    DB_PATH = _env_db
+else:
+    # prefer mounted data/attendance.db when available
+    candidate = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'data', 'attendance.db')
+    candidate = os.path.normpath(candidate)
+    if os.path.exists(candidate):
+        DB_PATH = candidate
+    else:
+        DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
 router = APIRouter()
 
@@ -238,6 +248,56 @@ async def get_face_embedding_coverage(admin_type: str = Depends(require_admin_pe
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.get("/api/debug/face-embedding-coverage-public", response_model=FaceEmbeddingCoverageResponse)
+async def get_face_embedding_coverage_public():
+    """Unauthenticated debug endpoint (temporary) returning embedding coverage.
+    Use this only for local verification. Remove before production rollout.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            ensure_embeddings_table(cursor)
+
+            cursor.execute("SELECT COUNT(*) FROM students")
+            total_students = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM students WHERE face_data_path IS NOT NULL AND TRIM(face_data_path) != ''")
+            students_with_face_path = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(DISTINCT student_id) FROM student_face_embeddings")
+            students_with_embeddings = cursor.fetchone()[0]
+
+            cursor.execute('''
+                SELECT COUNT(*)
+                FROM students s
+                WHERE (s.face_data_path IS NOT NULL AND TRIM(s.face_data_path) != '')
+                   OR EXISTS (
+                        SELECT 1
+                        FROM student_face_embeddings sfe
+                        WHERE sfe.student_id = s.student_id
+                   )
+            ''')
+            students_with_any_face_data = cursor.fetchone()[0]
+
+            students_missing_all_face_data = max(total_students - students_with_any_face_data, 0)
+
+            embedding_coverage_percent = 0.0
+            if total_students > 0:
+                embedding_coverage_percent = round((students_with_embeddings / total_students) * 100.0, 2)
+
+            return FaceEmbeddingCoverageResponse(
+                total_students=total_students,
+                students_with_face_path=students_with_face_path,
+                students_with_embeddings=students_with_embeddings,
+                students_with_any_face_data=students_with_any_face_data,
+                students_missing_all_face_data=students_missing_all_face_data,
+                embedding_coverage_percent=embedding_coverage_percent,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 
 @router.post("/api/admin/users")
 async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(require_admin_permission("manage_users"))):
