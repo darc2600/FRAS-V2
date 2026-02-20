@@ -14,7 +14,8 @@ export class AppComponent {
 
   get hideSidebar(): boolean {
     const currentUrl = window.location.pathname;
-    return currentUrl.includes('/login') || currentUrl.includes('/registration');
+    return currentUrl.includes('/login') ||
+           currentUrl.includes('/registration');
   }
 
   toggleSidebar() {

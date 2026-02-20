@@ -356,6 +356,12 @@ export class RegisterStudentsComponent implements OnInit, OnDestroy {
         return;
       }
 
+      // Check if schedule has at least one entry
+      if (this.schedule.length === 0) {
+        alert('Please add at least one course and section to your schedule before submitting.');
+        return;
+      }
+
       this.submitting = true;
       this.uploadProgress = 0;
 

@@ -20,6 +20,8 @@ class RegistrationService:
     ) -> RegistrationResponse:
         try:
             schedule_entries = json.loads(schedule)
+            print(f"[DEBUG] Parsed schedule_entries: {schedule_entries}")
+            print(f"[DEBUG] Number of schedule_entries: {len(schedule_entries)}")
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schedule: {e}")
         return await self.repo.register_student(

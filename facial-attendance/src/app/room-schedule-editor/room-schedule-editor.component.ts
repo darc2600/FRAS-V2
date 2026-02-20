@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../api.service';
@@ -30,7 +30,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
   templateUrl: './room-schedule-editor.component.html',
   styleUrls: ['./room-schedule-editor.component.css'],
 })
-export class RoomScheduleEditorComponent implements OnInit {
+export class RoomScheduleEditorComponent implements OnInit, OnDestroy {
   room = '';
   message = '';
   isLoading = false;
@@ -60,10 +60,72 @@ export class RoomScheduleEditorComponent implements OnInit {
   deleteConfirmationText = '';
   isDeleting = false;
 
+  // Date and time properties
+  currentDateTime = new Date();
+  currentDayName = '';
+  currentTimeSlotIndex = -1;
+  private clockInterval: any;
+
   constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.loadValidationData();
+    this.updateCurrentDateTime();
+    // Update time every minute
+    this.clockInterval = setInterval(() => this.updateCurrentDateTime(), 60000);
+  }
+
+  ngOnDestroy() {
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+    }
+  }
+
+  updateCurrentDateTime() {
+    this.currentDateTime = new Date();
+    const dayIndex = this.currentDateTime.getDay();
+    // Convert JS day index (0=Sunday) to our format (Monday=0)
+    const adjustedDayIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+    this.currentDayName = this.days[adjustedDayIndex];
+
+    // Find current time slot
+    const currentHour = this.currentDateTime.getHours();
+    const currentMinute = this.currentDateTime.getMinutes();
+    const currentTime = currentHour * 60 + currentMinute;
+
+    this.currentTimeSlotIndex = -1;
+    for (let i = 0; i < this.timeSlots.length; i++) {
+      const [startStr, endStr] = this.timeSlots[i].split(' - ');
+      const startTime = this.parseTime(startStr);
+      const endTime = this.parseTime(endStr);
+
+      if (currentTime >= startTime && currentTime < endTime) {
+        this.currentTimeSlotIndex = i;
+        break;
+      }
+    }
+  }
+
+  private parseTime(timeStr: string): number {
+    const match = timeStr.match(/(\d+):(\d+)(AM|PM)/i);
+    if (!match) return 0;
+    
+    let hours = parseInt(match[1]);
+    const minutes = parseInt(match[2]);
+    const period = match[3].toUpperCase();
+
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+  }
+
+  isCurrentTimeSlot(rowIndex: number): boolean {
+    return rowIndex === this.currentTimeSlotIndex;
+  }
+
+  isCurrentDay(colIndex: number): boolean {
+    return this.days[colIndex] === this.currentDayName;
   }
 
   loadValidationData() {

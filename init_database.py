@@ -218,6 +218,21 @@ def init_database():
             )
         ''')
 
+        # STUDENT_FACE_EMBEDDINGS (Option B: embeddings in DB)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS student_face_embeddings (
+                embedding_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER NOT NULL,
+                model_name TEXT NOT NULL,
+                embedding_json TEXT NOT NULL,
+                source_image_path TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(student_id, model_name),
+                FOREIGN KEY(student_id) REFERENCES students(student_id)
+            )
+        ''')
+
         # Triggers to auto-update updated_at on row update
         tables_to_trigger = [
             'students', 'instructors', 'courses', 'departments', 'room_types',

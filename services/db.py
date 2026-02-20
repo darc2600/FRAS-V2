@@ -84,5 +84,10 @@ def get_connection():
         raw = psycopg2.connect(DATABASE_URL)
         return PGConnectionWrapper(raw)
     else:
-        # default to sqlite file in project root
-        return sqlite3.connect('attendance.db')
+        # default to sqlite file in project root with timeout and WAL mode
+        conn = sqlite3.connect('attendance.db', timeout=30.0, check_same_thread=False)
+        # Enable WAL mode for better concurrency
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout = 5000')  # 5 seconds
+        conn.commit()
+        return conn

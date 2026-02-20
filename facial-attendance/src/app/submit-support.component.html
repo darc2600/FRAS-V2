@@ -1,0 +1,84 @@
+<div class="submit-support-container">
+  <div class="header-section">
+    <h2>Contact Support</h2>
+    <p>Submit a support ticket for assistance with the FRAS system</p>
+  </div>
+
+  <!-- Success/Error Messages -->
+  <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+  <div *ngIf="success" class="alert alert-success">{{ success }}</div>
+
+  <!-- Support Ticket Form -->
+  <div *ngIf="hasPermission('submit_support')" class="support-form card">
+    <div class="card-header">
+      <h5>Submit Support Request</h5>
+    </div>
+    <div class="card-body">
+      <form (ngSubmit)="submitTicket()" #ticketForm="ngForm">
+        <div class="form-group">
+          <label for="subject">Subject *</label>
+          <input
+            type="text"
+            id="subject"
+            class="form-control"
+            [(ngModel)]="ticket.subject"
+            name="subject"
+            required
+            placeholder="Brief description of your issue">
+        </div>
+
+        <div class="form-group">
+          <label for="category">Category *</label>
+          <select
+            id="category"
+            class="form-control"
+            [(ngModel)]="ticket.category"
+            name="category"
+            required>
+            <option *ngFor="let cat of categories" [value]="cat.value">
+              {{ cat.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="priority">Priority *</label>
+          <select
+            id="priority"
+            class="form-control"
+            [(ngModel)]="ticket.priority"
+            name="priority"
+            required>
+            <option *ngFor="let pri of priorities" [value]="pri.value">
+              {{ pri.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description *</label>
+          <textarea
+            id="description"
+            class="form-control"
+            [(ngModel)]="ticket.description"
+            name="description"
+            required
+            rows="5"
+            placeholder="Please provide detailed information about your issue or request"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-success" [disabled]="!ticketForm.form.valid || loading">
+            <i class="fas fa-paper-plane"></i> {{ loading ? 'Submitting...' : 'Submit Ticket' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- No Permission Message -->
+  <div *ngIf="!hasPermission('submit_support')" class="alert alert-warning">
+    <h5>Access Denied</h5>
+    <p>You don't have permission to submit support tickets.</p>
+  </div>
+</div>

@@ -1,0 +1,24 @@
+version: "3.8"
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SQLITE_DB_PATH=/app/data/attendance.db
+    volumes:
+      - ./data:/app/data
+      - ./dataset:/app/dataset:ro
+    ports:
+      - "8000:8000"
+
+  frontend:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    volumes:
+      - ./facial-attendance/dist/facial-attendance:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"

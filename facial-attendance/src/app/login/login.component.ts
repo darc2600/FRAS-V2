@@ -34,16 +34,17 @@ export class LoginComponent {
           // Create user object and login via AuthService
           const user: User = {
             email: this.email,
-            role: res.role,
+            user_type: res.user_type,
             userId: res.user_id,
-            token: res.access_token
+            token: res.access_token,
+            permissions: res.permissions || []
           };
           this.authService.login(user);
 
           this.email = '';
           this.password = '';
-          // navigate to webcam capture page
-          this.router.navigate(['/webcam']);
+          // navigate to monitor page
+          this.router.navigate(['/monitor']);
         },
         error: err => {
           this.error = err?.error?.message || 'Invalid credentials';

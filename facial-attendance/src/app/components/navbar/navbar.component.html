@@ -3,11 +3,20 @@
     <img src="assets/mapua-logo.png" alt="Mapua Logo" height="48" />
   </div>
   <ul class="sidebar-links">
-    <li><a routerLink="/monitor" routerLinkActive="active">Monitor</a></li>
-    
-    <li><a routerLink="/logs" routerLinkActive="active">Attendance Logs</a></li>
-    <li><a routerLink="/register-student" routerLinkActive="active">Register</a></li>
-    <li><a routerLink="/room-schedule" routerLinkActive="active">View Schedule</a></li>
-    <li><a routerLink="/room-schedule-editor" routerLinkActive="active">Add/Edit Schedule</a></li>
+    <!-- Core Features for all authenticated users -->
+    <li *ngIf="canMonitor"><a routerLink="/monitor" routerLinkActive="active">Monitor</a></li>
+    <li *ngIf="canViewLogs"><a routerLink="/logs" routerLinkActive="active">Attendance Logs</a></li>
+    <li *ngIf="canRegister"><a routerLink="/register-student" routerLinkActive="active">Register</a></li>
+    <li *ngIf="canViewSchedule"><a routerLink="/room-schedule" routerLinkActive="active">View Schedule</a></li>
+    <li *ngIf="canSubmitSupport"><a routerLink="/submit-support" routerLinkActive="active">Submit Support</a></li>
+
+    <!-- Admin Section -->
+    <li *ngIf="canManageUsers || canResetPasswords || canEditSchedule || canConfigureSystem || canViewAnalytics || canManageSupport" class="nav-section">Admin</li>
+    <li *ngIf="canManageUsers"><a routerLink="/admin/users" routerLinkActive="active">User Management</a></li>
+    <li *ngIf="canResetPasswords || canManageUsers"><a routerLink="/admin/password-reset" routerLinkActive="active">Password Reset</a></li>
+    <li *ngIf="canManageSupport"><a routerLink="/admin/support-tickets" routerLinkActive="active">Support Tickets</a></li>
+    <li *ngIf="canEditSchedule"><a routerLink="/room-schedule-editor" routerLinkActive="active">Add/Edit Schedule</a></li>
+    <li *ngIf="canViewAnalytics"><a routerLink="/admin/analytics" routerLinkActive="active">Analytics</a></li>
+    <li *ngIf="canConfigureSystem"><a routerLink="/admin/settings" routerLinkActive="active">System Settings</a></li>
   </ul>
 </nav>

@@ -145,7 +145,7 @@
     margin-bottom: 8px;
   }
   
-  .webcam {
+  .monitor {
     height: 200px;
     margin-bottom: 8px;
     border-width: 2px;
@@ -203,7 +203,7 @@
   flex-shrink: 0;
 }
 
-.webcam {
+.monitor {
   position: relative;
   background: #111;
   border: 3px solid #d9a3a3;
@@ -219,22 +219,22 @@
   flex-shrink: 0;
 }
 
-/* Responsive webcam sizing */
+/* Responsive monitor sizing */
 @media (max-width: 1200px) {
-  .webcam {
+  .monitor {
     max-width: 400px;
     height: 300px;
   }
 }
 
 @media (max-width: 768px) {
-  .webcam {
+  .monitor {
     max-width: 100%;
     height: 280px;
   }
 }
 
-.webcam webcam, .webcam img {
+.monitor webcam, .monitor img {
   width: 100%;
   height: 100%;
   object-fit: fill;
@@ -287,7 +287,7 @@
   100% { opacity: 1; }
 }
 
-.webcam .capture-button {
+.monitor .capture-button {
   position: absolute;
   bottom: 10px;
   right: 10px;
@@ -303,12 +303,12 @@
   transition: all 0.3s ease;
 }
 
-.webcam .capture-button:hover:not(:disabled) {
+.monitor .capture-button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
-.webcam .capture-button:disabled {
+.monitor .capture-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
