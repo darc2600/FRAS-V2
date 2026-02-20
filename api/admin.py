@@ -8,6 +8,7 @@ import importlib
 from datetime import datetime
 from services.settings_service import get_settings_service
 from services.attendance_service import mark_automatic_absents
+from services.face_embeddings import ensure_embeddings_table
 
 # Support ticket models
 class SupportTicketCreate(BaseModel):
@@ -86,6 +87,15 @@ class UpdateUserRequest(BaseModel):
     email: Optional[str] = None
     user_type: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+class FaceEmbeddingCoverageResponse(BaseModel):
+    total_students: int
+    students_with_face_path: int
+    students_with_embeddings: int
+    students_with_any_face_data: int
+    students_missing_all_face_data: int
+    embedding_coverage_percent: float
 
 # Dependency to check admin permissions
 def require_admin_permission(permission: str):
@@ -179,6 +189,53 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
 
             return users
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.get("/api/admin/face-embedding-coverage", response_model=FaceEmbeddingCoverageResponse)
+async def get_face_embedding_coverage(admin_type: str = Depends(require_admin_permission("view_all_data"))):
+    """Get migration/coverage stats for DB-stored face embeddings."""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            ensure_embeddings_table(cursor)
+
+            cursor.execute("SELECT COUNT(*) FROM students")
+            total_students = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM students WHERE face_data_path IS NOT NULL AND TRIM(face_data_path) != ''")
+            students_with_face_path = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(DISTINCT student_id) FROM student_face_embeddings")
+            students_with_embeddings = cursor.fetchone()[0]
+
+            cursor.execute('''
+                SELECT COUNT(*)
+                FROM students s
+                WHERE (s.face_data_path IS NOT NULL AND TRIM(s.face_data_path) != '')
+                   OR EXISTS (
+                        SELECT 1
+                        FROM student_face_embeddings sfe
+                        WHERE sfe.student_id = s.student_id
+                   )
+            ''')
+            students_with_any_face_data = cursor.fetchone()[0]
+
+            students_missing_all_face_data = max(total_students - students_with_any_face_data, 0)
+
+            embedding_coverage_percent = 0.0
+            if total_students > 0:
+                embedding_coverage_percent = round((students_with_embeddings / total_students) * 100.0, 2)
+
+            return FaceEmbeddingCoverageResponse(
+                total_students=total_students,
+                students_with_face_path=students_with_face_path,
+                students_with_embeddings=students_with_embeddings,
+                students_with_any_face_data=students_with_any_face_data,
+                students_missing_all_face_data=students_missing_all_face_data,
+                embedding_coverage_percent=embedding_coverage_percent,
+            )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 

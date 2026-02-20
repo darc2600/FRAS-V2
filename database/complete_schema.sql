@@ -16,6 +16,18 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Student face embeddings (Option B: store vectors in DB, keep images on disk)
+CREATE TABLE IF NOT EXISTS student_face_embeddings (
+    embedding_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL REFERENCES students(student_id),
+    model_name TEXT NOT NULL,
+    embedding_json TEXT NOT NULL,
+    source_image_path TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(student_id, model_name)
+);
+
 -- Permissions table - Defines all available permissions
 CREATE TABLE IF NOT EXISTS permissions (
     permission_id INTEGER PRIMARY KEY AUTOINCREMENT,

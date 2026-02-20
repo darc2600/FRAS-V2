@@ -1,0 +1,124 @@
+import json
+from typing import List, Optional, Tuple
+
+from deepface import DeepFace
+
+
+def ensure_embeddings_table(cursor) -> None:
+    cursor.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS student_face_embeddings (
+            embedding_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            model_name TEXT NOT NULL,
+            embedding_json TEXT NOT NULL,
+            source_image_path TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(student_id, model_name)
+        )
+        '''
+    )
+
+
+def extract_embedding_from_image(
+    image_path: str,
+    model_name: str,
+    enforce_detection: bool = False,
+) -> Optional[List[float]]:
+    try:
+        reps = DeepFace.represent(
+            img_path=image_path,
+            model_name=model_name,
+            enforce_detection=enforce_detection,
+        )
+        if not reps:
+            return None
+
+        first = reps[0] if isinstance(reps, list) else reps
+        embedding = first.get("embedding") if isinstance(first, dict) else None
+
+        if not embedding or not isinstance(embedding, list):
+            return None
+
+        return [float(v) for v in embedding]
+    except Exception:
+        return None
+
+
+def upsert_student_embedding(
+    cursor,
+    student_id: int,
+    model_name: str,
+    embedding: List[float],
+    source_image_path: Optional[str] = None,
+) -> None:
+    embedding_json = json.dumps(embedding)
+
+    cursor.execute(
+        '''
+        DELETE FROM student_face_embeddings
+        WHERE student_id = ? AND model_name = ?
+        ''',
+        (student_id, model_name),
+    )
+
+    cursor.execute(
+        '''
+        INSERT INTO student_face_embeddings (student_id, model_name, embedding_json, source_image_path)
+        VALUES (?, ?, ?, ?)
+        ''',
+        (student_id, model_name, embedding_json, source_image_path),
+    )
+
+
+def load_enrolled_embeddings(cursor, class_id: int, model_name: str) -> List[Tuple[int, str, str]]:
+    cursor.execute(
+        '''
+        SELECT e.student_id, s.last_name, sfe.embedding_json
+        FROM enrollments e
+        JOIN students s ON s.student_id = e.student_id
+        JOIN student_face_embeddings sfe ON sfe.student_id = e.student_id
+        WHERE e.class_id = ? AND sfe.model_name = ?
+        ''',
+        (class_id, model_name),
+    )
+    return cursor.fetchall()
+
+
+def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+    if not vec_a or not vec_b or len(vec_a) != len(vec_b):
+        return -1.0
+
+    dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = sum(a * a for a in vec_a) ** 0.5
+    norm_b = sum(b * b for b in vec_b) ** 0.5
+
+    if norm_a == 0.0 or norm_b == 0.0:
+        return -1.0
+
+    return dot_product / (norm_a * norm_b)
+
+
+def similarity_threshold_from_distance_threshold(distance_threshold: float) -> float:
+    try:
+        distance = float(distance_threshold)
+    except Exception:
+        distance = 0.6
+
+    similarity_threshold = 1.0 - distance
+    if similarity_threshold < 0.0:
+        return 0.0
+    if similarity_threshold > 1.0:
+        return 1.0
+    return similarity_threshold
+
+
+def parse_embedding_json(embedding_json: str) -> Optional[List[float]]:
+    try:
+        parsed = json.loads(embedding_json)
+        if not isinstance(parsed, list):
+            return None
+        return [float(v) for v in parsed]
+    except Exception:
+        return None

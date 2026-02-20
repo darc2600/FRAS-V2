@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../api.service';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-analytics',
@@ -30,6 +31,26 @@ import { ApiService } from '../api.service';
           <h3>Recent Attendance</h3>
           <div class="stat-number">{{ analyticsData.recent_attendance }}</div>
           <small>Last 7 days</small>
+        </div>
+      </div>
+
+      <div class="embedding-section" *ngIf="embeddingCoverage">
+        <h3>Face Embedding Coverage</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>Students with Embeddings</h3>
+            <div class="stat-number">{{ embeddingCoverage.students_with_embeddings }}</div>
+          </div>
+
+          <div class="stat-card">
+            <h3>Embedding Coverage</h3>
+            <div class="stat-number">{{ embeddingCoverage.embedding_coverage_percent }}%</div>
+          </div>
+
+          <div class="stat-card">
+            <h3>Missing All Face Data</h3>
+            <div class="stat-number">{{ embeddingCoverage.students_missing_all_face_data }}</div>
+          </div>
         </div>
       </div>
 
@@ -81,10 +102,20 @@ import { ApiService } from '../api.service';
       padding: 40px;
       color: #7f8c8d;
     }
+
+    .embedding-section {
+      margin-top: 28px;
+    }
+
+    .embedding-section h3 {
+      margin: 0 0 12px 0;
+      color: #2c3e50;
+    }
   `]
 })
 export class AnalyticsComponent implements OnInit {
   analyticsData: any = null;
+  embeddingCoverage: any = null;
 
   constructor(private apiService: ApiService) { }
 
@@ -93,9 +124,13 @@ export class AnalyticsComponent implements OnInit {
   }
 
   loadAnalytics(): void {
-    this.apiService.getAnalytics().subscribe({
-      next: (data) => {
-        this.analyticsData = data;
+    forkJoin({
+      analytics: this.apiService.getAnalytics(),
+      embeddingCoverage: this.apiService.getFaceEmbeddingCoverage()
+    }).subscribe({
+      next: (result) => {
+        this.analyticsData = result.analytics;
+        this.embeddingCoverage = result.embeddingCoverage;
       },
       error: (error) => {
         console.error('Error loading analytics:', error);

@@ -4,6 +4,12 @@ import shutil
 from fastapi import UploadFile, HTTPException
 from typing import List
 import sqlite3
+from services.settings_service import get_settings_service
+from services.face_embeddings import (
+    ensure_embeddings_table,
+    extract_embedding_from_image,
+    upsert_student_embedding,
+)
 
 
 class RegistrationRepository:
@@ -181,6 +187,29 @@ class RegistrationRepository:
                     print(f"[DEBUG] SUCCESS: face_data_path is properly set in database")
             else:
                 print(f"[DEBUG] ERROR: Student record not found in database!")
+
+            # Build and store face embedding in DB (Option B)
+            if saved_files:
+                settings = get_settings_service()
+                model_name = settings.face_recognition_model
+                embedding = extract_embedding_from_image(
+                    image_path=saved_files[0],
+                    model_name=model_name,
+                    enforce_detection=False,
+                )
+                if embedding:
+                    ensure_embeddings_table(cursor)
+                    upsert_student_embedding(
+                        cursor=cursor,
+                        student_id=student_id,
+                        model_name=model_name,
+                        embedding=embedding,
+                        source_image_path=saved_files[0],
+                    )
+                    conn.commit()
+                    print(f"[DEBUG] SUCCESS: embedding stored for student_id={student_id} model={model_name}")
+                else:
+                    print(f"[DEBUG] WARNING: embedding not created for student_id={student_id}")
 
             print(f"[DEBUG] Registration complete for {student_number}")
             print(f"[DEBUG] ========== REGISTRATION END ==========")

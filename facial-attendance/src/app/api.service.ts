@@ -143,6 +143,10 @@ export class ApiService {
     return this.http.get<any>(`${this.backendUrl}/api/admin/analytics`);
   }
 
+  getFaceEmbeddingCoverage(): Observable<any> {
+    return this.http.get<any>(`${this.backendUrl}/api/admin/face-embedding-coverage`);
+  }
+
   markAutomaticAbsents(): Observable<any> {
     return this.http.post(`${this.backendUrl}/api/admin/mark-automatic-absents`, {});
   }

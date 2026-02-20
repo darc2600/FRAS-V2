@@ -67,6 +67,20 @@ facial_attendance_system/
 2. **Attendance Recording:**
    The system will automatically recognize faces and update the attendance records in the `attendance.db` database.
 
+## Face Embeddings (DB-backed Recognition)
+
+The system supports Option B for facial data storage:
+
+- Raw face images remain in `dataset/<student_number>/`.
+- Face embeddings (numeric vectors) are stored in the database table `student_face_embeddings`.
+- Recognition uses DB embeddings first, then falls back to image-to-image verification when needed.
+
+To generate embeddings for existing students, run:
+
+```
+python scripts/backfill_face_embeddings.py
+```
+
 ## Additional Information
 
 - The `utils.py` file contains helper functions for image processing and database interactions.
