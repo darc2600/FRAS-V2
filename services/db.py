@@ -74,6 +74,27 @@ class PGConnectionWrapper:
 
 def get_connection():
     """Return a connection-like object. Use Postgres if DATABASE_URL is set, otherwise sqlite."""
+    # If DATABASE_URL explicitly points to a sqlite file use sqlite3
+    if DATABASE_URL and DATABASE_URL.strip().lower().startswith('sqlite'):
+        # Support urls like sqlite:///path/to/db or sqlite:///:memory:
+        url = DATABASE_URL.strip()
+        if url.startswith('sqlite:///'):
+            path = url[len('sqlite:///'):]
+        elif url.startswith('sqlite://'):
+            path = url[len('sqlite://'):]
+        else:
+            path = url
+        path = path or 'attendance.db'
+        # in-memory special case
+        if path == ':memory:' or path == '/:memory:':
+            conn = sqlite3.connect(':memory:', check_same_thread=False)
+        else:
+            conn = sqlite3.connect(path, timeout=30.0, check_same_thread=False)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout = 5000')
+        conn.commit()
+        return conn
+
     if DATABASE_URL:
         try:
             import psycopg2
