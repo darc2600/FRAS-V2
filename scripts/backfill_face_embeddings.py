@@ -46,7 +46,12 @@ def main():
         for student_id, student_number, face_data_path in students:
             processed += 1
 
-            folder_path = face_data_path or os.path.join('dataset', str(student_number))
+            # Normalize potential Windows-style backslashes in stored paths
+            if face_data_path:
+                folder_path = face_data_path.replace('\\', '/')
+            else:
+                folder_path = os.path.join('dataset', str(student_number))
+
             image_path = _first_jpg_from_folder(folder_path)
             if not image_path:
                 skipped += 1
