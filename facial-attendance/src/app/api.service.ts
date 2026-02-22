@@ -80,7 +80,7 @@ export class ApiService {
   }
 
   registerStudent(formData: FormData): Observable<any> {
-    return this.http.post(`${this.backendUrl}/api/register`, formData);
+    return this.http.post(`${this.backendUrl}/api/registration`, formData);
   }
 
   captureImage(formData: FormData): Observable<any> {
