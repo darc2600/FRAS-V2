@@ -4,6 +4,7 @@ import shutil
 from fastapi import UploadFile, HTTPException
 from typing import List
 import sqlite3
+import traceback
 from services.settings_service import get_settings_service
 from services.face_embeddings import (
     ensure_embeddings_table,
@@ -115,6 +116,8 @@ class RegistrationRepository:
             # Re-raise HTTPException without wrapping it
             raise
         except Exception as e:
+            print(f"[DEBUG] Exception during registration processing: {e}")
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
 
         try:
@@ -219,6 +222,8 @@ class RegistrationRepository:
                 return {"status": "success", "message": "Student registered and images saved.", "image_paths": saved_files}
 
         except Exception as e:
+            print(f"[DEBUG] Exception while saving images / updating DB: {e}")
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
         finally:
             conn.close()
