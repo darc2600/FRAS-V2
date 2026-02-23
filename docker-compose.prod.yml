@@ -11,9 +11,9 @@ services:
       - DATASET_PATH=/app/dataset
     volumes:
       - ./data:/app/data
-      # mount a host dataset directory (writable) and the repo into the container
-      - ./data/dataset:/app/dataset
-      - ./:/app
+      # mount the host dataset directory (writable) and the repo into the container
+      - /home/frasijbmapua/FRAS/dataset:/app/dataset:rw
+      - ./:/app:rw
     ports:
       - "8000:8000"
 
