@@ -2,10 +2,12 @@ from fastapi import APIRouter, HTTPException, Depends, status, Body, Request, Re
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import sqlite3
+from services.db import get_connection
 import os
 import secrets
 import importlib
 from datetime import datetime
+import logging
 from services.settings_service import get_settings_service
 from services.attendance_service import mark_automatic_absents
 from services.face_embeddings import ensure_embeddings_table
@@ -75,6 +77,8 @@ else:
 
 router = APIRouter()
 
+LOG = logging.getLogger(__name__)
+
 # Pydantic models
 class UserResponse(BaseModel):
     id: int
@@ -127,7 +131,7 @@ def require_admin_permission(permission: str):
 async def get_users(user_type: str = Depends(require_admin_permission("manage_users"))):
     """Get all users (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Map database role to frontend user_type for display
@@ -139,6 +143,14 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
 
             # Get users from users table with joined data
             users = []
+
+            def _fmt_dt(v):
+                try:
+                    if isinstance(v, datetime):
+                        return v.isoformat()
+                    return str(v) if v is not None else None
+                except Exception:
+                    return None
 
             # Instructors
             cursor.execute("""
@@ -155,8 +167,8 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                     "first_name": row[3],
                     "last_name": row[4],
                     "is_active": True,
-                    "created_at": row[5],
-                    "updated_at": row[6] if row[6] else row[5]  # Simplified fallback
+                    "created_at": _fmt_dt(row[5]),
+                    "updated_at": _fmt_dt(row[6] if row[6] else row[5])  # Simplified fallback
                 })
 
             # IT Admins
@@ -174,8 +186,8 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                     "first_name": row[3],
                     "last_name": row[4],
                     "is_active": True,
-                    "created_at": row[5],
-                    "updated_at": row[6] if row[6] and row[6] != "" else row[5]  # Use created_at if updated_at is None or empty
+                    "created_at": _fmt_dt(row[5]),
+                    "updated_at": _fmt_dt(row[6] if row[6] and row[6] != "" else row[5])  # Use created_at if updated_at is None or empty
                 })
 
             # Super Admins
@@ -193,13 +205,28 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                     "first_name": row[3],
                     "last_name": row[4],
                     "is_active": True,
-                    "created_at": row[5],
-                    "updated_at": row[6] if row[6] and row[6] != "" else row[5]  # Use created_at if updated_at is None or empty
+                    "created_at": _fmt_dt(row[5]),
+                    "updated_at": _fmt_dt(row[6] if row[6] and row[6] != "" else row[5])  # Use created_at if updated_at is None or empty
                 })
+
+            # Defensive normalization: ensure all datetime/date values are strings
+            for u in users:
+                for k in ('created_at', 'updated_at'):
+                    v = u.get(k)
+                    try:
+                        if isinstance(v, datetime):
+                            u[k] = v.isoformat()
+                        elif v is not None:
+                            u[k] = str(v)
+                        else:
+                            u[k] = None
+                    except Exception:
+                        u[k] = None
 
             return users
 
     except Exception as e:
+        LOG.exception('Error in get_face_embedding_coverage')
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
@@ -207,7 +234,7 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
 async def get_face_embedding_coverage(admin_type: str = Depends(require_admin_permission("view_all_data"))):
     """Get migration/coverage stats for DB-stored face embeddings."""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             ensure_embeddings_table(cursor)
 
@@ -256,7 +283,7 @@ async def get_face_embedding_coverage_public():
     Use this only for local verification. Remove before production rollout.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             ensure_embeddings_table(cursor)
 
@@ -303,7 +330,7 @@ async def get_face_embedding_coverage_public():
 async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(require_admin_permission("manage_users"))):
     """Create a new user (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Map frontend user_type to backend user_type
@@ -384,7 +411,7 @@ async def update_user(
 ):
     """Update user information (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if Super Admin permission is required
@@ -415,7 +442,7 @@ async def reset_password(
         if not email:
             raise HTTPException(400, "Email is required")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if user exists
@@ -461,7 +488,7 @@ async def delete_user(
 ):
     """Delete a user (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Get user info first
@@ -511,7 +538,7 @@ async def bulk_user_operation(
         if operation not in ['activate', 'deactivate', 'delete']:
             raise HTTPException(400, "Invalid operation")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             if operation == 'delete':
@@ -558,7 +585,7 @@ async def bulk_user_operation(
 async def get_system_settings(admin_type: str = Depends(require_admin_permission("system_config"))):
     """Get system settings (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT setting_key, setting_value, setting_type, category, options,
@@ -607,7 +634,7 @@ async def update_system_setting(
 ):
     """Update system setting (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
@@ -631,7 +658,7 @@ async def update_system_settings_bulk(
 ):
     """Update multiple system settings (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             for update in updates:
                 cursor.execute("""
@@ -653,7 +680,7 @@ async def update_system_settings_bulk(
 async def get_analytics(admin_type: str = Depends(require_admin_permission("view_all_data"))):
     """Get system analytics (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Basic analytics
@@ -669,11 +696,14 @@ async def get_analytics(admin_type: str = Depends(require_admin_permission("view
             cursor.execute("SELECT COUNT(*) FROM attendance_logs")
             analytics['total_attendance_records'] = cursor.fetchone()[0]
 
-            # Recent activity (last 7 days)
-            cursor.execute("""
-                SELECT COUNT(*) FROM attendance_logs
-                WHERE timestamp >= datetime('now', '-7 days')
-            """)
+            # Recent activity (last 7 days) -- dialect aware
+            db_url = os.environ.get('DATABASE_URL', '')
+            if db_url and not db_url.startswith('sqlite'):
+                # Postgres
+                cursor.execute("SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= NOW() - INTERVAL '7 days'")
+            else:
+                # SQLite
+                cursor.execute("SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= datetime('now', '-7 days')")
             analytics['recent_attendance'] = cursor.fetchone()[0]
 
             return analytics
@@ -719,7 +749,7 @@ async def create_user_support_ticket(
 
         print(f"Creating ticket for user_id: {user_id}, type: {type(user_id)}")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             from datetime import datetime
@@ -752,7 +782,7 @@ async def get_support_tickets(
 ):
     """Get support tickets (users see their own, admins see all)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             query = """
@@ -821,7 +851,7 @@ async def update_support_ticket(
 ):
     """Update support ticket (admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Build update query
@@ -867,7 +897,7 @@ async def create_ticket_reply(
 ):
     """Add reply to support ticket"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if ticket exists and user has access
@@ -907,7 +937,7 @@ async def get_ticket_replies(
 ):
     """Get replies for a support ticket"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if user has access to this ticket
@@ -992,7 +1022,7 @@ async def export_attendance_report(
 ):
     """Generate attendance export report (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Build the main query
@@ -1175,7 +1205,7 @@ async def export_professor_attendance_report(
         if not request.instructor_id:
             raise HTTPException(400, "instructor_id is required for professor reports")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Get all classes for this professor
