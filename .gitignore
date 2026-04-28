@@ -6,3 +6,9 @@ __pycache__/
 # Ignore runtime data and local SQLite DB
 data/
 attendance.db*
+node_modules
+node_modules
+# Python virtual environments
+.venv/
+.venv-1/
+.venv*/

@@ -2,9 +2,40 @@
 /* Import Roboto from Google Fonts and set as the global font-family. */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
+html, body {
+  height: 100%;
+  margin: 0;
+  background-color: #0b0b0b; /* dark fallback to prevent white flash */
+}
+
+* {
+  box-sizing: border-box;
+}
+
 /* Global font set for the app */
 body {
   font-family: 'Roboto', Arial, sans-serif;
+  min-height: 100vh;
+
+  background-image:
+    linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+    url('/assets/mapua-bg.jpg');
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* VERY IMPORTANT: ensure the root app element is transparent and fills viewport */
+app-root {
+  display: block;
+  min-height: 100vh;
+  background: transparent;
+}
+
+/* Extra safety: ensure app-root has dark background until styles load */
+app-root, body::before {
+  background-color: #0b0b0b;
 }
 
 /* Status color coding for attendance */

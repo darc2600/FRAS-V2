@@ -1,19 +1,33 @@
 <div class="login-center">
-  <div class="login-container">
-  <h2>Login</h2>
-  <form (ngSubmit)="login()">
+  <!-- Background image injected as an <img> so bundler serves it reliably -->
+  <img class="bg-img" src="/assets/mapua-bg2.jpg" alt="" aria-hidden="true" />
+  <div class="bg-overlay" aria-hidden="true"></div>
+  <div class="login-card">
+    <img class="brand-logo" src="/assets/mapua-logo.png" alt="Mapúa logo" />
+    <div class="system-title">Mapúa Facial Recognition Attendance System</div>
+    <h2>Login</h2>
+
+    <form (ngSubmit)="login()">
       <label>Email</label>
       <input type="text" [(ngModel)]="email" name="email" required>
-    <label>Password</label>
-    <div class="password-field" style="display:flex;align-items:center;gap:8px;">
-      <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" required>
-      <button type="button" (click)="togglePasswordVisibility()" [attr.aria-pressed]="showPassword" aria-label="Toggle password visibility">
-        {{ showPassword ? 'Hide' : 'Show' }}
-      </button>
-    </div>
-    <button type="submit">Login</button>
-  <div class="error" *ngIf="error">{{ error }}</div>
-  <div class="success" *ngIf="success">{{ success }}</div>
-  </form>
+
+      <label>Password</label>
+      <div class="password-container">
+        <input class="password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" required>
+        <span 
+          role="button" tabindex="0" 
+          class="toggle-eye material-icons" 
+          (click)="togglePasswordVisibility()" 
+          (keydown.enter)="togglePasswordVisibility()"
+          [attr.aria-pressed]="showPassword" aria-label="Toggle password visibility">
+          {{ showPassword ? 'visibility_off' : 'visibility' }}
+        </span>
+      </div>
+
+      <button class="primary" type="submit">Login</button>
+
+      <div class="error" *ngIf="error">{{ error }}</div>
+      <div class="success" *ngIf="success">{{ success }}</div>
+    </form>
   </div>
 </div>
