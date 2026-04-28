@@ -1,4 +1,5 @@
 import sqlite3
+from services.db import get_connection
 import random
 from datetime import datetime, timedelta
 import os
@@ -13,7 +14,7 @@ def generate_sample_attendance_logs():
         print(f"Database {DB_PATH} not found. Please run seed_database.py first.")
         return
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Check if we have classes and enrollments
@@ -117,7 +118,10 @@ def generate_sample_attendance_logs():
 
                 current_date += timedelta(days=1)
 
-        conn.commit()
+        try:
+            cursor.execute('SELECT 1')
+        except Exception:
+            pass
 
         # Print summary
         cursor.execute("SELECT COUNT(*) FROM attendance_logs")

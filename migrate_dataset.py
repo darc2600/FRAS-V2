@@ -1,25 +1,24 @@
 import os
 import shutil
 import sqlite3
+from services.db import get_connection
 
 # Path to dataset and database
 DATASET_DIR = 'dataset'
 DB_PATH = 'attendance.db'
 
-# Connect to DB
-conn = sqlite3.connect(DB_PATH)
-cursor = conn.cursor()
-
 def ensure_student(student_id):
-    cursor.execute('INSERT OR IGNORE INTO students (student_id, name) VALUES (?, ?)', (student_id, student_id))
-    conn.commit()
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute('INSERT OR IGNORE INTO students (student_id, name) VALUES (?, ?)', (student_id, student_id))
 
 def add_student_course(student_id, course_code, section, room):
-    cursor.execute('''
-        INSERT INTO student_courses (student_id, course_code, section, room)
-        VALUES (?, ?, ?, ?)
-    ''', (student_id, course_code, section, room))
-    conn.commit()
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO student_courses (student_id, course_code, section, room)
+            VALUES (?, ?, ?, ?)
+        ''', (student_id, course_code, section, room))
 
 def migrate_flat():
     # Handles dataset/{student_id}/imgX.jpg

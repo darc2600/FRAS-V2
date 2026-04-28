@@ -17,7 +17,7 @@ export interface SimpleRegistrationPayload {
 
 @Injectable({ providedIn: 'root' })
 export class RegistrationService {
-  private readonly baseUrl = 'http://127.0.0.1:8000/api';
+  private readonly baseUrl = '/api';
 
   constructor(private http: HttpClient) {}
 

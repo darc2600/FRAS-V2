@@ -4,6 +4,7 @@ Seed system settings with default values for FRAS
 """
 
 import sqlite3
+from services.db import get_connection
 import os
 
 DB_PATH = "attendance.db"
@@ -15,10 +16,9 @@ def seed_system_settings():
         print(f"Database {DB_PATH} not found!")
         return
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
     try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
         # Default system settings with appropriate types and values
         default_settings = [
             # Attendance settings
@@ -56,15 +56,11 @@ def seed_system_settings():
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         """, default_settings)
 
-        conn.commit()
-        print(f"✅ Successfully seeded {len(default_settings)} system settings")
+            conn.commit()
+            print(f"✅ Successfully seeded {len(default_settings)} system settings")
 
     except Exception as e:
         print(f"❌ Failed to seed system settings: {e}")
-        conn.rollback()
-
-    finally:
-        conn.close()
 
 if __name__ == "__main__":
     seed_system_settings()

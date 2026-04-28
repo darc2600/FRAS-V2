@@ -90,7 +90,7 @@
           <span>📥 Export Data</span>
         </button>
       </div>
-      <div *ngFor="let date of objectKeys(groupedLogs)" class="date-section">
+      <div *ngFor="let date of groupedDateKeys" class="date-section">
         <h4 class="date-header">{{ date | date:'fullDate' }}</h4>
         <div class="table-container">
           <table class="attendance-table">

@@ -28,7 +28,7 @@ export class ScheduleUploadComponent {
     const formData = new FormData();
     formData.set('student_id', this.studentId);
     formData.set('file', this.file);
-    this.http.post<any>('http://127.0.0.1:8000/api/upload-schedule-image', formData)
+    this.http.post<any>('/api/upload-schedule-image', formData)
       .subscribe({
         next: (res) => {
           if (res.status === 'success') {

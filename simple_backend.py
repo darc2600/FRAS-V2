@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import sqlite3
+from services.db import get_connection
 import os
 import jwt
 from datetime import datetime, timedelta
@@ -49,7 +50,7 @@ def create_access_token(data: dict):
 
 def get_user_auth(email: str):
     """Get user authentication data from database"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT password, role, user_id, reference_id
@@ -111,7 +112,7 @@ async def register_user(payload: UserRegister):
     """User registration endpoint"""
     print(f"Registration attempt for: {payload.email}")
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Check if user already exists
@@ -173,7 +174,7 @@ async def get_users(current_user: dict = Depends(get_current_user)):
     if current_user.get("user_type") not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT user_id, email, role, created_at
@@ -197,7 +198,7 @@ async def get_analytics(current_user: dict = Depends(get_current_user)):
     if current_user.get("user_type") not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Get user counts

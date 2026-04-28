@@ -1,233 +1,183 @@
+#!/usr/bin/env python3
 """
-Migrate SQLite (attendance.db) to PostgreSQL.
+Upsert missing rows from SQLite into Postgres (safe, idempotent).
 
-Usage:
-  - Install dependencies: pip install -r requirements.txt
-  - Set DATABASE_URL env var, e.g.:
-      export DATABASE_URL=postgresql://username:password@host:5432/dbname
-    On Windows PowerShell:
-      $env:DATABASE_URL = 'postgresql://username:password@host:5432/dbname'
+Usage examples:
+  # Dry-run inside container (let container expand DATABASE_URL):
+  docker exec -it fras-backend-1 /bin/bash -c 'python3 /app/scripts/migrate_sqlite_to_postgres.py --sqlite /app/data/attendance.db --pg "$DATABASE_URL" --dry-run'
 
-  - Run:
-      python scripts/migrate_sqlite_to_postgres.py --sqlite-file attendance.db
+  # Or run on host pointing to local sqlite and DATABASE_URL in env:
+  python3 scripts/migrate_sqlite_to_postgres.py --sqlite data/attendance.db --pg "$DATABASE_URL" --dry-run
 
-Notes:
- - This script creates tables in Postgres mirroring the schema in backend.py
- - It copies rows in an order that respects foreign keys
- - It does not attempt to migrate triggers. After migration you can enable triggers on the Postgres side as needed.
- - Test on a non-production Postgres first.
+The script is idempotent and uses ON CONFLICT DO NOTHING for inserts.
 """
-
-from __future__ import annotations
-
 import argparse
+import json
 import os
 import sqlite3
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
-import psycopg2
-from psycopg2.extras import execute_values
-
-SQLITE_DEFAULT = 'attendance.db'
-
-
-POSTGRES_TABLES_DDL = [
-    """
-    CREATE TABLE IF NOT EXISTS students (
-        student_id SERIAL PRIMARY KEY,
-        student_number VARCHAR(20) UNIQUE,
-        last_name TEXT,
-        first_name TEXT,
-        email TEXT,
-        face_data_path TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS instructors (
-        instructor_id SERIAL PRIMARY KEY,
-        instructor_number VARCHAR(20) UNIQUE,
-        last_name TEXT,
-        first_name TEXT,
-        email TEXT,
-        department TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS courses (
-        course_id SERIAL PRIMARY KEY,
-        course_code VARCHAR(20) UNIQUE,
-        course_name VARCHAR(100),
-        units INTEGER,
-        department TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS room_types (
-        room_type_id SERIAL PRIMARY KEY,
-        type_name VARCHAR(50) UNIQUE
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS campuses (
-        campus_id SERIAL PRIMARY KEY,
-        campus_name TEXT UNIQUE NOT NULL,
-        location TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS buildings (
-        building_id SERIAL PRIMARY KEY,
-        building_name TEXT NOT NULL,
-        campus_id INTEGER NOT NULL REFERENCES campuses(campus_id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS rooms (
-        room_id SERIAL PRIMARY KEY,
-        room_number VARCHAR(20),
-        floor_level INTEGER,
-        campus_id INTEGER NOT NULL REFERENCES campuses(campus_id),
-        building_id INTEGER REFERENCES buildings(building_id),
-        room_type_id INTEGER REFERENCES room_types(room_type_id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS school_terms (
-        term_id SERIAL PRIMARY KEY,
-        school_year VARCHAR(20),
-        term INTEGER,
-        start_date DATE,
-        end_date DATE
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS classes (
-        class_id SERIAL PRIMARY KEY,
-        course_id INTEGER,
-        room_id INTEGER,
-        instructor_id INTEGER,
-        section VARCHAR(10),
-        day_of_week VARCHAR(10),
-        start_time TIME,
-        end_time TIME,
-        term_id INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(course_id) REFERENCES courses(course_id),
-        FOREIGN KEY(room_id) REFERENCES rooms(room_id),
-        FOREIGN KEY(instructor_id) REFERENCES instructors(instructor_id),
-        FOREIGN KEY(term_id) REFERENCES school_terms(term_id)
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS enrollments (
-        enrollment_id SERIAL PRIMARY KEY,
-        student_id INTEGER,
-        class_id INTEGER,
-        enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(student_id) REFERENCES students(student_id),
-        FOREIGN KEY(class_id) REFERENCES classes(class_id)
-    );
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS attendance_logs (
-        log_id SERIAL PRIMARY KEY,
-        student_id INTEGER,
-        class_id INTEGER,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        status VARCHAR(20),
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(student_id) REFERENCES students(student_id),
-        FOREIGN KEY(class_id) REFERENCES classes(class_id)
-    );
-    """,
-]
+try:
+    import psycopg2
+    from psycopg2 import sql
+except Exception:
+    psycopg2 = None
 
 
-def get_sqlite_rows(sqlite_conn: sqlite3.Connection, table: str) -> Tuple[List[str], List[Tuple[Any, ...]]]:
-    cur = sqlite_conn.cursor()
-    cur.execute(f"SELECT * FROM {table}")
-    rows = cur.fetchall()
-    cols = [d[0] for d in cur.description]
-    return cols, rows
+def sqlite_table_info(conn: sqlite3.Connection, table: str) -> List[Dict[str, Any]]:
+    cur = conn.execute(f"PRAGMA table_info('{table}')")
+    cols = []
+    for cid, name, ctype, notnull, dflt_value, pk in cur.fetchall():
+        cols.append({'cid': cid, 'name': name, 'type': ctype, 'notnull': bool(notnull), 'dflt_value': dflt_value, 'pk': int(pk)})
+    return cols
 
 
-def copy_table(sqlite_conn: sqlite3.Connection, pg_conn, table: str, mapping: Dict[str, str] | None = None):
-    """Copy rows from sqlite table to Postgres table.
+def fetch_sqlite_pks(conn: sqlite3.Connection, table: str, pk_col: str) -> List[Any]:
+    cur = conn.execute(f'SELECT "{pk_col}" FROM "{table}"')
+    return [r[0] for r in cur.fetchall()]
 
-    mapping: optional dict mapping sqlite column -> postgres column (if names differ)
-    """
-    cols, rows = get_sqlite_rows(sqlite_conn, table)
+
+def fetch_pg_pks(pg_conn, table: str, pk_col: str) -> List[Any]:
+    cur = pg_conn.cursor()
+    cur.execute(sql.SQL('SELECT {} FROM {}').format(sql.Identifier(pk_col), sql.Identifier(table)))
+    return [r[0] for r in cur.fetchall()]
+
+
+def fetch_sqlite_row(conn: sqlite3.Connection, table: str, cols: List[str], pk_col: str, pk_val: Any) -> Dict[str, Any]:
+    cur = conn.execute(f'SELECT * FROM "{table}" WHERE "{pk_col}" = ? LIMIT 1', (pk_val,))
+    row = cur.fetchone()
+    if row is None:
+        return {}
+    return dict(zip(cols, row))
+
+
+def insert_rows(pg_conn, table: str, cols: List[str], rows: List[Dict[str, Any]], pk_col: str, dry_run: bool = False) -> int:
     if not rows:
-        print(f"{table}: no rows to copy")
-        return
-    pg_cols = [mapping.get(c, c) if mapping else c for c in cols]
-    placeholders = ','.join(['%s'] * len(pg_cols))
-    insert_sql = f"INSERT INTO {table} ({', '.join(pg_cols)}) VALUES %s"
-    with pg_conn.cursor() as cur:
+        return 0
+    inserted = 0
+    if dry_run:
+        for r in rows:
+            print('DRY:', table, '->', r)
+        return 0
+
+    cur = pg_conn.cursor()
+    col_idents = [sql.Identifier(c) for c in cols]
+    placeholders = sql.SQL(',').join(sql.Placeholder() * len(cols))
+    insert_sql = sql.SQL('INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING').format(
+        sql.Identifier(table), sql.SQL(',').join(col_idents), placeholders, sql.Identifier(pk_col)
+    )
+
+    for r in rows:
+        vals = [r.get(c) for c in cols]
         try:
-            execute_values(cur, insert_sql, rows)
-            pg_conn.commit()
-            print(f"Copied {len(rows)} rows into {table}")
+            cur.execute(insert_sql, vals)
+            inserted += 1
         except Exception as e:
+            print('Insert error', table, 'pk=', r.get(pk_col), str(e))
             pg_conn.rollback()
-            print(f"Failed copying into {table}: {e}")
             raise
 
+    pg_conn.commit()
+    return inserted
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description='Migrate attendance.db (SQLite) to Postgres')
-    parser.add_argument('--sqlite-file', default=SQLITE_DEFAULT, help='Path to SQLite file')
-    parser.add_argument('--database-url', default=os.environ.get('DATABASE_URL'), help='Postgres DATABASE_URL (env DATABASE_URL)')
+
+def sanitize_dsn(dsn: str) -> str:
+    if not dsn:
+        return dsn
+    d = dsn.strip()
+    if (d.startswith('"') and d.endswith('"')) or (d.startswith("'") and d.endswith("'")):
+        d = d[1:-1]
+    return d
+
+
+def main(argv: List[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description='Upsert missing rows from SQLite into Postgres (safe, idempotent)')
+    parser.add_argument('--sqlite', required=True, help='Path to SQLite file')
+    parser.add_argument('--pg', required=False, help='Postgres DSN (e.g. postgres://user:pw@host:5432/db)')
+    parser.add_argument('--tables', default='classes,enrollments,permissions,rooms', help='Comma-separated list of tables')
+    parser.add_argument('--dry-run', action='store_true', help='Show what would be inserted without performing inserts')
+    parser.add_argument('--sample', type=int, default=5, help='Max sample rows to print per table')
     args = parser.parse_args(argv)
 
-    if not args.database_url:
-        print('Please provide --database-url or set DATABASE_URL env var')
+    if args.pg and psycopg2 is None:
+        print('psycopg2 not installed in this Python environment. Install and re-run.', file=sys.stderr)
         sys.exit(2)
 
-    if not os.path.exists(args.sqlite_file):
-        print(f"SQLite file not found: {args.sqlite_file}")
+    if not os.path.exists(args.sqlite):
+        print('SQLite file not found:', args.sqlite, file=sys.stderr)
         sys.exit(2)
 
-    sqlite_conn = sqlite3.connect(args.sqlite_file)
-    # Use row factory to preserve order
+    sqlite_conn = sqlite3.connect(args.sqlite)
+    sqlite_conn.row_factory = sqlite3.Row
 
-    print('Connecting to Postgres...')
-    pg_conn = psycopg2.connect(args.database_url)
-
-    # Create tables
-    with pg_conn.cursor() as cur:
-        for ddl in POSTGRES_TABLES_DDL:
-            cur.execute(ddl)
-        pg_conn.commit()
-    print('Created/verified tables in Postgres')
-
-    # Copy order: students, instructors, courses, rooms, classes, enrollments, attendance_logs
-    order = ['students', 'instructors', 'courses', 'rooms', 'classes', 'enrollments', 'attendance_logs']
-
-    # Special handling: sqlite may have autoincrement integers and column names, ensure mapping if needed
-    for table in order:
-        # if the sqlite DB doesn't have the table, skip
+    pg_conn = None
+    # Allow DSN to come from --pg or from the DATABASE_URL environment variable
+    dsn = None
+    if args.pg:
+        dsn = args.pg
+    else:
+        dsn = os.environ.get('DATABASE_URL')
+    dsn = sanitize_dsn(dsn) if dsn else None
+    if dsn:
         try:
-            copy_table(sqlite_conn, pg_conn, table)
-        except sqlite3.OperationalError as e:
-            print(f"Skipping {table} (not present in sqlite): {e}")
+            pg_conn = psycopg2.connect(dsn)
+        except Exception as e:
+            print('Error connecting to Postgres with DSN:', repr(e), file=sys.stderr)
+            sys.exit(2)
+    else:
+        # No DSN provided; only allow read-only dry-run behavior
+        if not args.dry_run:
+            print('No Postgres DSN provided via --pg or DATABASE_URL; provide one or run with --dry-run', file=sys.stderr)
+            sys.exit(2)
 
-    print('Migration complete. Verify data and recreate any triggers/indexes as needed on Postgres.')
+    tables = [t.strip() for t in args.tables.split(',') if t.strip()]
+    total_inserted = 0
+
+    for t in tables:
+        print(f"\nProcessing table {t}")
+        try:
+            info = sqlite_table_info(sqlite_conn, t)
+        except Exception as e:
+            print('  Skipping', t, '(not present in sqlite?)', e)
+            continue
+
+        cols = [c['name'] for c in info]
+        pk_cols = [c['name'] for c in info if c['pk']]
+
+        if len(pk_cols) != 1:
+            print('  Skipping detailed PK diff for', t, '(composite or no PK)')
+            continue
+        pk = pk_cols[0]
+
+        s_pks = set(fetch_sqlite_pks(sqlite_conn, t, pk))
+        p_pks = set(fetch_pg_pks(pg_conn, t, pk)) if pg_conn else set()
+
+        missing_in_pg = sorted(list(s_pks - p_pks))
+        print(f"  sqlite rows: {len(s_pks)}, pg rows: {len(p_pks)}, missing in pg: {len(missing_in_pg)}")
+
+        if not missing_in_pg:
+            continue
+
+        sample = missing_in_pg[: args.sample]
+        print(f"  Preparing to insert {len(missing_in_pg)} rows into {t} (sample up to {args.sample}):")
+        rows_to_insert = []
+        for pkval in sample:
+            row = fetch_sqlite_row(sqlite_conn, t, cols, pk, pkval)
+            print('   -', json.dumps(row, default=str))
+            rows_to_insert.append(row)
+
+        if args.dry_run:
+            for r in rows_to_insert:
+                print('DRY:', t, '->', r)
+            print(f"  Inserted: 0")
+            continue
+
+        inserted = insert_rows(pg_conn, t, cols, rows_to_insert, pk, dry_run=False)
+        print(f"  Inserted: {inserted}")
+        total_inserted += inserted
+
+    print('\nTotal inserted:', total_inserted)
 
 
 if __name__ == '__main__':

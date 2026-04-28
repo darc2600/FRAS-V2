@@ -8,12 +8,21 @@ interface User {
   id: number;
   email: string;
   user_type: string;
+  original_user_type?: string;
+  can_change_role?: boolean;
+  role_change_block_reason?: string;
   role?: string;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
   first_name?: string;
   last_name?: string;
+}
+
+interface ApiErrorPayload {
+  detail?: string;
+  message?: string;
+  error?: string;
 }
 
 interface CreateUserRequest {
@@ -66,6 +75,11 @@ export class UserManagementComponent implements OnInit {
     public authService: AuthService
   ) {}
 
+  private getErrorMessage(err: any, fallback: string): string {
+    const payload = (err?.error || {}) as ApiErrorPayload;
+    return payload.detail || payload.message || payload.error || err?.message || fallback;
+  }
+
   ngOnInit(): void {
     this.loadUsers();
     this.newUser.user_type = this.authService.getCurrentUser()?.user_type || 'instructor';
@@ -79,13 +93,14 @@ export class UserManagementComponent implements OnInit {
       next: (users) => {
         this.users = users.map(user => ({
           ...user,
+          original_user_type: user.user_type,
           role: user.user_type // Map user_type to role for consistency
         }));
         this.applyFilters();
         this.loading = false;
       },
       error: (err) => {
-        this.error = 'Failed to load users: ' + (err.error?.message || err.message);
+        this.error = 'Failed to load users: ' + this.getErrorMessage(err, 'Unknown error');
         this.loading = false;
         // Fallback to demo data for development
         this.users = [
@@ -151,7 +166,7 @@ export class UserManagementComponent implements OnInit {
         this.loadUsers(); // Reload to show new user
       },
       error: (err) => {
-        this.error = 'Failed to create user: ' + (err.error?.message || err.message);
+        this.error = 'Failed to create user: ' + this.getErrorMessage(err, 'Unknown error');
       }
     });
   }
@@ -200,12 +215,13 @@ export class UserManagementComponent implements OnInit {
     this.apiService.updateUser(user.id, { user_type: newType }).subscribe({
       next: () => {
         user.user_type = newType;
+        user.original_user_type = newType;
         user.role = newType;
         this.success = `User ${user.email} updated to ${newType}`;
         this.applyFilters(); // Re-apply filters in case user type changed
       },
       error: (err) => {
-        this.error = 'Failed to update user: ' + (err.error?.message || err.message);
+        this.error = 'Failed to update user: ' + this.getErrorMessage(err, 'Unknown error');
       }
     });
   }
@@ -224,7 +240,7 @@ export class UserManagementComponent implements OnInit {
         this.loadUsers();
       },
       error: (err) => {
-        this.error = 'Failed to delete user: ' + (err.error?.message || err.message);
+        this.error = 'Failed to delete user: ' + this.getErrorMessage(err, 'Unknown error');
       }
     });
   }
@@ -246,7 +262,7 @@ export class UserManagementComponent implements OnInit {
         this.success = `Password reset successfully for ${email}`;
       },
       error: (err) => {
-        this.error = 'Failed to reset password: ' + (err.error?.message || err.message);
+        this.error = 'Failed to reset password: ' + this.getErrorMessage(err, 'Unknown error');
       }
     });
   }
@@ -315,7 +331,7 @@ export class UserManagementComponent implements OnInit {
         this.loadUsers();
       },
       error: (err) => {
-        this.error = 'Bulk operation failed: ' + (err.error?.message || err.message);
+        this.error = 'Bulk operation failed: ' + this.getErrorMessage(err, 'Unknown error');
       }
     });
   }
@@ -357,9 +373,26 @@ export class UserManagementComponent implements OnInit {
     this.updateUserType(user, target.value);
   }
 
+  saveUserRole(user: User): void {
+    const nextType = user.user_type;
+    const originalType = user.original_user_type || user.user_type;
+
+    if (!nextType || nextType === originalType) {
+      return;
+    }
+
+    this.updateUserType(user, nextType);
+  }
+
+  hasPendingRoleChange(user: User): boolean {
+    if (user.can_change_role === false) {
+      return false;
+    }
+    return !!user.user_type && !!user.original_user_type && user.user_type !== user.original_user_type;
+  }
+
   hasPermission(permission: string): boolean {
-    const currentUser = this.authService.getCurrentUser();
-    return currentUser ? currentUser.permissions.includes(permission) : false;
+    return this.authService.hasPermission(permission);
   }
 
   getUserTypeDisplayName(userType: string): string {

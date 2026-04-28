@@ -141,6 +141,30 @@
   min-width: 120px;
 }
 
+.role-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.role-lock-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background-color: #6c757d;
+  color: #fff;
+  font-size: 0.65rem;
+  cursor: help;
+}
+
+.role-lock-text {
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
 .badge {
   font-size: 0.75em;
   padding: 0.35em 0.65em;
@@ -221,6 +245,11 @@
 .btn-group .btn:last-child {
   border-top-right-radius: 0.25rem;
   border-bottom-right-radius: 0.25rem;
+}
+
+.btn-group {
+  display: inline-flex;
+  align-items: center;
 }
 
 .alert {

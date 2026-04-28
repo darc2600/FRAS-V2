@@ -2,10 +2,14 @@ from repositories.attendance_repo import AttendanceRepository, get_attendance_re
 from models.attendance import AttendanceResponse
 from fastapi import Depends
 import sqlite3
+from services.db import get_connection
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from services.settings_service import get_settings_service
 from repositories.recognition_repo import RecognitionRepository
+
+MANILA_TZ = ZoneInfo("Asia/Manila")
 
 class AttendanceService:
     def __init__(self, repo: AttendanceRepository):
@@ -32,7 +36,7 @@ async def mark_automatic_absents():
     settings = get_settings_service()
     auto_absent_threshold = settings.auto_mark_absent_after_minutes
 
-    now = datetime.now()
+    now = datetime.now(MANILA_TZ)
     current_day = now.strftime("%A")
     attendance_date = now.strftime("%Y-%m-%d")
     current_time = now.strftime("%H:%M")
@@ -42,7 +46,7 @@ async def mark_automatic_absents():
     # Database path
     DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "attendance.db")
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Get classes for today that have started and are past the auto-absent threshold

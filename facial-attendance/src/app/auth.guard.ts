@@ -50,7 +50,10 @@ export class AnalyticsGuard implements CanActivate {
   ) {}
 
   canActivate(): boolean {
-    if (this.authService.isAuthenticated() && this.authService.hasPermission('view_analytics')) {
+    if (
+      this.authService.isAuthenticated() &&
+      this.authService.hasAnyPermission(['view_analytics', 'view_all_data'])
+    ) {
       return true;
     } else {
       this.router.navigate(['/login']);

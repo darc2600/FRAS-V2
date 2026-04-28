@@ -6,7 +6,7 @@ import { Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class ApiService {
-  backendUrl = 'http://127.0.0.1:8000';
+  backendUrl = '';
 
   constructor(private http: HttpClient) {}
 

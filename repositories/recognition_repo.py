@@ -1,8 +1,10 @@
 import os
 import shutil
+import logging
 from fastapi import UploadFile
 from deepface import DeepFace
-from datetime import datetime
+from datetime import datetime, time as dt_time, timezone
+from zoneinfo import ZoneInfo
 from models.recognition import RecognitionResponse
 from services.db import get_connection
 from services.s3_utils import download_student_folder
@@ -17,44 +19,122 @@ from services.face_embeddings import (
     parse_embedding_json,
 )
 
+LOG = logging.getLogger(__name__)
+MANILA_TZ = ZoneInfo("Asia/Manila")
+
 
 class RecognitionRepository:
     def __init__(self):
         self.settings = get_settings_service()
 
-    def _build_attendance_response(self, cursor, conn, student_id: int, class_id: int):
+    def _is_postgres(self) -> bool:
+        database_url = (os.environ.get('DATABASE_URL') or '').strip().lower()
+        return bool(database_url) and not database_url.startswith('sqlite')
+
+    def _db_timestamp_value(self, local_dt: datetime):
+        if self._is_postgres():
+            return local_dt.astimezone(timezone.utc)
+        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    def _parse_db_timestamp(self, value):
+        if isinstance(value, datetime):
+            return value
+
+        if value is None:
+            return None
+
+        text = str(value).strip()
+        if not text:
+            return None
+
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+
+        normalized = text.replace("T", " ")
+        candidates = [normalized]
+
+        if "+" in normalized[10:] or "-" in normalized[10:]:
+            try:
+                candidates.append(normalized.rsplit(":", 1)[0] + normalized[-3:])
+            except Exception:
+                pass
+
+        for candidate in candidates:
+            for fmt in (
+                "%Y-%m-%d %H:%M:%S.%f%z",
+                "%Y-%m-%d %H:%M:%S%z",
+                "%Y-%m-%d %H:%M:%S.%f",
+                "%Y-%m-%d %H:%M:%S",
+            ):
+                try:
+                    return datetime.strptime(candidate, fmt)
+                except ValueError:
+                    continue
+
+        try:
+            return datetime.fromisoformat(normalized)
+        except Exception:
+            LOG.warning("Could not parse attendance timestamp value: %s", value)
+            return None
+
+    def _build_attendance_response(self, cursor, conn, student_id: int, class_id: int) -> RecognitionResponse:
         cursor.execute('''
             SELECT day_of_week, start_time, end_time FROM classes WHERE class_id = ?
         ''', (class_id,))
         class_row = cursor.fetchone()
         if not class_row:
             print(f"[DEBUG] No class details found for class_id={class_id}")
-            return None
-        day_of_week, start_time_str, end_time_str = class_row
+            return RecognitionResponse(status="failed", message="Class schedule not found for selected class")
+        day_of_week, start_time_val, end_time_val = class_row
 
-        now = datetime.now()
-        timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+        # Normalize start/end times: DB may return time objects or strings
+        def _to_time_str(val):
+            if isinstance(val, str):
+                return val
+            try:
+                if isinstance(val, dt_time):
+                    return val.strftime("%H:%M")
+            except Exception:
+                pass
+            return str(val)
+
+        start_time_str = _to_time_str(start_time_val)
+        end_time_str = _to_time_str(end_time_val)
+
+        now = datetime.now(MANILA_TZ)
+        timestamp_value = self._db_timestamp_value(now)
         attendance_date = now.strftime("%Y-%m-%d")
         current_day = now.strftime("%A")
 
         if current_day != day_of_week:
             print(f"[DEBUG] Not class day: today={current_day}, class_day={day_of_week}")
-            return None
+            return RecognitionResponse(
+                status="failed",
+                message=f"Attendance recognition time not valid: class is scheduled on {day_of_week}"
+            )
 
         try:
-            class_start = datetime.strptime(attendance_date + ' ' + start_time_str, "%Y-%m-%d %H:%M")
-            class_end = datetime.strptime(attendance_date + ' ' + end_time_str, "%Y-%m-%d %H:%M")
+            class_start = datetime.strptime(attendance_date + ' ' + start_time_str, "%Y-%m-%d %H:%M").replace(tzinfo=MANILA_TZ)
+            class_end = datetime.strptime(attendance_date + ' ' + end_time_str, "%Y-%m-%d %H:%M").replace(tzinfo=MANILA_TZ)
         except ValueError:
             try:
-                class_start = datetime.strptime(attendance_date + ' ' + start_time_str, "%Y-%m-%d %I:%M%p")
-                class_end = datetime.strptime(attendance_date + ' ' + end_time_str, "%Y-%m-%d %I:%M%p")
+                class_start = datetime.strptime(attendance_date + ' ' + start_time_str, "%Y-%m-%d %I:%M%p").replace(tzinfo=MANILA_TZ)
+                class_end = datetime.strptime(attendance_date + ' ' + end_time_str, "%Y-%m-%d %I:%M%p").replace(tzinfo=MANILA_TZ)
             except Exception as e:
                 print(f"[DEBUG] Could not parse start_time or end_time: {e}")
-                return None
+                return RecognitionResponse(
+                    status="error",
+                    message="Invalid class schedule time format"
+                )
 
         if not (class_start <= now <= class_end):
             print(f"[DEBUG] Outside class hours: now={now}, class_start={class_start}, class_end={class_end}")
-            return None
+            start_label = class_start.strftime("%I:%M %p").lstrip("0")
+            end_label = class_end.strftime("%I:%M %p").lstrip("0")
+            return RecognitionResponse(
+                status="failed",
+                message=f"Attendance recognition time not valid: no active class schedule right now ({start_label} - {end_label})"
+            )
 
         delta = (now - class_start).total_seconds() / 60.0
         late_threshold = self.settings.late_threshold_minutes
@@ -76,7 +156,7 @@ class RecognitionRepository:
         status_row = cursor.fetchone()
         if not status_row:
             print(f"[DEBUG] No status_id found for status_name={status_name}")
-            return None
+            return RecognitionResponse(status="error", message=f"Attendance status mapping not found for {status_name}")
         status_id = status_row[0]
 
         cursor.execute('''
@@ -85,11 +165,20 @@ class RecognitionRepository:
         name_row = cursor.fetchone()
         student_name = name_row[0] if name_row else "Unknown"
 
-        cursor.execute("""
-            SELECT timestamp FROM attendance_logs
-            WHERE student_id = ? AND class_id = ? AND DATE(timestamp) = ?
-            ORDER BY timestamp DESC LIMIT 1
-        """, (student_id, class_id, attendance_date))
+        if self._is_postgres():
+            cursor.execute("""
+                SELECT timestamp FROM attendance_logs
+                WHERE student_id = ? AND class_id = ?
+                AND ((timestamp AT TIME ZONE 'Asia/Manila')::date = ?::date)
+                ORDER BY timestamp DESC LIMIT 1
+            """, (student_id, class_id, attendance_date))
+        else:
+            cursor.execute("""
+                SELECT timestamp FROM attendance_logs
+                WHERE student_id = ? AND class_id = ?
+                AND DATE(datetime(timestamp, '+8 hours')) = DATE(?)
+                ORDER BY timestamp DESC LIMIT 1
+            """, (student_id, class_id, attendance_date))
 
         last_attendance_row = cursor.fetchone()
         buffer_minutes = self.settings.attendance_buffer_minutes
@@ -98,22 +187,29 @@ class RecognitionRepository:
             should_insert = True
             print(f"[DEBUG] No previous attendance for student {student_id} in class {class_id} today")
         else:
-            last_timestamp_str = last_attendance_row[0]
-            last_timestamp = datetime.strptime(last_timestamp_str, "%Y-%m-%d %H:%M:%S")
-            time_diff = (now - last_timestamp).total_seconds() / 60.0
-            if time_diff < buffer_minutes:
-                should_insert = False
-                print(f"[DEBUG] Duplicate attendance blocked: last check-in {time_diff:.2f} mins ago (< {buffer_minutes} mins buffer)")
-            else:
+            last_timestamp = self._parse_db_timestamp(last_attendance_row[0])
+            if last_timestamp is None:
                 should_insert = True
-                print(f"[DEBUG] Allowing attendance: {time_diff:.2f} mins since last check-in (>= {buffer_minutes} mins buffer)")
+                print("[DEBUG] Unparseable previous attendance timestamp; allowing insert")
+            else:
+                if last_timestamp.tzinfo:
+                    now_ref = now.astimezone(last_timestamp.tzinfo)
+                else:
+                    now_ref = now.replace(tzinfo=None)
+                time_diff = (now_ref - last_timestamp).total_seconds() / 60.0
+                if time_diff < buffer_minutes:
+                    should_insert = False
+                    print(f"[DEBUG] Duplicate attendance blocked: last check-in {time_diff:.2f} mins ago (< {buffer_minutes} mins buffer)")
+                else:
+                    should_insert = True
+                    print(f"[DEBUG] Allowing attendance: {time_diff:.2f} mins since last check-in (>= {buffer_minutes} mins buffer)")
 
         if should_insert:
             note = f"Face recognized at {now.strftime('%H:%M:%S')} - {status_name}"
             cursor.execute("""
                 INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)
                 VALUES (?, ?, ?, ?, ?)
-            """, (student_id, class_id, timestamp, status_id, note))
+            """, (student_id, class_id, timestamp_value, status_id, note))
             conn.commit()
             print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id}")
 
@@ -168,7 +264,7 @@ class RecognitionRepository:
                     print(f"[DEBUG] Best embedding match: student_id={best_student_id}, similarity={best_similarity:.4f}, threshold={similarity_threshold:.4f}")
                     if best_student_id is not None and best_similarity >= similarity_threshold:
                         response = self._build_attendance_response(cursor, conn, best_student_id, class_id)
-                        if response:
+                        if response.status == "success":
                             upsert_student_embedding(
                                 cursor=cursor,
                                 student_id=best_student_id,
@@ -177,7 +273,7 @@ class RecognitionRepository:
                                 source_image_path=temp_path,
                             )
                             conn.commit()
-                            return response
+                        return response
                 
                 # 2) Fallback: image-to-image verify (legacy path)
                 # Get all students enrolled in this class
@@ -246,18 +342,20 @@ class RecognitionRepository:
                                 )
                                 conn.commit()
                             response = self._build_attendance_response(cursor, conn, student_id, class_id)
-                            if response:
-                                return response
+                            return response
                     except Exception as e:
                         print(f"[DEBUG] Exception for {student_id}: {e}")
                         continue
+        except Exception as e:
+            LOG.exception("Unhandled exception during face recognition")
+            return RecognitionResponse(status="error", message="Internal server error")
         finally:
             try:
                 os.remove(temp_path)
             except Exception:
                 pass
 
-        print(f"[DEBUG] Returning failure response: No match found")
+        LOG.debug("Returning failure response: No match found")
         return RecognitionResponse(status="failed", message="No match found")
 
     async def mark_absents(self, class_id: int, date: str):
@@ -274,10 +372,17 @@ class RecognitionRepository:
             enrolled_students = cursor.fetchall()
             
             # Get students who already have attendance for the date
-            cursor.execute('''
-                SELECT DISTINCT student_id FROM attendance_logs
-                WHERE class_id = ? AND DATE(timestamp) = ?
-            ''', (class_id, date))
+            if self._is_postgres():
+                cursor.execute('''
+                    SELECT DISTINCT student_id FROM attendance_logs
+                    WHERE class_id = ?
+                    AND ((timestamp AT TIME ZONE 'Asia/Manila')::date = ?::date)
+                ''', (class_id, date))
+            else:
+                cursor.execute('''
+                    SELECT DISTINCT student_id FROM attendance_logs
+                    WHERE class_id = ? AND DATE(datetime(timestamp, '+8 hours')) = DATE(?)
+                ''', (class_id, date))
             attended_students = {row[0] for row in cursor.fetchall()}
             
             # Get absent status_id
@@ -293,7 +398,8 @@ class RecognitionRepository:
             for student_id, last_name in enrolled_students:
                 if student_id not in attended_students:
                     # Insert absent record
-                    timestamp = f"{date} 23:59:59"  # End of day
+                    timestamp_local = datetime.strptime(f"{date} 23:59:59", "%Y-%m-%d %H:%M:%S").replace(tzinfo=MANILA_TZ)
+                    timestamp = self._db_timestamp_value(timestamp_local)
                     note = f"Auto-marked absent on {date} - No attendance recorded during class"
                     cursor.execute('''
                         INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)

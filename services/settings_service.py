@@ -6,9 +6,9 @@ cached access throughout the application. Settings are automatically reloaded
 when changed through the admin interface.
 """
 
-import sqlite3
 import threading
 from typing import Dict, Any, Optional
+from services.db import get_connection
 
 
 class SettingsService:
@@ -34,7 +34,8 @@ class SettingsService:
 
     def _get_connection(self):
         """Get database connection"""
-        return sqlite3.connect(self._db_path)
+        # Use central DB wrapper so Postgres is used when DATABASE_URL is set
+        return get_connection()
 
     def _load_settings_from_db(self) -> Dict[str, Any]:
         """Load all settings from database"""

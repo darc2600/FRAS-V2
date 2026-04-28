@@ -1,4 +1,4 @@
-<nav class="sidebar-navbar">
+<nav class="sidebar-navbar" [class.closed]="!isOpen">
   <div class="sidebar-logo">
     <img src="assets/mapua-logo.png" alt="Mapua Logo" height="48" />
   </div>
@@ -15,8 +15,13 @@
     <li *ngIf="canManageUsers"><a routerLink="/admin/users" routerLinkActive="active">User Management</a></li>
     <li *ngIf="canResetPasswords || canManageUsers"><a routerLink="/admin/password-reset" routerLinkActive="active">Password Reset</a></li>
     <li *ngIf="canManageSupport"><a routerLink="/admin/support-tickets" routerLinkActive="active">Support Tickets</a></li>
+    <li *ngIf="canViewReports"><a routerLink="/admin/attendance-reports" routerLinkActive="active">Generate Report</a></li>
     <li *ngIf="canEditSchedule"><a routerLink="/room-schedule-editor" routerLinkActive="active">Add/Edit Schedule</a></li>
     <li *ngIf="canViewAnalytics"><a routerLink="/admin/analytics" routerLinkActive="active">Analytics</a></li>
     <li *ngIf="canConfigureSystem"><a routerLink="/admin/settings" routerLinkActive="active">System Settings</a></li>
   </ul>
+
+  <div class="sidebar-footer">
+    <button class="sidebar-logout-btn" (click)="logout()">Sign Out</button>
+  </div>
 </nav>

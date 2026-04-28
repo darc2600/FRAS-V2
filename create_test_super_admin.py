@@ -4,6 +4,7 @@ Script to create a new super admin user for testing
 """
 
 import sqlite3
+from services.db import get_connection
 import os
 import secrets
 
@@ -12,7 +13,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "attendance.db")
 def create_test_super_admin():
     """Create a test super admin user"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Test data
@@ -33,15 +34,18 @@ def create_test_super_admin():
                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, (f"SUPER{secrets.token_hex(4).upper()}", last_name, first_name, email, 1))
 
-            super_admin_id = cursor.lastrowid
+            super_admin_id = getattr(cursor, 'lastrowid', None)
+            if not super_admin_id:
+                # Re-query if backend is Postgres and lastrowid not supported
+                cursor.execute("SELECT super_admin_id FROM super_admins WHERE email = ?", (email,))
+                r = cursor.fetchone()
+                super_admin_id = r[0] if r else None
 
             # Create user record
             cursor.execute("""
                 INSERT INTO users (email, password, role, reference_id, created_at)
                 VALUES (?, ?, 'super_admin', ?, CURRENT_TIMESTAMP)
             """, (email, password, super_admin_id))
-
-            conn.commit()
 
             print("✅ Test Super Admin Created Successfully!")
             print(f"   Email: {email}")

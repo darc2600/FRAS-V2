@@ -10,8 +10,6 @@ export class LoginService {
 
   // Accepts an email + password and forwards it to the backend
   login(data: { email: string; password: string }): Observable<any> {
-    // Use the full backend URL during development to avoid proxy configuration
-    const fullUrl = 'http://127.0.0.1:8000/api/login';
-    return this.http.post(fullUrl, data);
+    return this.http.post(this.apiUrl, data);
   }
 }
