@@ -1,14 +1,59 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-.env
-# Ignore runtime data and local SQLite DB
-data/
-attendance.db*
-node_modules
-node_modules
-# Python virtual environments
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
 .venv/
-.venv-1/
-.venv*/
+.venv-*/
+venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Node / Angular
+node_modules/
+facial-attendance/node_modules/
+facial-attendance/dist/
+facial-attendance/.angular/
+facial-attendance/.cache/
+
+# Runtime data and local databases
+data/
+pgdata/
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+
+# Keep the current demo database intentionally tracked if already committed.
+# Do not add private production database dumps.
+*_backup.db
+*.dump
+*.sql.gz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Deployment bundles
+*.zip
+!docs/**/*.zip
