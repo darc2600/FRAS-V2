@@ -9,3 +9,5 @@ CREATE INDEX IF NOT EXISTS idx_attendance_logs_student_date ON attendance_logs(s
 CREATE INDEX IF NOT EXISTS idx_attendance_logs_status ON attendance_logs(status_id);
 CREATE INDEX IF NOT EXISTS idx_courses_code ON courses(course_code);
 CREATE INDEX IF NOT EXISTS idx_instructors_number ON instructors(instructor_number);
+-- Prevent duplicate room records for the same campus/building/room number.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_unique_location_number ON rooms(campus_id, building_id, room_number);

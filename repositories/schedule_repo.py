@@ -2,6 +2,7 @@
 from fastapi import Request, HTTPException
 from models.schedule import ScheduleResponse
 from services.db import get_connection
+from services.room_codes import normalize_room, room_lookup_values
 
 DB_PATH = "attendance.db"
 
@@ -81,9 +82,23 @@ class ScheduleRepository:
                     slots.append(slot)
 
             return slots
+        try:
+            normalized_room_number, raw_room_code = room_lookup_values(room_code)
+        except ValueError:
+            return []
+
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
+            cursor.execute(
+                """
+                SELECT room_id
+                FROM rooms
+                WHERE room_number IN (?, ?)
+                ORDER BY CASE WHEN room_number = ? THEN 0 ELSE 1 END, room_id
+                LIMIT 1
+                """,
+                (normalized_room_number, raw_room_code, normalized_room_number),
+            )
             row = cursor.fetchone()
             if not row:
                 return []
@@ -217,33 +232,72 @@ class ScheduleRepository:
                 except Exception:
                     pass
                 
-                # Get or create room
-                import re
-                match = re.search(r"(\d+)$", room_code)
-                if match:
-                    room_number = match.group(1)
-                    floor_level = int(room_number[0]) if len(room_number) > 0 else None
-                else:
-                    room_number = None
-                    floor_level = None
-                cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
+                # Get or create room using one normalized room number.
+                # This prevents variants like "305", "Room 305", and "room-305"
+                # from creating duplicate room rows that break schedule views.
+                try:
+                    normalized_room = normalize_room(room_code)
+                except ValueError as exc:
+                    cursor.execute("ROLLBACK")
+                    raise HTTPException(status_code=400, detail=str(exc))
+
+                room_number = normalized_room.room_number
+                floor_level = normalized_room.floor_level
+
+                cursor.execute(
+                    """
+                    SELECT room_id
+                    FROM rooms
+                    WHERE campus_id = 1 AND building_id = 1 AND room_number = ?
+                    ORDER BY room_id
+                    LIMIT 1
+                    """,
+                    (room_number,),
+                )
                 row = cursor.fetchone()
+
                 if not row:
-                    cursor.execute(
-                        "INSERT INTO rooms (floor_level, room_number, campus_id, building_id) VALUES (?, ?, 1, 1)",
-                        (floor_level, room_number)
-                    )
-                    # Get inserted id; sqlite cursor has lastrowid, Postgres may not
+                    try:
+                        cursor.execute(
+                            "INSERT INTO rooms (floor_level, room_number, campus_id, building_id) VALUES (?, ?, 1, 1)",
+                            (floor_level, room_number),
+                        )
+                    except Exception as insert_error:
+                        # If a unique index catches a duplicate created by another request,
+                        # fetch the existing room instead of creating a second row.
+                        cursor.execute(
+                            """
+                            SELECT room_id
+                            FROM rooms
+                            WHERE campus_id = 1 AND building_id = 1 AND room_number = ?
+                            ORDER BY room_id
+                            LIMIT 1
+                            """,
+                            (room_number,),
+                        )
+                        row = cursor.fetchone()
+                        if not row:
+                            raise insert_error
+
                     room_id = getattr(cursor, 'lastrowid', None)
                     if not room_id:
-                        cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
+                        cursor.execute(
+                            """
+                            SELECT room_id
+                            FROM rooms
+                            WHERE campus_id = 1 AND building_id = 1 AND room_number = ?
+                            ORDER BY room_id
+                            LIMIT 1
+                            """,
+                            (room_number,),
+                        )
                         rr = cursor.fetchone()
                         room_id = rr[0] if rr else None
                 else:
                     room_id = row[0]
                     cursor.execute(
                         "UPDATE rooms SET floor_level = ?, room_number = ?, campus_id = 1, building_id = 1 WHERE room_id = ?",
-                        (floor_level, room_number, room_id)
+                        (floor_level, room_number, room_id),
                     )
 
                 # Validate course and instructor existence
@@ -427,9 +481,13 @@ class ScheduleRepository:
         return ScheduleResponse(schedule=merged)
 
     async def delete_room_schedule(self, room_code: str):
+        normalized_room_number, raw_room_code = room_lookup_values(room_code)
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM classes WHERE room_id IN (SELECT room_id FROM rooms WHERE room_number = ?)", (room_code,))
+            cursor.execute(
+                "DELETE FROM classes WHERE room_id IN (SELECT room_id FROM rooms WHERE room_number IN (?, ?))",
+                (normalized_room_number, raw_room_code),
+            )
         return {"detail": "Room schedule deleted"}
 
 def get_schedule_repository():
