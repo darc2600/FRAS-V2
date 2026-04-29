@@ -1,77 +1,27 @@
-# FRAS Upgrade Roadmap
+# FRAS Patch Roadmap
 
-This roadmap tracks the planned PR-based cleanup and upgrade sequence for the latest branch.
+## Completed / prepared patches
 
-## Fix 1 — Repo Stabilization and Documentation Cleanup
+```txt
+Fix 1: Showcase README and docs cleanup
+Fix 2: Docker and environment deployment cleanup
+Fix 3: Panel feedback UI fixes
+Fix 4: Duplicate room protection
+Fix 5: Attendance Reports polish
+Fix 6: Analytics charts and face registration insights
+Fix 7: Repeatable demo data reset workflow
+```
 
-Status: In progress
+## Current patch: Fix 7
 
-Scope:
+This patch adds a repeatable demo database reset script so the project can always be restored to a clean presentation-ready state.
 
-- Rewrite README as a project showcase
-- Add dedicated setup/deployment/demo/troubleshooting docs
-- Add `.env.example`
-- Improve `.gitignore`
-- Define official backend and database direction
+## Next recommended patch
 
-## Fix 2 — Docker and Environment Cleanup
+```txt
+Fix 8: security cleanup for JWT secrets, password handling, debug logs, and environment validation
+```
 
-Scope:
+## Why Fix 8 matters
 
-- Convert Dockerfile to valid UTF-8
-- Clean Docker build flow
-- Move secrets to environment variables
-- Update production compose guidance
-
-## Fix 3 — Small Panel Feedback Fixes
-
-Scope:
-
-- Add Contact Support placeholders
-- Rename Create User to Add User
-- Add user-management filter icon/collapsible filter panel
-
-## Fix 4 — Duplicate Room Protection
-
-Scope:
-
-- Normalize room numbers
-- Prevent duplicate room creation
-- Add unique database index
-- Show clear frontend duplicate warning
-
-## Fix 5 — Attendance Reports Polish
-
-Scope:
-
-- Clean report form controls
-- Improve table display
-- Add better no-data states
-- Clarify export actions
-
-## Fix 6 — Analytics Charts
-
-Scope:
-
-- Monthly student registration chart
-- Monthly instructor registration chart
-- Monthly attendance chart
-- Attendance status distribution chart
-- Clearer face-registration metrics
-
-## Fix 7 — Repeatable Demo Data Workflow
-
-Scope:
-
-- Add reset demo data script
-- Seed clean demo users, classes, rooms, attendance logs, and support tickets
-- Document demo accounts and demo flow
-
-## Fix 8 — Security Hardening
-
-Scope:
-
-- Remove dev fallback secrets
-- Remove plaintext password fallback
-- Remove password debug logs
-- Add stricter environment validation
+The project still contains development fallback secrets, password debug logging, and plaintext password fallback behavior in some paths. These should be cleaned before the final presentation or deployment.
