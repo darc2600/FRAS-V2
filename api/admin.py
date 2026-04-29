@@ -923,38 +923,178 @@ async def update_system_settings_bulk(
 
 @router.get("/api/admin/analytics")
 async def get_analytics(admin_type: str = Depends(require_admin_permission("view_all_data"))):
-    """Get system analytics (Super Admin only)"""
+    """Get dashboard analytics for the admin analytics page.
+
+    The response intentionally includes both headline totals and simple
+    Jan-Dec chart datasets so the frontend can present panel-friendly
+    monthly insights without adding a heavy charting dependency.
+    """
+    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    def empty_month_series():
+        return [{"month": label, "count": 0} for label in month_labels]
+
+    def rows_to_month_series(rows):
+        series = empty_month_series()
+        for row in rows:
+            try:
+                month_number = int(row[0])
+                count = int(row[1] or 0)
+                if 1 <= month_number <= 12:
+                    series[month_number - 1]["count"] = count
+            except Exception:
+                continue
+        return series
+
+    def safe_count(cursor, query, params=()):
+        cursor.execute(query, params)
+        row = cursor.fetchone()
+        return int(row[0] or 0) if row else 0
+
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-
-            # Basic analytics
             analytics = {}
 
-            # User counts
-            cursor.execute("SELECT COUNT(*) FROM students")
-            analytics['total_students'] = cursor.fetchone()[0]
+            db_url = os.environ.get("DATABASE_URL", "")
+            is_postgres = bool(db_url and not db_url.startswith("sqlite"))
 
-            cursor.execute("SELECT COUNT(*) FROM instructors")
-            analytics['total_instructors'] = cursor.fetchone()[0]
+            # Headline totals
+            analytics["total_students"] = safe_count(cursor, "SELECT COUNT(*) FROM students")
+            analytics["total_instructors"] = safe_count(cursor, "SELECT COUNT(*) FROM instructors")
+            analytics["total_attendance_records"] = safe_count(cursor, "SELECT COUNT(*) FROM attendance_logs")
 
-            cursor.execute("SELECT COUNT(*) FROM attendance_logs")
-            analytics['total_attendance_records'] = cursor.fetchone()[0]
-
-            # Recent activity (last 7 days) -- dialect aware
-            db_url = os.environ.get('DATABASE_URL', '')
-            if db_url and not db_url.startswith('sqlite'):
-                # Postgres
-                cursor.execute("SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= NOW() - INTERVAL '7 days'")
+            # Recent activity
+            if is_postgres:
+                analytics["recent_attendance"] = safe_count(
+                    cursor,
+                    "SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= NOW() - INTERVAL '7 days'"
+                )
             else:
-                # SQLite
-                cursor.execute("SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= datetime('now', '-7 days')")
-            analytics['recent_attendance'] = cursor.fetchone()[0]
+                analytics["recent_attendance"] = safe_count(
+                    cursor,
+                    "SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= datetime('now', '-7 days')"
+                )
+
+            # Pick the most useful chart year automatically.
+            # Demo databases often contain fixed historical data, so using the latest data year
+            # is more useful than blindly using the current calendar year.
+            if is_postgres:
+                cursor.execute("""
+                    SELECT MAX(year_value) FROM (
+                        SELECT EXTRACT(YEAR FROM created_at)::INT AS year_value FROM students WHERE created_at IS NOT NULL
+                        UNION ALL
+                        SELECT EXTRACT(YEAR FROM created_at)::INT AS year_value FROM instructors WHERE created_at IS NOT NULL
+                        UNION ALL
+                        SELECT EXTRACT(YEAR FROM timestamp)::INT AS year_value FROM attendance_logs WHERE timestamp IS NOT NULL
+                    ) yearly_data
+                """)
+            else:
+                cursor.execute("""
+                    SELECT MAX(year_value) FROM (
+                        SELECT CAST(strftime('%Y', created_at) AS INTEGER) AS year_value FROM students WHERE created_at IS NOT NULL
+                        UNION ALL
+                        SELECT CAST(strftime('%Y', created_at) AS INTEGER) AS year_value FROM instructors WHERE created_at IS NOT NULL
+                        UNION ALL
+                        SELECT CAST(strftime('%Y', timestamp) AS INTEGER) AS year_value FROM attendance_logs WHERE timestamp IS NOT NULL
+                    )
+                """)
+            selected_year_row = cursor.fetchone()
+            selected_year = selected_year_row[0] if selected_year_row and selected_year_row[0] else datetime.now().year
+            analytics["chart_year"] = int(selected_year)
+
+            # Monthly student registrations
+            if is_postgres:
+                cursor.execute("""
+                    SELECT EXTRACT(MONTH FROM created_at)::INT AS month_number, COUNT(*) AS total
+                    FROM students
+                    WHERE EXTRACT(YEAR FROM created_at)::INT = %s
+                    GROUP BY month_number
+                    ORDER BY month_number
+                """, (selected_year,))
+            else:
+                cursor.execute("""
+                    SELECT CAST(strftime('%m', created_at) AS INTEGER) AS month_number, COUNT(*) AS total
+                    FROM students
+                    WHERE CAST(strftime('%Y', created_at) AS INTEGER) = ?
+                    GROUP BY month_number
+                    ORDER BY month_number
+                """, (selected_year,))
+            analytics["monthly_student_registrations"] = rows_to_month_series(cursor.fetchall())
+
+            # Monthly instructor registrations
+            if is_postgres:
+                cursor.execute("""
+                    SELECT EXTRACT(MONTH FROM created_at)::INT AS month_number, COUNT(*) AS total
+                    FROM instructors
+                    WHERE EXTRACT(YEAR FROM created_at)::INT = %s
+                    GROUP BY month_number
+                    ORDER BY month_number
+                """, (selected_year,))
+            else:
+                cursor.execute("""
+                    SELECT CAST(strftime('%m', created_at) AS INTEGER) AS month_number, COUNT(*) AS total
+                    FROM instructors
+                    WHERE CAST(strftime('%Y', created_at) AS INTEGER) = ?
+                    GROUP BY month_number
+                    ORDER BY month_number
+                """, (selected_year,))
+            analytics["monthly_instructor_registrations"] = rows_to_month_series(cursor.fetchall())
+
+            # Monthly attendance records
+            if is_postgres:
+                cursor.execute("""
+                    SELECT EXTRACT(MONTH FROM timestamp)::INT AS month_number, COUNT(*) AS total
+                    FROM attendance_logs
+                    WHERE EXTRACT(YEAR FROM timestamp)::INT = %s
+                    GROUP BY month_number
+                    ORDER BY month_number
+                """, (selected_year,))
+            else:
+                cursor.execute("""
+                    SELECT CAST(strftime('%m', timestamp) AS INTEGER) AS month_number, COUNT(*) AS total
+                    FROM attendance_logs
+                    WHERE CAST(strftime('%Y', timestamp) AS INTEGER) = ?
+                    GROUP BY month_number
+                    ORDER BY month_number
+                """, (selected_year,))
+            analytics["monthly_attendance_records"] = rows_to_month_series(cursor.fetchall())
+
+            # Attendance status distribution
+            cursor.execute("""
+                SELECT COALESCE(ast.status_name, ast.status_code, 'Unknown') AS status_label, COUNT(*) AS total
+                FROM attendance_logs al
+                LEFT JOIN attendance_status_types ast ON ast.status_id = al.status_id
+                GROUP BY status_label
+                ORDER BY total DESC, status_label ASC
+            """)
+            analytics["attendance_status_distribution"] = [
+                {"status": str(row[0]), "count": int(row[1] or 0)}
+                for row in cursor.fetchall()
+            ]
+
+            # Top classes by attendance volume
+            cursor.execute("""
+                SELECT
+                    COALESCE(c.course_code, 'Course') || ' - ' || COALESCE(cls.section, 'Section') AS class_label,
+                    COUNT(al.log_id) AS total
+                FROM attendance_logs al
+                LEFT JOIN classes cls ON cls.class_id = al.class_id
+                LEFT JOIN courses c ON c.course_id = cls.course_id
+                GROUP BY class_label
+                ORDER BY total DESC
+                LIMIT 5
+            """)
+            analytics["top_classes_by_attendance"] = [
+                {"class_label": str(row[0]), "count": int(row[1] or 0)}
+                for row in cursor.fetchall()
+            ]
 
             return analytics
 
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
+
 
 @router.post("/api/admin/mark-automatic-absents")
 async def trigger_automatic_absent_marking(admin_type: str = Depends(require_admin_permission("manage_users"))):
