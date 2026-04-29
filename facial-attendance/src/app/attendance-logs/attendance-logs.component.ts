@@ -30,6 +30,7 @@ export class AttendanceLogsComponent implements OnInit {
   
   logs: any[] = [];
   groupedLogs: { [date: string]: any[] } = {};
+  groupedDateKeys: string[] = [];
   message = '';
   loading = false;
 
@@ -38,9 +39,10 @@ export class AttendanceLogsComponent implements OnInit {
   ngOnInit() {
     // Set default date to today
     const today = new Date();
-    this.selectedDate = today.toISOString().split('T')[0];
-    this.startDate = today.toISOString().split('T')[0];
-    this.endDate = today.toISOString().split('T')[0];
+    const localToday = this.toLocalDateString(today);
+    this.selectedDate = localToday;
+    this.startDate = localToday;
+    this.endDate = localToday;
     
     this.loadValidationData();
   }
@@ -191,22 +193,47 @@ export class AttendanceLogsComponent implements OnInit {
   groupLogsByDate() {
     this.groupedLogs = {};
     this.logs.forEach(log => {
-      const date = log.time.split(' ')[0]; // Extract date part directly from timestamp
+      const date = this.getDateKey(log.time);
       if (!this.groupedLogs[date]) {
         this.groupedLogs[date] = [];
       }
       this.groupedLogs[date].push(log);
     });
+    this.groupedDateKeys = Object.keys(this.groupedLogs).sort((a, b) => b.localeCompare(a));
   }
 
   get objectKeys() {
     return Object.keys;
   }
 
+  private getDateKey(timestamp: string): string {
+    if (!timestamp) {
+      return '';
+    }
+
+    const normalized = timestamp.trim();
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(normalized);
+    if (isDateOnly) {
+      return normalized;
+    }
+
+    const parsedDate = new Date(normalized);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      return this.toLocalDateString(parsedDate);
+    }
+
+    return normalized;
+  }
+
+  private toLocalDateString(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   toggleDateMode() {
     this.isDateRangeMode = !this.isDateRangeMode;
-    // Reset dates when switching modes
-    const today = new Date().toISOString().split('T')[0];
     if (this.isDateRangeMode) {
       // Switching to date range - keep current selectedDate as startDate
       this.startDate = this.selectedDate;

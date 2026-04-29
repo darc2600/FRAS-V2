@@ -1,7 +1,7 @@
 
-import sqlite3
 from fastapi import Request, HTTPException
 from models.schedule import ScheduleResponse
+from services.db import get_connection
 
 DB_PATH = "attendance.db"
 
@@ -15,8 +15,26 @@ class ScheduleRepository:
         DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         
         def convert_to_12_hour(time_24h):
-            """Convert 24-hour time (HH:MM) to 12-hour format (HH:MMAM/PM)"""
-            hour, minute = map(int, time_24h.split(':'))
+            """Convert 24-hour time (HH:MM) or datetime.time to 12-hour format (HH:MMAM/PM)
+            Accepts strings like '07:00' or datetime.time objects. Returns None if input is falsy.
+            """
+            if not time_24h:
+                return None
+            # If a datetime.time object (or similar), use its attributes
+            if hasattr(time_24h, 'hour') and hasattr(time_24h, 'minute'):
+                hour = int(time_24h.hour)
+                minute = int(time_24h.minute)
+            else:
+                # Accept formats like 'HH:MM' or 'HH:MM:SS'
+                parts = str(time_24h).split(':')
+                if len(parts) < 2:
+                    return None
+                try:
+                    hour = int(parts[0])
+                    minute = int(parts[1])
+                except Exception:
+                    return None
+
             if hour == 0:
                 return f"12:{minute:02d}AM"
             elif hour < 12:
@@ -40,21 +58,30 @@ class ScheduleRepository:
         
         def slot_range(start_24h, end_24h):
             # Convert class times to minutes for comparison
-            class_start_min = time_to_minutes(convert_to_12_hour(start_24h))
-            class_end_min = time_to_minutes(convert_to_12_hour(end_24h))
-            
+            class_start = convert_to_12_hour(start_24h)
+            class_end = convert_to_12_hour(end_24h)
+            class_start_min = time_to_minutes(class_start) if class_start else None
+            class_end_min = time_to_minutes(class_end) if class_end else None
+
+            if class_start_min is None or class_end_min is None:
+                return []
+
             slots = []
             for slot in TIME_SLOTS:
                 slot_start, slot_end = slot.split(' - ')
                 slot_start_min = time_to_minutes(slot_start)
                 slot_end_min = time_to_minutes(slot_end)
-                
+
+                # If any slot bounds failed to parse, skip
+                if slot_start_min is None or slot_end_min is None:
+                    continue
+
                 # Check if class overlaps with slot
                 if max(class_start_min, slot_start_min) < min(class_end_min, slot_end_min):
                     slots.append(slot)
-            
+
             return slots
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
             row = cursor.fetchone()
@@ -182,10 +209,13 @@ class ScheduleRepository:
             raise HTTPException(status_code=400, detail=error_message)
 
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            with get_connection() as conn:
                 cursor = conn.cursor()
-                # Start transaction
-                cursor.execute("BEGIN TRANSACTION")
+                # Start transaction (some DB wrappers commit on context exit)
+                try:
+                    cursor.execute("BEGIN TRANSACTION")
+                except Exception:
+                    pass
                 
                 # Get or create room
                 import re
@@ -203,7 +233,12 @@ class ScheduleRepository:
                         "INSERT INTO rooms (floor_level, room_number, campus_id, building_id) VALUES (?, ?, 1, 1)",
                         (floor_level, room_number)
                     )
-                    room_id = cursor.lastrowid
+                    # Get inserted id; sqlite cursor has lastrowid, Postgres may not
+                    room_id = getattr(cursor, 'lastrowid', None)
+                    if not room_id:
+                        cursor.execute("SELECT room_id FROM rooms WHERE room_number = ?", (room_code,))
+                        rr = cursor.fetchone()
+                        room_id = rr[0] if rr else None
                 else:
                     room_id = row[0]
                     cursor.execute(
@@ -247,29 +282,87 @@ class ScheduleRepository:
                     error_message = "Validation errors found:\n" + "\n".join(f"- {error}" for error in validation_errors)
                     raise HTTPException(status_code=400, detail=error_message)
                 
-                # Insert schedule entries - don't delete existing ones, just add new ones
+                # Replace mode with FK-safe updates:
+                # - Reuse/update existing classes first to preserve class_id (and enrollments)
+                # - Insert only truly new classes
+                # - Delete only classes no longer in schedule and with no enrollments
+                cursor.execute("""
+                    SELECT class_id, course_id, section, instructor_id, day_of_week, start_time, end_time
+                    FROM classes
+                    WHERE room_id = ?
+                """, (room_id,))
+                existing_rows = cursor.fetchall()
+
+                def _norm(v):
+                    return '' if v is None else str(v)
+
+                existing_by_exact = {}
+                existing_by_identity = {}
+                for class_id, existing_course_id, existing_section, existing_instructor_id, existing_day, existing_start, existing_end in existing_rows:
+                    exact_key = (
+                        existing_course_id,
+                        _norm(existing_section),
+                        existing_instructor_id,
+                        _norm(existing_day),
+                        _norm(existing_start)[:5],
+                        _norm(existing_end)[:5],
+                    )
+                    identity_key = (
+                        existing_course_id,
+                        _norm(existing_section),
+                        existing_instructor_id,
+                        _norm(existing_day),
+                    )
+                    existing_by_exact.setdefault(exact_key, []).append(class_id)
+                    existing_by_identity.setdefault(identity_key, []).append(class_id)
+
+                used_class_ids = set()
+
                 for entry in merged:
                     course_code = entry.get('courseCode', '').strip()
                     section = entry.get('section', '').strip()
                     professor_name = entry.get('professor', '').strip()
-                    
+                    day_of_week = entry.get('day', '')
+                    start_24 = convert_to_24_hour(entry.get('startTime', ''))
+                    end_24 = convert_to_24_hour(entry.get('endTime', ''))
+
                     course_id = course_cache[course_code]
                     instructor_id = instructor_cache.get(professor_name)
-                    
-                    # Check if this exact schedule entry already exists to avoid duplicates
-                    cursor.execute("""
-                        SELECT class_id FROM classes 
-                        WHERE course_id = ? AND section = ? AND instructor_id = ? 
-                        AND room_id = ? AND day_of_week = ? AND start_time = ? AND end_time = ?
-                    """, (
-                        course_id, section, instructor_id, room_id,
-                        entry.get('day',''),
-                        convert_to_24_hour(entry.get('startTime','')),
-                        convert_to_24_hour(entry.get('endTime',''))
-                    ))
-                    
-                    if cursor.fetchone() is None:
-                        # Schedule entry doesn't exist, create it
+
+                    exact_key = (course_id, section, instructor_id, day_of_week, start_24, end_24)
+                    identity_key = (course_id, section, instructor_id, day_of_week)
+
+                    reusable_class_id = None
+
+                    for candidate_id in existing_by_exact.get(exact_key, []):
+                        if candidate_id not in used_class_ids:
+                            reusable_class_id = candidate_id
+                            break
+
+                    if reusable_class_id is None:
+                        for candidate_id in existing_by_identity.get(identity_key, []):
+                            if candidate_id not in used_class_ids:
+                                reusable_class_id = candidate_id
+                                break
+
+                    if reusable_class_id is not None:
+                        cursor.execute("""
+                            UPDATE classes
+                            SET course_id = ?, section = ?, room_id = ?, instructor_id = ?, day_of_week = ?, start_time = ?, end_time = ?, term_id = ?
+                            WHERE class_id = ?
+                        """, (
+                            course_id,
+                            section,
+                            room_id,
+                            instructor_id,
+                            day_of_week,
+                            start_24,
+                            end_24,
+                            1,
+                            reusable_class_id,
+                        ))
+                        used_class_ids.add(reusable_class_id)
+                    else:
                         cursor.execute("""
                             INSERT INTO classes (course_id, section, room_id, instructor_id, day_of_week, start_time, end_time, term_id)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -278,13 +371,53 @@ class ScheduleRepository:
                             section,
                             room_id,
                             instructor_id,
-                            entry.get('day',''),
-                            convert_to_24_hour(entry.get('startTime','')),
-                            convert_to_24_hour(entry.get('endTime','')),
-                            1  # term_id - use current term
+                            day_of_week,
+                            start_24,
+                            end_24,
+                            1,
                         ))
+
+                existing_class_ids = {row[0] for row in existing_rows}
+                class_ids_to_remove = [class_id for class_id in existing_class_ids if class_id not in used_class_ids]
+
+                blocked_deletes = []
+                for class_id in class_ids_to_remove:
+                    cursor.execute("SELECT COUNT(*) FROM enrollments WHERE class_id = ?", (class_id,))
+                    count_row = cursor.fetchone()
+                    enrollment_count = count_row[0] if count_row else 0
+                    if enrollment_count and int(enrollment_count) > 0:
+                        cursor.execute("""
+                            SELECT co.course_code, c.section, c.day_of_week, c.start_time, c.end_time
+                            FROM classes c
+                            LEFT JOIN courses co ON c.course_id = co.course_id
+                            WHERE c.class_id = ?
+                        """, (class_id,))
+                        class_meta = cursor.fetchone()
+                        blocked_deletes.append((class_id, enrollment_count, class_meta))
+                    else:
+                        cursor.execute("DELETE FROM classes WHERE class_id = ?", (class_id,))
+
+                if blocked_deletes:
+                    cursor.execute("ROLLBACK")
+                    details = []
+                    for class_id, enrollment_count, class_meta in blocked_deletes:
+                        if class_meta:
+                            course_code, section, day_of_week, start_time, end_time = class_meta
+                            details.append(
+                                f"class_id={class_id} ({course_code or 'Unknown'} {section or ''} {day_of_week or ''} {start_time or ''}-{end_time or ''}) has {enrollment_count} enrolled student(s)"
+                            )
+                        else:
+                            details.append(f"class_id={class_id} has {enrollment_count} enrolled student(s)")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Cannot remove schedule entries that still have enrolled students. " + "; ".join(details)
+                    )
                 
-                cursor.execute("COMMIT")
+                try:
+                    cursor.execute("COMMIT")
+                except Exception:
+                    # wrapper may commit on context exit
+                    pass
         except HTTPException:
             raise  # Re-raise validation errors
         except Exception as e:
@@ -294,10 +427,9 @@ class ScheduleRepository:
         return ScheduleResponse(schedule=merged)
 
     async def delete_room_schedule(self, room_code: str):
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM classes WHERE room_id IN (SELECT room_id FROM rooms WHERE room_number = ?)", (room_code,))
-            conn.commit()
         return {"detail": "Room schedule deleted"}
 
 def get_schedule_repository():

@@ -6,7 +6,7 @@ import { Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class ApiService {
-  backendUrl = 'http://127.0.0.1:8000';
+  backendUrl = '';
 
   constructor(private http: HttpClient) {}
 
@@ -80,7 +80,7 @@ export class ApiService {
   }
 
   registerStudent(formData: FormData): Observable<any> {
-    return this.http.post(`${this.backendUrl}/api/register`, formData);
+    return this.http.post(`${this.backendUrl}/api/registration`, formData);
   }
 
   captureImage(formData: FormData): Observable<any> {

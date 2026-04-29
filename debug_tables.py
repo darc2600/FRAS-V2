@@ -1,7 +1,8 @@
 import sqlite3
+from services.db import get_connection
 
-conn = sqlite3.connect('attendance.db')
-cursor = conn.cursor()
+with get_connection() as conn:
+    cursor = conn.cursor()
 
 # Check if support_tickets table exists
 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='support_tickets'")
@@ -20,4 +21,4 @@ cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tick
 result = cursor.fetchone()
 print('ticket_replies table exists:', result is not None)
 
-conn.close()
+    # connection closed by context manager

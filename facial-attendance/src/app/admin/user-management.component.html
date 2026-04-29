@@ -247,16 +247,27 @@
               <td>{{ user.first_name }} {{ user.last_name }}</td>
               <td>{{ user.email }}</td>
               <td>
-                <select
-                  *ngIf="hasPermission('manage_users')"
-                  [(ngModel)]="user.user_type"
-                  (ngModelChange)="updateUserType(user, $event)"
-                  class="form-select form-select-sm"
-                  [disabled]="!getUserTypeOptions(user.user_type).length">
-                  <option *ngFor="let type of getUserTypeOptions(user.user_type)" [value]="type">
-                    {{ getUserTypeDisplayName(type) }}
-                  </option>
-                </select>
+                <div *ngIf="hasPermission('manage_users')" class="role-cell">
+                  <select
+                    [(ngModel)]="user.user_type"
+                    class="form-select form-select-sm"
+                    [disabled]="!getUserTypeOptions(user.user_type).length || user.can_change_role === false"
+                    [attr.title]="user.can_change_role === false ? (user.role_change_block_reason || 'Role change unavailable') : null">
+                    <option *ngFor="let type of getUserTypeOptions(user.user_type)" [value]="type">
+                      {{ getUserTypeDisplayName(type) }}
+                    </option>
+                  </select>
+                  <span
+                    *ngIf="user.can_change_role === false"
+                    class="role-lock-indicator"
+                    [attr.title]="user.role_change_block_reason || 'Role change unavailable'"
+                    aria-label="Role cannot be edited">
+                    <i class="fas fa-lock"></i>
+                  </span>
+                  <span *ngIf="user.can_change_role === false" class="badge bg-secondary role-lock-text">
+                    {{ user.role_change_block_reason || 'Role change unavailable' }}
+                  </span>
+                </div>
                 <span *ngIf="!hasPermission('manage_users')">{{ getUserTypeDisplayName(user.user_type) }}</span>
               </td>
               <td>
@@ -268,6 +279,13 @@
               <td>{{ user.updated_at | date:'short' }}</td>
               <td>
                 <div class="btn-group" role="group">
+                  <button
+                    *ngIf="hasPermission('manage_users') && hasPendingRoleChange(user)"
+                    (click)="saveUserRole(user)"
+                    class="btn btn-sm btn-primary"
+                    title="Save role change">
+                    <i class="fas fa-save"></i>
+                  </button>
                   <button
                     *ngIf="hasPermission('reset_passwords')"
                     (click)="resetPassword(user.email)"

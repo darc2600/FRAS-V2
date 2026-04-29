@@ -3,15 +3,16 @@ from tkinter import ttk, messagebox
 import cv2
 import os
 import sqlite3
+from services.db import get_connection
 from datetime import datetime
 from deepface import DeepFace
 from services.settings_service import get_settings_service
 
 # Initialize database
 def init_db():
-    conn = sqlite3.connect("attendance.db")
-    cursor = conn.cursor()
-    cursor.execute('''
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id TEXT,
@@ -20,8 +21,7 @@ def init_db():
             timestamp TEXT
         )
     ''')
-    conn.commit()
-    conn.close()
+        # commit handled by connection wrapper
 
 # Attendance monitoring logic
 def start_attendance(course_code, section):
@@ -30,8 +30,8 @@ def start_attendance(course_code, section):
         messagebox.showerror("Error", f"Dataset path not found: {dataset_path}")
         return
 
-    conn = sqlite3.connect("attendance.db")
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        cursor = conn.cursor()
 
     student_faces = {}
     for student_id in os.listdir(dataset_path):
@@ -69,7 +69,7 @@ def start_attendance(course_code, section):
                         INSERT INTO attendance (student_id, course_code, section, timestamp)
                         VALUES (?, ?, ?, ?)
                     """, (student_id, course_code, section, timestamp))
-                    conn.commit()
+                    # commit handled by context manager
                     print(f"Attendance recorded for {student_id} at {timestamp}")
                     break
             except Exception as e:
@@ -81,7 +81,7 @@ def start_attendance(course_code, section):
 
     cap.release()
     cv2.destroyAllWindows()
-    conn.close()
+    # connection closed by context manager
 
 # GUI setup
 init_db()

@@ -47,7 +47,7 @@ export class LoginComponent {
           this.router.navigate(['/monitor']);
         },
         error: err => {
-          this.error = err?.error?.message || 'Invalid credentials';
+          this.error = err?.error?.detail || err?.error?.message || 'Invalid credentials';
         }
       });
     } else {

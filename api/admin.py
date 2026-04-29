@@ -1,11 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Body, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 import sqlite3
+from services.db import get_connection
 import os
 import secrets
 import importlib
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+import logging
 from services.settings_service import get_settings_service
 from services.attendance_service import mark_automatic_absents
 from services.face_embeddings import ensure_embeddings_table
@@ -75,6 +78,113 @@ else:
 
 router = APIRouter()
 
+LOG = logging.getLogger(__name__)
+MANILA_TZ = ZoneInfo("Asia/Manila")
+
+ROLE_TABLE_META = {
+    'instructor': {
+        'table': 'instructors',
+        'id_col': 'instructor_id',
+        'number_col': 'instructor_number',
+        'number_prefix': 'INS'
+    },
+    'it_admin': {
+        'table': 'it_admins',
+        'id_col': 'it_admin_id',
+        'number_col': 'employee_number',
+        'number_prefix': 'IT'
+    },
+    'super_admin': {
+        'table': 'super_admins',
+        'id_col': 'super_admin_id',
+        'number_col': 'employee_number',
+        'number_prefix': 'SUPER'
+    }
+}
+
+
+def _is_postgres_backend() -> bool:
+    db_url = (os.environ.get('DATABASE_URL') or '').strip().lower()
+    return bool(db_url) and not db_url.startswith('sqlite')
+
+
+def _ensure_users_is_active_column(cursor):
+    if _is_postgres_backend():
+        cursor.execute(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = ? AND column_name = ?
+            """,
+            ('users', 'is_active')
+        )
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE")
+        cursor.execute("UPDATE users SET is_active = TRUE WHERE is_active IS NULL")
+    else:
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in (cursor.fetchall() or [])]
+        if 'is_active' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1")
+        cursor.execute("UPDATE users SET is_active = 1 WHERE is_active IS NULL")
+
+
+def _insert_role_profile(cursor, role: str, profile: dict) -> int:
+    meta = ROLE_TABLE_META[role]
+    number_value = profile.get(meta['number_col']) or f"{meta['number_prefix']}{secrets.token_hex(4).upper()}"
+    first_name = profile.get('first_name') or ''
+    last_name = profile.get('last_name') or ''
+    email = profile.get('email') or ''
+    dept_id = profile.get('dept_id') or 1
+
+    is_postgres = _is_postgres_backend()
+    if is_postgres:
+        cursor.execute(
+            f"""
+            INSERT INTO {meta['table']} ({meta['number_col']}, last_name, first_name, email, dept_id, created_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            RETURNING {meta['id_col']}
+            """,
+            (number_value, last_name, first_name, email, dept_id)
+        )
+        row = cursor.fetchone()
+        return int(row[0])
+
+    cursor.execute(
+        f"""
+        INSERT INTO {meta['table']} ({meta['number_col']}, last_name, first_name, email, dept_id, created_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        (number_value, last_name, first_name, email, dept_id)
+    )
+    return int(getattr(cursor, 'lastrowid', 0) or 0)
+
+
+def _to_manila_iso(value):
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return text
+        normalized = text
+        if normalized.endswith('Z'):
+            normalized = normalized[:-1] + '+00:00'
+        if ' ' in normalized and 'T' not in normalized:
+            normalized = normalized.replace(' ', 'T')
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except Exception:
+            return str(value)
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    return parsed.astimezone(MANILA_TZ).isoformat()
+
 # Pydantic models
 class UserResponse(BaseModel):
     id: int
@@ -85,6 +195,8 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: Optional[str]
     updated_at: Optional[str] = None  # Explicit None default
+    can_change_role: Optional[bool] = True
+    role_change_block_reason: Optional[str] = None
 
 class CreateUserRequest(BaseModel):
     email: str
@@ -112,8 +224,17 @@ def require_admin_permission(permission: str):
     def dependency(user_type: str = Depends(get_current_user_type)):
         if user_type == 'super_admin':
             return user_type  # Super admin has all permissions
-        permissions = get_user_permissions(user_type)
-        if permission not in permissions:
+        permissions = set(get_user_permissions(user_type))
+
+        permission_aliases = {
+            "view_all_data": {"view_all_data", "view_analytics"},
+            "view_analytics": {"view_analytics", "view_all_data"},
+            "reset_passwords": {"reset_passwords", "manage_users"},
+            "manage_users": {"manage_users", "reset_passwords"},
+        }
+        allowed = permission_aliases.get(permission, {permission})
+
+        if permissions.isdisjoint(allowed):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Insufficient permissions: {permission} required"
@@ -127,8 +248,9 @@ def require_admin_permission(permission: str):
 async def get_users(user_type: str = Depends(require_admin_permission("manage_users"))):
     """Get all users (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
+            _ensure_users_is_active_column(cursor)
 
             # Map database role to frontend user_type for display
             role_to_user_type = {
@@ -140,28 +262,43 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
             # Get users from users table with joined data
             users = []
 
+            def _fmt_dt(v):
+                try:
+                    if isinstance(v, datetime):
+                        return v.isoformat()
+                    return str(v) if v is not None else None
+                except Exception:
+                    return None
+
             # Instructors
             cursor.execute("""
-                SELECT u.user_id, u.email, u.role, i.first_name, i.last_name, u.created_at, u.updated_at
+                SELECT u.user_id, u.email, u.role, i.first_name, i.last_name, u.created_at, u.updated_at, COALESCE(u.is_active, TRUE), u.reference_id
                 FROM users u
                 JOIN instructors i ON u.reference_id = i.instructor_id
                 WHERE u.role = 'instructor'
             """)
             for row in cursor.fetchall():
+                instructor_id = row[8]
+                cursor.execute("SELECT COUNT(*) FROM classes WHERE instructor_id = ?", (instructor_id,))
+                class_count_row = cursor.fetchone()
+                class_count = int(class_count_row[0]) if class_count_row else 0
+                can_change_role = class_count == 0
                 users.append({
                     "id": row[0],
                     "email": row[1],
                     "user_type": role_to_user_type.get(row[2], row[2]),
                     "first_name": row[3],
                     "last_name": row[4],
-                    "is_active": True,
-                    "created_at": row[5],
-                    "updated_at": row[6] if row[6] else row[5]  # Simplified fallback
+                    "is_active": bool(row[7]),
+                    "created_at": _fmt_dt(row[5]),
+                    "updated_at": _fmt_dt(row[6] if row[6] else row[5]),  # Simplified fallback
+                    "can_change_role": can_change_role,
+                    "role_change_block_reason": None if can_change_role else "Assigned classes"
                 })
 
             # IT Admins
             cursor.execute("""
-                SELECT u.user_id, u.email, u.role, ia.first_name, ia.last_name, u.created_at, u.updated_at
+                SELECT u.user_id, u.email, u.role, ia.first_name, ia.last_name, u.created_at, u.updated_at, COALESCE(u.is_active, TRUE)
                 FROM users u
                 JOIN it_admins ia ON u.reference_id = ia.it_admin_id
                 WHERE u.role = 'it_admin'
@@ -173,14 +310,16 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                     "user_type": role_to_user_type.get(row[2], row[2]),
                     "first_name": row[3],
                     "last_name": row[4],
-                    "is_active": True,
-                    "created_at": row[5],
-                    "updated_at": row[6] if row[6] and row[6] != "" else row[5]  # Use created_at if updated_at is None or empty
+                    "is_active": bool(row[7]),
+                    "created_at": _fmt_dt(row[5]),
+                    "updated_at": _fmt_dt(row[6] if row[6] and row[6] != "" else row[5]),  # Use created_at if updated_at is None or empty
+                    "can_change_role": True,
+                    "role_change_block_reason": None
                 })
 
             # Super Admins
             cursor.execute("""
-                SELECT u.user_id, u.email, u.role, sa.first_name, sa.last_name, u.created_at, u.updated_at
+                SELECT u.user_id, u.email, u.role, sa.first_name, sa.last_name, u.created_at, u.updated_at, COALESCE(u.is_active, TRUE)
                 FROM users u
                 JOIN super_admins sa ON u.reference_id = sa.super_admin_id
                 WHERE u.role = 'super_admin'
@@ -192,14 +331,31 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
                     "user_type": role_to_user_type.get(row[2], row[2]),
                     "first_name": row[3],
                     "last_name": row[4],
-                    "is_active": True,
-                    "created_at": row[5],
-                    "updated_at": row[6] if row[6] and row[6] != "" else row[5]  # Use created_at if updated_at is None or empty
+                    "is_active": bool(row[7]),
+                    "created_at": _fmt_dt(row[5]),
+                    "updated_at": _fmt_dt(row[6] if row[6] and row[6] != "" else row[5]),  # Use created_at if updated_at is None or empty
+                    "can_change_role": True,
+                    "role_change_block_reason": None
                 })
+
+            # Defensive normalization: ensure all datetime/date values are strings
+            for u in users:
+                for k in ('created_at', 'updated_at'):
+                    v = u.get(k)
+                    try:
+                        if isinstance(v, datetime):
+                            u[k] = v.isoformat()
+                        elif v is not None:
+                            u[k] = str(v)
+                        else:
+                            u[k] = None
+                    except Exception:
+                        u[k] = None
 
             return users
 
     except Exception as e:
+        LOG.exception('Error in get_face_embedding_coverage')
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
@@ -207,7 +363,7 @@ async def get_users(user_type: str = Depends(require_admin_permission("manage_us
 async def get_face_embedding_coverage(admin_type: str = Depends(require_admin_permission("view_all_data"))):
     """Get migration/coverage stats for DB-stored face embeddings."""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             ensure_embeddings_table(cursor)
 
@@ -256,7 +412,7 @@ async def get_face_embedding_coverage_public():
     Use this only for local verification. Remove before production rollout.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             ensure_embeddings_table(cursor)
 
@@ -303,8 +459,9 @@ async def get_face_embedding_coverage_public():
 async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(require_admin_permission("manage_users"))):
     """Create a new user (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
+            _ensure_users_is_active_column(cursor)
 
             # Map frontend user_type to backend user_type
             user_type_mapping = {
@@ -332,41 +489,35 @@ async def create_user(user_data: CreateUserRequest, admin_type: str = Depends(re
             # Hash the password if passlib is available
             hashed_password = user_data.password
             if _HAS_PASSLIB and bcrypt:
-                hashed_password = bcrypt.hash(user_data.password)
+                try:
+                    hashed_password = bcrypt.hash(user_data.password)
+                except Exception:
+                    LOG.exception("bcrypt hashing failed during user creation; storing plaintext fallback")
+                    hashed_password = user_data.password
 
             # Create user in appropriate data table
-            reference_id = None
-            if backend_user_type == 'instructor':
-                # Create instructor account
-                cursor.execute("""
-                    INSERT INTO instructors (instructor_number, last_name, first_name, email, dept_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (f"INS{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
-                reference_id = cursor.lastrowid
-
-            elif backend_user_type == 'it_admin':
-                # Create IT admin account
-                cursor.execute("""
-                    INSERT INTO it_admins (employee_number, last_name, first_name, email, dept_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (f"IT{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
-                reference_id = cursor.lastrowid
-
-            elif backend_user_type == 'super_admin':
-                # Create super admin account
-                cursor.execute("""
-                    INSERT INTO super_admins (employee_number, last_name, first_name, email, dept_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (f"SUPER{secrets.token_hex(4).upper()}", user_data.last_name, user_data.first_name, user_data.email, 1))  # Default dept
-                reference_id = cursor.lastrowid
+            reference_id = _insert_role_profile(cursor, backend_user_type, {
+                "first_name": user_data.first_name,
+                "last_name": user_data.last_name,
+                "email": user_data.email,
+                "dept_id": 1
+            })
 
             # Create entry in users table for authentication
-            cursor.execute("""
-                INSERT INTO users (email, password, role, reference_id, created_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (user_data.email, hashed_password, backend_user_type, reference_id))
-
-            user_id = cursor.lastrowid
+            if _is_postgres_backend():
+                cursor.execute("""
+                    INSERT INTO users (email, password, role, reference_id, is_active, created_at)
+                    VALUES (?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP)
+                    RETURNING user_id
+                """, (user_data.email, hashed_password, backend_user_type, reference_id))
+                row = cursor.fetchone()
+                user_id = int(row[0])
+            else:
+                cursor.execute("""
+                    INSERT INTO users (email, password, role, reference_id, is_active, created_at)
+                    VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+                """, (user_data.email, hashed_password, backend_user_type, reference_id))
+                user_id = int(getattr(cursor, 'lastrowid', 0) or 0)
             conn.commit()
 
             return {"message": "User created successfully", "user_id": user_id, "user_type": user_data.user_type}
@@ -384,18 +535,120 @@ async def update_user(
 ):
     """Update user information (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
+            _ensure_users_is_active_column(cursor)
 
-            # Check if Super Admin permission is required
-            if user_data.user_type in ['it_admin', 'super_admin'] and admin_type != 'super_admin':
-                raise HTTPException(403, "Only Super Admin can modify admin roles")
+            user_type_mapping = {
+                'instructor': 'instructor',
+                'it_admin': 'it_admin',
+                'super_admin': 'super_admin'
+            }
 
-            # Update logic here (simplified for now)
-            # In real implementation, you'd update the appropriate table
+            cursor.execute(
+                "SELECT email, role, reference_id FROM users WHERE user_id = ?",
+                (user_id,)
+            )
+            existing_user = cursor.fetchone()
+            if not existing_user:
+                raise HTTPException(404, "User not found")
 
-            return {"message": "User updated successfully"}
+            current_email, current_role, current_reference_id = existing_user
+            target_role = user_type_mapping.get(user_data.user_type, current_role) if user_data.user_type else current_role
 
+            if target_role not in ROLE_TABLE_META:
+                raise HTTPException(400, "Invalid user type")
+
+            if admin_type != 'super_admin' and (current_role != 'instructor' or target_role != 'instructor'):
+                raise HTTPException(403, "Only Super Admin can modify admin accounts or roles")
+
+            role_changed = target_role != current_role
+            new_email = user_data.email or current_email
+
+            # Read current profile row
+            current_meta = ROLE_TABLE_META[current_role]
+            cursor.execute(
+                f"""
+                SELECT {current_meta['number_col']}, last_name, first_name, email, dept_id
+                FROM {current_meta['table']}
+                WHERE {current_meta['id_col']} = ?
+                """,
+                (current_reference_id,)
+            )
+            profile_row = cursor.fetchone()
+            if profile_row:
+                profile = {
+                    current_meta['number_col']: profile_row[0],
+                    'last_name': profile_row[1],
+                    'first_name': profile_row[2],
+                    'email': profile_row[3] or current_email,
+                    'dept_id': profile_row[4] or 1
+                }
+            else:
+                profile = {
+                    'last_name': '',
+                    'first_name': '',
+                    'email': current_email,
+                    'dept_id': 1
+                }
+
+            profile['email'] = new_email
+
+            if role_changed:
+                if current_role == 'instructor':
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM classes WHERE instructor_id = ?",
+                        (current_reference_id,)
+                    )
+                    class_count_row = cursor.fetchone()
+                    class_count = int(class_count_row[0]) if class_count_row else 0
+                    if class_count > 0:
+                        raise HTTPException(
+                            400,
+                            "Cannot change role: this instructor is assigned to classes. Reassign or remove class assignments first."
+                        )
+
+                new_reference_id = _insert_role_profile(cursor, target_role, profile)
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET role = ?, reference_id = ?, email = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ?
+                    """,
+                    (target_role, new_reference_id, new_email, user_id)
+                )
+                cursor.execute(
+                    f"DELETE FROM {current_meta['table']} WHERE {current_meta['id_col']} = ?",
+                    (current_reference_id,)
+                )
+            else:
+                if new_email != current_email:
+                    cursor.execute(
+                        "UPDATE users SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                        (new_email, user_id)
+                    )
+                    cursor.execute(
+                        f"UPDATE {current_meta['table']} SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE {current_meta['id_col']} = ?",
+                        (new_email, current_reference_id)
+                    )
+
+            if user_data.is_active is not None:
+                active_value = True if bool(user_data.is_active) else False
+                cursor.execute(
+                    "UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                    (active_value, user_id)
+                )
+            conn.commit()
+            return {
+                "message": "User updated successfully",
+                "user_id": user_id,
+                "role": target_role,
+                "email": new_email,
+                "is_active": user_data.is_active
+            }
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Database error: {str(e)}")
 
@@ -415,7 +668,7 @@ async def reset_password(
         if not email:
             raise HTTPException(400, "Email is required")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if user exists
@@ -429,15 +682,23 @@ async def reset_password(
             if new_password:
                 if len(new_password) < 6:
                     raise HTTPException(400, "Password must be at least 6 characters long")
-                hashed_password = new_password  # Store plain text for now
-                # if _HAS_PASSLIB and bcrypt:
-                #     hashed_password = bcrypt.hash(new_password)
+                hashed_password = new_password
+                if _HAS_PASSLIB and bcrypt:
+                    try:
+                        hashed_password = bcrypt.hash(new_password)
+                    except Exception:
+                        LOG.exception("bcrypt hashing failed during password reset; storing plaintext fallback")
+                        hashed_password = new_password
             else:
                 # Generate temporary password
                 temp_password = secrets.token_urlsafe(8)
                 hashed_password = temp_password
-                # if _HAS_PASSLIB and bcrypt:
-                #     hashed_password = bcrypt.hash(temp_password)
+                if _HAS_PASSLIB and bcrypt:
+                    try:
+                        hashed_password = bcrypt.hash(temp_password)
+                    except Exception:
+                        LOG.exception("bcrypt hashing failed during temp password reset; storing plaintext fallback")
+                        hashed_password = temp_password
 
             print(f"DEBUG: Updating password for {email} to {hashed_password}")
             # Update password
@@ -461,7 +722,7 @@ async def delete_user(
 ):
     """Delete a user (IT Admin and Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Get user info first
@@ -511,8 +772,16 @@ async def bulk_user_operation(
         if operation not in ['activate', 'deactivate', 'delete']:
             raise HTTPException(400, "Invalid operation")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
+            _ensure_users_is_active_column(cursor)
+
+            if admin_type != 'super_admin':
+                placeholders = ','.join('?' * len(user_ids))
+                cursor.execute(f"SELECT DISTINCT role FROM users WHERE user_id IN ({placeholders})", user_ids)
+                roles = {row[0] for row in cursor.fetchall()}
+                if any(role in {'it_admin', 'super_admin'} for role in roles):
+                    raise HTTPException(403, "Only Super Admin can modify admin accounts")
 
             if operation == 'delete':
                 # Check for super admin restrictions
@@ -541,9 +810,12 @@ async def bulk_user_operation(
                 cursor.execute(f"DELETE FROM users WHERE user_id IN ({placeholders})", user_ids)
 
             elif operation in ['activate', 'deactivate']:
-                # For now, we'll assume all users are active
-                # In a real implementation, you'd have an is_active column
-                pass
+                is_active_value = True if operation == 'activate' else False
+                placeholders = ','.join('?' * len(user_ids))
+                cursor.execute(
+                    f"UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id IN ({placeholders})",
+                    [is_active_value, *user_ids]
+                )
 
             conn.commit()
 
@@ -558,7 +830,7 @@ async def bulk_user_operation(
 async def get_system_settings(admin_type: str = Depends(require_admin_permission("system_config"))):
     """Get system settings (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT setting_key, setting_value, setting_type, category, options,
@@ -607,7 +879,7 @@ async def update_system_setting(
 ):
     """Update system setting (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
@@ -631,7 +903,7 @@ async def update_system_settings_bulk(
 ):
     """Update multiple system settings (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             for update in updates:
                 cursor.execute("""
@@ -653,7 +925,7 @@ async def update_system_settings_bulk(
 async def get_analytics(admin_type: str = Depends(require_admin_permission("view_all_data"))):
     """Get system analytics (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Basic analytics
@@ -669,11 +941,14 @@ async def get_analytics(admin_type: str = Depends(require_admin_permission("view
             cursor.execute("SELECT COUNT(*) FROM attendance_logs")
             analytics['total_attendance_records'] = cursor.fetchone()[0]
 
-            # Recent activity (last 7 days)
-            cursor.execute("""
-                SELECT COUNT(*) FROM attendance_logs
-                WHERE timestamp >= datetime('now', '-7 days')
-            """)
+            # Recent activity (last 7 days) -- dialect aware
+            db_url = os.environ.get('DATABASE_URL', '')
+            if db_url and not db_url.startswith('sqlite'):
+                # Postgres
+                cursor.execute("SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= NOW() - INTERVAL '7 days'")
+            else:
+                # SQLite
+                cursor.execute("SELECT COUNT(*) FROM attendance_logs WHERE timestamp >= datetime('now', '-7 days')")
             analytics['recent_attendance'] = cursor.fetchone()[0]
 
             return analytics
@@ -719,19 +994,37 @@ async def create_user_support_ticket(
 
         print(f"Creating ticket for user_id: {user_id}, type: {type(user_id)}")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
-            from datetime import datetime
-            now = datetime.now().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
 
-            cursor.execute("""
-                INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+            db_url = (os.environ.get('DATABASE_URL') or '').strip().lower()
+            is_postgres = bool(db_url) and not db_url.startswith('sqlite')
 
-            ticket_id = cursor.lastrowid
+            if is_postgres:
+                cursor.execute("""
+                    INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    RETURNING ticket_id
+                """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+                row = cursor.fetchone()
+                ticket_id = row[0] if row else None
+            else:
+                cursor.execute("""
+                    INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+                ticket_id = getattr(cursor, 'lastrowid', None)
+                if not ticket_id:
+                    cursor.execute("SELECT ticket_id FROM support_tickets WHERE user_id = ? ORDER BY ticket_id DESC LIMIT 1", (user_id,))
+                    row = cursor.fetchone()
+                    ticket_id = row[0] if row else None
+
             conn.commit()
+
+            if ticket_id is None:
+                raise HTTPException(500, "Failed to retrieve created ticket ID")
 
             return {"message": "Support ticket created successfully", "ticket_id": ticket_id}
 
@@ -752,7 +1045,7 @@ async def get_support_tickets(
 ):
     """Get support tickets (users see their own, admins see all)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             query = """
@@ -799,8 +1092,8 @@ async def get_support_tickets(
                     "priority": row[5],
                     "status": row[6],
                     "assigned_to": row[7],
-                    "created_at": str(row[8]),
-                    "updated_at": str(row[9]),
+                    "created_at": _to_manila_iso(row[8]),
+                    "updated_at": _to_manila_iso(row[9]),
                     "user_email": row[10],
                     "assigned_email": row[11]
                 })
@@ -821,7 +1114,7 @@ async def update_support_ticket(
 ):
     """Update support ticket (admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Build update query
@@ -841,7 +1134,8 @@ async def update_support_ticket(
             if not update_fields:
                 raise HTTPException(400, "No fields to update")
 
-            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            update_fields.append("updated_at = ?")
+            params.append(datetime.now(timezone.utc).isoformat())
             params.append(ticket_id)
 
             query = f"UPDATE support_tickets SET {', '.join(update_fields)} WHERE ticket_id = ?"
@@ -867,7 +1161,7 @@ async def create_ticket_reply(
 ):
     """Add reply to support ticket"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if ticket exists and user has access
@@ -880,15 +1174,38 @@ async def create_ticket_reply(
             if ticket[0] != user_id and user_type not in ['it_admin', 'super_admin']:
                 raise HTTPException(403, "Access denied")
 
-            cursor.execute("""
-                INSERT INTO ticket_replies (ticket_id, user_id, message, is_internal, created_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (ticket_id, user_id, reply.message, reply.is_internal))
+            db_url = (os.environ.get('DATABASE_URL') or '').strip().lower()
+            is_postgres = bool(db_url) and not db_url.startswith('sqlite')
 
-            reply_id = cursor.lastrowid
+            created_at = datetime.now(timezone.utc).isoformat()
+
+            if is_postgres:
+                cursor.execute("""
+                    INSERT INTO ticket_replies (ticket_id, user_id, message, is_internal, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    RETURNING reply_id
+                """, (ticket_id, user_id, reply.message, reply.is_internal, created_at))
+                reply_row = cursor.fetchone()
+                reply_id = reply_row[0] if reply_row else None
+            else:
+                cursor.execute("""
+                    INSERT INTO ticket_replies (ticket_id, user_id, message, is_internal, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (ticket_id, user_id, reply.message, reply.is_internal, created_at))
+                reply_id = getattr(cursor, 'lastrowid', None)
+                if not reply_id:
+                    cursor.execute("SELECT reply_id FROM ticket_replies WHERE ticket_id = ? ORDER BY reply_id DESC LIMIT 1", (ticket_id,))
+                    rr = cursor.fetchone()
+                    reply_id = rr[0] if rr else None
+
+            if reply_id is None:
+                raise HTTPException(500, "Failed to retrieve created reply ID")
 
             # Update ticket updated_at
-            cursor.execute("UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE ticket_id = ?", (ticket_id,))
+            cursor.execute(
+                "UPDATE support_tickets SET updated_at = ? WHERE ticket_id = ?",
+                (datetime.now(timezone.utc).isoformat(), ticket_id)
+            )
 
             conn.commit()
 
@@ -907,7 +1224,7 @@ async def get_ticket_replies(
 ):
     """Get replies for a support ticket"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if user has access to this ticket
@@ -936,7 +1253,7 @@ async def get_ticket_replies(
                 "user_id": row[2],
                 "message": row[3],
                 "is_internal": bool(row[4]),
-                "created_at": row[5],
+                "created_at": _to_manila_iso(row[5]),
                 "user_email": row[6]
             } for row in replies]
 
@@ -947,14 +1264,22 @@ async def get_ticket_replies(
 
 # Attendance Export Report Endpoints
 class AttendanceExportRequest(BaseModel):
-    date_from: Optional[str] = None
-    date_to: Optional[str] = None
-    student_ids: Optional[List[int]] = None
-    status_filter: Optional[List[str]] = None  # ['Present', 'Absent', 'Late', 'Excused']
-    course_code: Optional[str] = None
+    date_from: Optional[str] = Field(None, alias='dateFrom')
+    date_to: Optional[str] = Field(None, alias='dateTo')
+    class_id: Optional[int] = Field(None, alias='classId')
+    student_ids: Optional[List[int]] = Field(None, alias='studentIds')
+    status_filter: Optional[List[str]] = Field(None, alias='statusFilter')  # ['Present', 'Absent', 'Late', 'Excused']
+    course_code: Optional[str] = Field(None, alias='courseCode')
     section: Optional[str] = None
-    instructor_id: Optional[int] = None
-    export_format: str = "json"  # json, csv, excel, pdf
+    instructor_id: Optional[int] = Field(None, alias='instructorId')
+    professor_name: Optional[str] = Field(None, alias='professorName')
+    export_format: str = Field("json", alias='exportFormat')  # json, csv, excel, pdf
+
+    class Config:
+        # Allow sending either snake_case or camelCase from the frontend
+        allow_population_by_field_name = True
+        # Accept unknown fields gracefully (do not error on extra frontend props)
+        extra = 'ignore'
 
 class AttendanceRecord(BaseModel):
     student_id: str
@@ -992,16 +1317,21 @@ async def export_attendance_report(
 ):
     """Generate attendance export report (Super Admin only)"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
+            db_url = os.environ.get('DATABASE_URL', '')
+            is_postgres = bool(db_url and not db_url.lower().startswith('sqlite'))
+            date_expr = "CAST(a.timestamp AS DATE)" if is_postgres else "DATE(a.timestamp)"
+            time_expr = "CAST(a.timestamp AS TIME)" if is_postgres else "TIME(a.timestamp)"
+
             # Build the main query
-            base_query = """
+            base_query = f"""
                 SELECT
                     s.student_number as student_id,
                     (s.last_name || ', ' || s.first_name) as student_name,
-                    DATE(a.timestamp) as date,
-                    TIME(a.timestamp) as time_in,
+                    {date_expr} as date,
+                    {time_expr} as time_in,
                     ast.status_name as status,
                     c.course_id,
                     c.section,
@@ -1022,17 +1352,21 @@ async def export_attendance_report(
 
             # Apply filters
             if request.date_from:
-                base_query += " AND DATE(a.timestamp) >= ?"
+                base_query += f" AND {date_expr} >= ?"
                 params.append(request.date_from)
 
             if request.date_to:
-                base_query += " AND DATE(a.timestamp) <= ?"
+                base_query += f" AND {date_expr} <= ?"
                 params.append(request.date_to)
 
             if request.student_ids:
                 placeholders = ','.join('?' * len(request.student_ids))
                 base_query += f" AND s.student_id IN ({placeholders})"
                 params.extend(request.student_ids)
+
+            if request.class_id:
+                base_query += " AND c.class_id = ?"
+                params.append(request.class_id)
 
             if request.status_filter:
                 placeholders = ','.join('?' * len(request.status_filter))
@@ -1062,8 +1396,8 @@ async def export_attendance_report(
                 records.append({
                     "student_id": row[0] or "N/A",
                     "student_name": row[1] or "N/A",
-                    "date": row[2] or "N/A",
-                    "time_in": row[3] or "N/A",
+                    "date": str(row[2]) if row[2] is not None else "N/A",
+                    "time_in": str(row[3]) if row[3] is not None else "N/A",
                     "status": row[4] or "N/A"
                 })
 
@@ -1163,7 +1497,160 @@ async def export_attendance_report(
                 return report
 
     except Exception as e:
+        LOG.exception("Attendance export failed")
         raise HTTPException(500, f"Error generating report: {str(e)}")
+
+# Helper to generate attendance report using an existing DB cursor
+def _generate_attendance_report(cursor, request: AttendanceExportRequest) -> dict:
+    """Generate attendance report dict using provided DB cursor and request filters."""
+    db_url = os.environ.get('DATABASE_URL', '')
+    is_postgres = bool(db_url and not db_url.lower().startswith('sqlite'))
+    date_expr = "CAST(a.timestamp AS DATE)" if is_postgres else "DATE(a.timestamp)"
+    time_expr = "CAST(a.timestamp AS TIME)" if is_postgres else "TIME(a.timestamp)"
+
+    # Build the main query
+    base_query = f"""
+                SELECT
+                    s.student_number as student_id,
+                    (s.last_name || ', ' || s.first_name) as student_name,
+                    {date_expr} as date,
+                    {time_expr} as time_in,
+                    ast.status_name as status,
+                    c.course_id,
+                    c.section,
+                    i.instructor_id,
+                    (i.last_name || ', ' || i.first_name) as instructor_name,
+                    co.course_code,
+                    co.course_name
+                FROM attendance_logs a
+                JOIN students s ON a.student_id = s.student_id
+                JOIN attendance_status_types ast ON a.status_id = ast.status_id
+                JOIN classes c ON a.class_id = c.class_id
+                JOIN instructors i ON c.instructor_id = i.instructor_id
+                JOIN courses co ON c.course_id = co.course_id
+                WHERE 1=1
+            """
+
+    params = []
+
+    if request.date_from:
+        base_query += f" AND {date_expr} >= ?"
+        params.append(request.date_from)
+
+    if request.date_to:
+        base_query += f" AND {date_expr} <= ?"
+        params.append(request.date_to)
+
+    if request.student_ids:
+        placeholders = ','.join('?' * len(request.student_ids))
+        base_query += f" AND s.student_id IN ({placeholders})"
+        params.extend(request.student_ids)
+
+    if request.class_id:
+        base_query += " AND c.class_id = ?"
+        params.append(request.class_id)
+
+    if request.status_filter:
+        placeholders = ','.join('?' * len(request.status_filter))
+        base_query += f" AND ast.status_name IN ({placeholders})"
+        params.extend(request.status_filter)
+
+    if request.course_code:
+        base_query += " AND co.course_code = ?"
+        params.append(request.course_code)
+
+    if request.section:
+        base_query += " AND c.section = ?"
+        params.append(request.section)
+
+    if request.instructor_id:
+        base_query += " AND i.instructor_id = ?"
+        params.append(request.instructor_id)
+
+    base_query += " ORDER BY a.timestamp DESC"
+
+    cursor.execute(base_query, params)
+    rows = cursor.fetchall()
+
+    # Process results
+    records = []
+    for row in rows:
+        records.append({
+            "student_id": row[0] or "N/A",
+            "student_name": row[1] or "N/A",
+            "date": str(row[2]) if row[2] is not None else "N/A",
+            "time_in": str(row[3]) if row[3] is not None else "N/A",
+            "status": row[4] or "N/A"
+        })
+
+    # Generate class summary
+    if records:
+        status_counts = {}
+        student_absences = {}
+
+        for record in records:
+            status = record["status"]
+            student_id = record["student_id"]
+
+            if status not in status_counts:
+                status_counts[status] = 0
+            status_counts[status] += 1
+
+            if status == "Absent":
+                if student_id not in student_absences:
+                    student_absences[student_id] = 0
+                student_absences[student_id] += 1
+
+        unique_students = len(set(r["student_id"] for r in records))
+
+        present_count = status_counts.get("Present", 0)
+        absent_count = status_counts.get("Absent", 0)
+        late_count = status_counts.get("Late", 0)
+        excused_count = status_counts.get("Excused", 0)
+
+        total_records = len(records)
+        attendance_percentage = (present_count / total_records * 100) if total_records > 0 else 0
+
+        needs_attention = [student_id for student_id, absences in student_absences.items() if absences > 3]
+
+        class_summary = {
+            "total_students": unique_students,
+            "present_count": present_count,
+            "absent_count": absent_count,
+            "late_count": late_count,
+            "excused_count": excused_count,
+            "attendance_percentage": round(attendance_percentage, 2),
+            "needs_attention": needs_attention
+        }
+    else:
+        class_summary = {
+            "total_students": 0,
+            "present_count": 0,
+            "absent_count": 0,
+            "late_count": 0,
+            "excused_count": 0,
+            "attendance_percentage": 0.0,
+            "needs_attention": []
+        }
+
+    # Determine exported_by
+    exported_by = "System Admin"
+    if request.instructor_id:
+        cursor.execute("SELECT (last_name || ', ' || first_name) FROM instructors WHERE instructor_id = ?", (request.instructor_id,))
+        row = cursor.fetchone()
+        exported_by = row[0] if row else exported_by
+
+    from datetime import datetime
+    report = {
+        "report_title": f"Attendance Report - {request.course_code or 'All Classes'}",
+        "generated_at": datetime.now().isoformat(),
+        "exported_by": exported_by,
+        "date_range": f"{request.date_from or 'N/A'} to {request.date_to or 'N/A'}",
+        "records": records,
+        "class_summary": class_summary
+    }
+
+    return report
 
 @router.post("/api/admin/attendance/export/professor")
 async def export_professor_attendance_report(
@@ -1172,19 +1659,49 @@ async def export_professor_attendance_report(
 ):
     """Generate consolidated attendance report for all classes handled by a professor"""
     try:
-        if not request.instructor_id:
-            raise HTTPException(400, "instructor_id is required for professor reports")
+        # Allow identifying professor by `instructor_id` or by `professor_name` search
+        if not request.instructor_id and not request.professor_name:
+            raise HTTPException(400, "instructor_id or professor_name is required for professor reports. Admins should provide instructor_id or search by professor_name.")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
-            # Get all classes for this professor
-            cursor.execute("""
+            # If professor_name provided, resolve to instructor_id (simple LIKE search)
+            if not request.instructor_id and request.professor_name:
+                name_search = f"%{request.professor_name.strip()}%"
+                cursor.execute("SELECT instructor_id, (last_name || ', ' || first_name) FROM instructors WHERE (last_name || ', ' || first_name) LIKE ? OR first_name LIKE ? OR last_name LIKE ?", (name_search, name_search, name_search))
+                matches = cursor.fetchall()
+                if not matches:
+                    raise HTTPException(404, f"No instructor found matching '{request.professor_name}'")
+                if len(matches) > 1:
+                    # Multiple matches - ask caller to provide explicit instructor_id
+                    match_list = [f"{m[0]}: {m[1]}" for m in matches]
+                    raise HTTPException(400, f"Multiple instructors match '{request.professor_name}': {match_list}. Please provide instructor_id.")
+                # single match
+                request.instructor_id = matches[0][0]
+
+            # Get classes for this professor (optionally filtered by selected class/course/section)
+            classes_query = """
                 SELECT c.class_id, co.course_code, co.course_name, c.section
                 FROM classes c
                 JOIN courses co ON c.course_id = co.course_id
                 WHERE c.instructor_id = ?
-            """, (request.instructor_id,))
+            """
+            classes_params = [request.instructor_id]
+
+            if request.course_code:
+                classes_query += " AND co.course_code = ?"
+                classes_params.append(request.course_code)
+
+            if request.section:
+                classes_query += " AND c.section = ?"
+                classes_params.append(request.section)
+
+            if request.class_id:
+                classes_query += " AND c.class_id = ?"
+                classes_params.append(request.class_id)
+
+            cursor.execute(classes_query, tuple(classes_params))
 
             classes = cursor.fetchall()
 
@@ -1214,6 +1731,7 @@ async def export_professor_attendance_report(
                 class_request = AttendanceExportRequest(
                     date_from=request.date_from,
                     date_to=request.date_to,
+                    class_id=class_id,
                     student_ids=request.student_ids,
                     status_filter=request.status_filter,
                     course_code=course_code,
@@ -1222,8 +1740,8 @@ async def export_professor_attendance_report(
                     export_format="json"
                 )
 
-                # Get class report (reuse the logic above)
-                class_report = await export_attendance_report(class_request, admin_type)
+                # Get class report using helper (reuse query logic without opening new DB connections)
+                class_report = _generate_attendance_report(cursor, class_request)
                 class_reports.append(class_report)
 
                 # Accumulate consolidated stats
@@ -1282,6 +1800,7 @@ async def export_professor_attendance_report(
     except HTTPException:
         raise
     except Exception as e:
+        LOG.exception("Professor attendance export failed")
         raise HTTPException(500, f"Error generating professor report: {str(e)}")
 
 # Export format helper functions
@@ -1914,7 +2433,7 @@ def generate_pdf_report(report: dict) -> bytes:
                 ])
 
         records_table = Table(records_data, colWidths=[80, 150, 80, 80])
-        records_table.setStyle(TableStyle([
+        table_style = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -1924,10 +2443,18 @@ def generate_pdf_report(report: dict) -> bytes:
             ('BACKGROUND', (0, 1), (-1, -1), colors.white),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
-            # Style date separator rows
-            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey, lambda x: x[0] % len(headers) == 1 and records_data[x[0]][0].startswith('---')),
-            ('SPAN', (0, 1), (-1, 1), lambda x: x[0] % len(headers) == 1 and records_data[x[0]][0].startswith('---')),
-        ]))
+        ]
+
+        for row_index in range(1, len(records_data)):
+            first_cell = records_data[row_index][0]
+            if isinstance(first_cell, str) and first_cell.startswith('---'):
+                table_style.extend([
+                    ('BACKGROUND', (0, row_index), (-1, row_index), colors.lightgrey),
+                    ('FONTNAME', (0, row_index), (-1, row_index), 'Helvetica-Bold'),
+                    ('SPAN', (0, row_index), (-1, row_index)),
+                ])
+
+        records_table.setStyle(TableStyle(table_style))
         elements.append(records_table)
 
         doc.build(elements)

@@ -16,6 +16,13 @@ export class AuthService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
+  private readonly permissionAliases: Record<string, string[]> = {
+    reset_passwords: ['reset_passwords', 'manage_users', 'reset passwords', 'reset user passwords', 'create and manage user accounts'],
+    view_analytics: ['view_analytics', 'view_all_data', 'view analytics', 'view system analytics and reports'],
+    view_all_data: ['view_all_data', 'view_analytics', 'view all data', 'view system analytics and reports'],
+    manage_users: ['manage_users', 'reset_passwords', 'create and manage user accounts'],
+  };
+
   constructor() {
     // Load user from localStorage on service initialization
     this.loadUserFromStorage();
@@ -106,11 +113,23 @@ export class AuthService {
 
   hasPermission(permission: string): boolean {
     const user = this.currentUserSubject.value;
-    return user ? user.permissions.includes(permission) : false;
+    if (!user) return false;
+
+    const normalizedPermissions = new Set(
+      (user.permissions || []).map(p => this.normalizePermission(p)).filter(Boolean)
+    );
+
+    const normalizedRequested = this.normalizePermission(permission);
+    const aliasList = this.permissionAliases[normalizedRequested] || [normalizedRequested];
+
+    return aliasList.some(alias => normalizedPermissions.has(this.normalizePermission(alias)));
   }
 
   hasAnyPermission(permissions: string[]): boolean {
-    const user = this.currentUserSubject.value;
-    return user ? permissions.some(perm => user.permissions.includes(perm)) : false;
+    return permissions.some(perm => this.hasPermission(perm));
+  }
+
+  private normalizePermission(permission: string): string {
+    return (permission || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   }
 }

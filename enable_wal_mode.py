@@ -1,19 +1,25 @@
 import sqlite3
+from services.db import get_connection
 
 # Enable WAL mode to prevent database locking issues
-conn = sqlite3.connect('attendance.db')
-cursor = conn.cursor()
+with get_connection() as conn:
+	cursor = conn.cursor()
 
-# Enable WAL (Write-Ahead Logging) mode
-cursor.execute('PRAGMA journal_mode=WAL')
-result = cursor.fetchone()
-print(f'Journal mode: {result[0]}')
+	# Attempt to enable WAL (only meaningful for sqlite)
+	try:
+		cursor.execute('PRAGMA journal_mode=WAL')
+		result = cursor.fetchone()
+		if result:
+			print(f'Journal mode: {result[0]}')
+	except Exception:
+		# Non-sqlite backends may ignore PRAGMA
+		pass
 
-# Set timeout to allow retries on lock
-conn.execute('PRAGMA busy_timeout = 5000')  # 5 seconds
+	# Set timeout to allow retries on lock (sqlite-only)
+	try:
+		conn.execute('PRAGMA busy_timeout = 5000')  # 5 seconds
+	except Exception:
+		pass
 
-conn.commit()
-conn.close()
-
-print('✅ Database configured to use WAL mode and 5-second timeout')
-print('This prevents "database is locked" errors')
+print('✅ Database (if sqlite) configured to use WAL mode and 5-second timeout')
+print('This helps prevent "database is locked" errors on sqlite')

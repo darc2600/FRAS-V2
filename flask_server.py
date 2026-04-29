@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
+from services.db import get_connection
 import os
 import jwt
 from datetime import datetime, timedelta
@@ -26,7 +27,7 @@ def create_access_token(data: dict):
 
 def get_user_auth(email: str):
     """Get user authentication data from database"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT password, role, user_id, reference_id
@@ -83,7 +84,7 @@ def login():
     # Get user permissions based on role
     permissions = []
     try:
-        with sqlite3.connect(DB_PATH) as perm_conn:
+        with get_connection() as perm_conn:
             perm_cursor = perm_conn.cursor()
             perm_cursor.execute("""
                 SELECT p.permission_name
@@ -136,7 +137,7 @@ def register():
         print("Missing email or password")
         return jsonify({'error': 'Email and password are required'}), 400
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Check if user already exists in users table
@@ -203,7 +204,7 @@ def register():
 @app.route('/api/admin/users', methods=['GET'])
 def get_users():
     # For now, skip authentication check
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT user_id, email, role, created_at
@@ -224,7 +225,7 @@ def get_users():
 @app.route('/api/admin/analytics', methods=['GET'])
 def get_analytics():
     # For now, skip authentication check
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Get user counts

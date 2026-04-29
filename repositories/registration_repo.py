@@ -4,6 +4,8 @@ import shutil
 from fastapi import UploadFile, HTTPException
 from typing import List
 import sqlite3
+import traceback
+import errno
 from services.settings_service import get_settings_service
 from services.face_embeddings import (
     ensure_embeddings_table,
@@ -17,7 +19,10 @@ class RegistrationRepository:
         print(f"[DEBUG] ========== REGISTRATION START ==========")
         print(f"[DEBUG] Student Number: {student_number}")
         print(f"[DEBUG] Repo called with schedule_entries: {schedule_entries}, len: {len(schedule_entries) if schedule_entries else 'None'}")
-        face_data_path = os.path.join("dataset", student_number)
+        # Use configurable dataset base path; default to /app/dataset (writable in container)
+        dataset_base = os.getenv('DATASET_PATH', '/app/dataset')
+        face_data_path = os.path.join(dataset_base, student_number)
+        print(f"[DEBUG] Face data base: {dataset_base}")
         print(f"[DEBUG] Face data path set to: {face_data_path}")
         update_existing = False
 
@@ -115,15 +120,23 @@ class RegistrationRepository:
             # Re-raise HTTPException without wrapping it
             raise
         except Exception as e:
+            print(f"[DEBUG] Exception during registration processing: {e}")
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
 
         try:
-            # Save images under dataset/{student_number}/
+            # Save images under DATASET_PATH/{student_number}/
             save_path = face_data_path
             print(f"[DEBUG] Saving images to {save_path}")
             print(f"[DEBUG] Absolute path: {os.path.abspath(save_path)}")
-            os.makedirs(save_path, exist_ok=True)
-            print(f"[DEBUG] Directory created/confirmed at: {os.path.abspath(save_path)}")
+            try:
+                os.makedirs(save_path, exist_ok=True)
+                print(f"[DEBUG] Directory created/confirmed at: {os.path.abspath(save_path)}")
+            except OSError as e:
+                print(f"[DEBUG] OSError when creating directory {save_path}: {e}")
+                if e.errno == errno.EROFS:
+                    raise HTTPException(status_code=500, detail=f"Registration failed: Read-only filesystem when creating directory {save_path}")
+                raise HTTPException(status_code=500, detail=f"Registration failed: Could not create directory {save_path}: {e}")
             
             # Remove existing images if updating
             if update_existing:
@@ -144,14 +157,20 @@ class RegistrationRepository:
                 try:
                     img_path = os.path.join(save_path, file.filename or f"image_{i}.jpg")
                     print(f"[DEBUG] Full image path: {os.path.abspath(img_path)}")
-                    with open(img_path, "wb") as buffer:
-                        content = file.file.read()
-                        buffer.write(content)
+                    try:
+                        with open(img_path, "wb") as buffer:
+                            content = file.file.read()
+                            buffer.write(content)
+                    except OSError as e:
+                        print(f"[DEBUG] OSError when writing file {img_path}: {e}")
+                        if e.errno == errno.EROFS:
+                            raise HTTPException(status_code=500, detail=f"Registration failed: Read-only filesystem when writing file {img_path}")
+                        raise
                     saved_files.append(img_path)
                     print(f"[DEBUG] Successfully saved {img_path}")
                 except Exception as e:
                     print(f"[DEBUG] Error saving {file.filename}: {e}")
-                    raise
+                    raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
 
             # Verify images were saved
             print(f"[DEBUG] Verifying images were saved...")
@@ -219,6 +238,8 @@ class RegistrationRepository:
                 return {"status": "success", "message": "Student registered and images saved.", "image_paths": saved_files}
 
         except Exception as e:
+            print(f"[DEBUG] Exception while saving images / updating DB: {e}")
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
         finally:
             conn.close()

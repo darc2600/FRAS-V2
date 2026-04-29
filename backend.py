@@ -3,6 +3,11 @@ import os
 import sys
 print("UNIQUE BACKEND LOADED MARKER")
 print(f"Current working directory: {os.getcwd()}")
+# Ensure the application root is on sys.path so top-level imports (e.g. `models`) work
+BASE_DIR = os.path.dirname(__file__)
+if BASE_DIR and BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+    print(f"Inserted BASE_DIR to sys.path: {BASE_DIR}")
 import asyncio
 import sys
 
@@ -15,13 +20,17 @@ from typing import List, Dict
 import secrets
 import jwt
 from datetime import datetime, timedelta
+from datetime import timezone
+from zoneinfo import ZoneInfo
 from pydantic import BaseModel
+from services.db import get_connection
 # from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # from apscheduler.triggers.cron import CronTrigger
 
 JWT_SECRET = "dev-secret-change-me"
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 1440
+MANILA_TZ = ZoneInfo("Asia/Manila")
 
 # Optional imports for secure password hashing / verification
 try:
@@ -55,7 +64,7 @@ import os
 DB_PATH = os.path.join(os.path.dirname(__file__), "attendance.db")
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         # Enable foreign keys
         cursor.execute("PRAGMA foreign_keys = ON")
@@ -347,7 +356,7 @@ async def mark_daily_absents():
     current_time = now.strftime("%H:%M")
     print(f"[SCHEDULER] Current day: {current_day}, date: {attendance_date}, time: {current_time}")
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Get classes for today that have ended
@@ -372,7 +381,7 @@ async def mark_daily_absents():
     current_time = now.strftime("%H:%M")
     print(f"[SCHEDULER] Current day: {current_day}, date: {attendance_date}, time: {current_time}")
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # Get classes for today that have ended
@@ -474,7 +483,7 @@ async def register_user(payload: UserRegister):
     else:
         stored = payload.password  # fallback
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cur = conn.cursor()
         
         # Add columns if they don't exist (for existing tables)
@@ -573,7 +582,7 @@ async def delete_room_schedule(room_id: str, schedule_service=Depends(get_schedu
 @app.get("/api/courses", tags=["Courses"])
 async def get_courses():
     """Get all available course codes"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT course_code, course_name FROM courses ORDER BY course_code")
         courses = cursor.fetchall()
@@ -582,7 +591,7 @@ async def get_courses():
 @app.get("/api/courses/{course_code}/sections", tags=["Courses"])
 async def get_sections_for_course(course_code: str):
     """Get all sections for a specific course across all rooms"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT DISTINCT c.section 
@@ -597,7 +606,7 @@ async def get_sections_for_course(course_code: str):
 @app.get("/api/rooms/{room_id}/courses/{course_code}/sections", tags=["Rooms"])
 async def get_sections_for_course_and_room(room_id: int, course_code: str):
     """Get sections for a specific course in a specific room"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT DISTINCT c.section 
@@ -612,7 +621,7 @@ async def get_sections_for_course_and_room(room_id: int, course_code: str):
 @app.get("/api/instructors", tags=["Instructors"])  
 async def get_instructors():
     """Get all available instructors in 'Last, First' format"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT last_name, first_name FROM instructors ORDER BY last_name, first_name")
         instructors = cursor.fetchall()
@@ -622,7 +631,7 @@ async def get_instructors():
 @app.get("/api/students/{student_number}", tags=["Students"])
 async def get_student_by_number(student_number: str):
     """Get student information by student number for validation"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT student_id, student_number, last_name, first_name, email FROM students WHERE student_number = ?", (student_number,))
         student = cursor.fetchone()
@@ -640,7 +649,7 @@ async def get_student_by_number(student_number: str):
 @app.get("/api/students", tags=["Students"])
 async def get_all_students():
     """Get all students for dropdown selection"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT student_id, student_number, last_name, first_name, email FROM students ORDER BY last_name, first_name")
         students = cursor.fetchall()
@@ -654,7 +663,7 @@ async def get_all_students():
 @app.get("/api/classes", tags=["Classes"])
 async def get_all_classes():
     """Get all classes for dropdown selection"""
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT c.class_id, co.course_code, c.section, c.room_id, c.instructor_id,
@@ -761,19 +770,37 @@ async def create_user_support_ticket(
         if user_id is None:
             raise HTTPException(400, "User ID not found in token")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
-            from datetime import datetime
-            now = datetime.now().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
 
-            cursor.execute("""
-                INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+            db_url = (os.environ.get('DATABASE_URL') or '').strip().lower()
+            is_postgres = bool(db_url) and not db_url.startswith('sqlite')
 
-            ticket_id = cursor.lastrowid
+            if is_postgres:
+                cursor.execute("""
+                    INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    RETURNING ticket_id
+                """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+                row = cursor.fetchone()
+                ticket_id = row[0] if row else None
+            else:
+                cursor.execute("""
+                    INSERT INTO support_tickets (user_id, subject, description, category, priority, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (user_id, ticket.subject, ticket.description, ticket.category, ticket.priority, now))
+                ticket_id = getattr(cursor, 'lastrowid', None)
+                if not ticket_id:
+                    cursor.execute("SELECT ticket_id FROM support_tickets WHERE user_id = ? ORDER BY ticket_id DESC LIMIT 1", (user_id,))
+                    row = cursor.fetchone()
+                    ticket_id = row[0] if row else None
+
             conn.commit()
+
+            if ticket_id is None:
+                raise HTTPException(500, "Failed to retrieve created ticket ID")
 
             return {"message": "Support ticket created successfully", "ticket_id": ticket_id}
 

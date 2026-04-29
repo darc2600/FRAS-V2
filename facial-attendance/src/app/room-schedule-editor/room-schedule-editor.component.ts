@@ -419,18 +419,15 @@ export class RoomScheduleEditorComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (schedule.length === 0) {
-      this.message = 'No schedule entries to save.';
-      return;
-    }
-
     console.log('Saving schedule:', schedule);
     this.isSaving = true;
     this.message = 'Saving schedule...';
 
     this.api.updateRoomSchedule(this.room, schedule).subscribe({
       next: () => {
-        this.message = `Schedule saved successfully! (${schedule.length} entries)`;
+        this.message = schedule.length > 0
+          ? `Schedule saved successfully! (${schedule.length} entries)`
+          : 'Schedule cleared successfully!';
         this.messageType = 'success';
         this.isSaving = false;
         // Update original grid to reflect saved state

@@ -53,6 +53,7 @@ export class AttendanceReportsComponent implements OnInit {
   reportData: AttendanceReport | ProfessorReport | null = null;
   studentList: any[] = [];
   myClasses: any[] = [];
+  instructorList: string[] = [];
   showAdvanced: boolean = false;
   exportFormats = [
     { value: 'json', label: 'JSON' },
@@ -82,11 +83,13 @@ export class AttendanceReportsComponent implements OnInit {
       classId: [''],
       dateFrom: [''],
       dateTo: [''],
-      studentIds: [''],
+        studentId: [''],
+        studentIds: [''],
       statusFilter: [[]],
       courseCode: [''],
       section: [''],
       instructorId: [''],
+        professorName: [''],
       exportFormat: ['json', Validators.required]
     });
   }
@@ -106,6 +109,8 @@ export class AttendanceReportsComponent implements OnInit {
     this.loadStudents();
     // Load classes for dropdown
     this.loadClasses();
+    // Load professors for professor report dropdown
+    this.loadInstructors();
   }
 
   loadStudents(): void {
@@ -132,6 +137,17 @@ export class AttendanceReportsComponent implements OnInit {
     });
   }
 
+  loadInstructors(): void {
+    this.apiService.getInstructors().subscribe({
+      next: (instructors: string[]) => {
+        this.instructorList = instructors;
+      },
+      error: (error: any) => {
+        console.error('Error loading instructors:', error);
+      }
+    });
+  }
+
   get recordsGroupedByDate(): { date: string; records: AttendanceRecord[] }[] {
     if (!this.reportData || this.isProfessorReport(this.reportData)) {
       return [];
@@ -154,11 +170,62 @@ export class AttendanceReportsComponent implements OnInit {
     return this.reportForm.get('reportType')?.value === 'class';
   }
 
-  onReportTypeChange(): void {
-    // Clear class selection when switching report types
-    if (!this.requiresClassSelection) {
-      this.reportForm.patchValue({ classId: '' });
+  get isClassReportType(): boolean {
+    return this.reportForm.get('reportType')?.value === 'class';
+  }
+
+  get isProfessorReportType(): boolean {
+    return this.reportForm.get('reportType')?.value === 'professor';
+  }
+
+  get filteredProfessorClasses(): any[] {
+    const selectedProfessor = this.reportForm.get('professorName')?.value;
+    if (!selectedProfessor) {
+      return [];
     }
+
+    return this.myClasses.filter((classItem: any) =>
+      classItem?.instructor_name === selectedProfessor
+    );
+  }
+
+  onReportTypeChange(): void {
+    if (this.isProfessorReportType) {
+      this.reportForm.patchValue({
+        classId: '',
+        studentId: '',
+        studentIds: ''
+      });
+    } else {
+      this.reportForm.patchValue({
+        instructorId: '',
+        professorName: ''
+      });
+    }
+  }
+
+  onProfessorSelectionChange(): void {
+    this.reportForm.patchValue({ classId: '' });
+  }
+
+  isStatusSelected(status: string): boolean {
+    const selected: string[] = this.reportForm.get('statusFilter')?.value || [];
+    return selected.includes(status);
+  }
+
+  onStatusToggle(status: string, checked: boolean): void {
+    const selected: string[] = [...(this.reportForm.get('statusFilter')?.value || [])];
+    const statusIndex = selected.indexOf(status);
+
+    if (checked && statusIndex === -1) {
+      selected.push(status);
+    }
+
+    if (!checked && statusIndex !== -1) {
+      selected.splice(statusIndex, 1);
+    }
+
+    this.reportForm.patchValue({ statusFilter: selected });
   }
 
   onSubmit(): void {
@@ -172,17 +239,27 @@ export class AttendanceReportsComponent implements OnInit {
     this.reportData = null;
 
     const formValue = this.reportForm.value;
+    const selectedClass = this.getSelectedClass(formValue.classId);
     const requestData: any = {
-      date_from: formValue.dateFrom || undefined,
-      date_to: formValue.dateTo || undefined,
-      class_id: formValue.classId ? parseInt(formValue.classId) : undefined,
-      student_ids: formValue.studentIds ? formValue.studentIds.split(',').map((id: string) => parseInt(id.trim())) : undefined,
-      status_filter: formValue.statusFilter.length > 0 ? formValue.statusFilter : undefined,
-      course_code: formValue.courseCode || undefined,
-      section: formValue.section || undefined,
-      instructor_id: formValue.instructorId ? parseInt(formValue.instructorId) : undefined,
-      export_format: formValue.exportFormat
+      dateFrom: formValue.dateFrom || undefined,
+      dateTo: formValue.dateTo || undefined,
+      classId: formValue.classId ? parseInt(formValue.classId, 10) : undefined,
+      // Support either single student selection or comma-separated list
+      studentIds: formValue.studentId ? [parseInt(formValue.studentId)] : (formValue.studentIds ? formValue.studentIds.split(',').map((id: string) => parseInt(id.trim())) : undefined),
+      statusFilter: formValue.statusFilter.length > 0 ? formValue.statusFilter : undefined,
+      courseCode: formValue.courseCode || selectedClass?.course_code || selectedClass?.courseCode || undefined,
+      section: formValue.section || selectedClass?.section || undefined,
+      instructorId: formValue.instructorId ? parseInt(formValue.instructorId) : (selectedClass?.instructor_id || selectedClass?.instructorId || undefined),
+      professorName: formValue.professorName || undefined,
+      exportFormat: formValue.exportFormat
     };
+
+    // Client-side validation for professor reports (prevent accidental empty requests)
+    if (formValue.reportType === 'professor' && !requestData.instructorId && !requestData.professorName) {
+      this.isLoading = false;
+      alert('Please provide either Instructor ID or Professor name when generating a Professor report.');
+      return;
+    }
 
     // Remove undefined values
     Object.keys(requestData).forEach((key: string) => {
@@ -300,6 +377,7 @@ export class AttendanceReportsComponent implements OnInit {
       courseCode: '',
       section: '',
       instructorId: '',
+      professorName: '',
       exportFormat: 'json'
     });
   }
@@ -309,19 +387,30 @@ export class AttendanceReportsComponent implements OnInit {
 
     // Create a temporary form data for export
     const exportData: any = {
-      export_format: format
+      exportFormat: format
     };
 
     // Copy current filter values
     const formValue = this.reportForm.value;
-    if (formValue.dateFrom) exportData.date_from = formValue.dateFrom;
-    if (formValue.dateTo) exportData.date_to = formValue.dateTo;
-    if (formValue.classId) exportData.class_id = parseInt(formValue.classId);
-    if (formValue.studentIds) exportData.student_ids = formValue.studentIds.split(',').map((id: string) => parseInt(id.trim()));
-    if (formValue.statusFilter.length > 0) exportData.status_filter = formValue.statusFilter;
-    if (formValue.courseCode) exportData.course_code = formValue.courseCode;
-    if (formValue.section) exportData.section = formValue.section;
-    if (formValue.instructorId) exportData.instructor_id = parseInt(formValue.instructorId);
+    if (formValue.dateFrom) exportData.dateFrom = formValue.dateFrom;
+    if (formValue.dateTo) exportData.dateTo = formValue.dateTo;
+    const selectedClass = this.getSelectedClass(formValue.classId);
+    if (formValue.classId) exportData.classId = parseInt(formValue.classId, 10);
+    if (formValue.studentIds) exportData.studentIds = formValue.studentIds.split(',').map((id: string) => parseInt(id.trim()));
+    if (formValue.studentId) exportData.studentIds = [parseInt(formValue.studentId)];
+    if (formValue.statusFilter.length > 0) exportData.statusFilter = formValue.statusFilter;
+    if (formValue.courseCode || selectedClass?.course_code || selectedClass?.courseCode) {
+      exportData.courseCode = formValue.courseCode || selectedClass?.course_code || selectedClass?.courseCode;
+    }
+    if (formValue.section || selectedClass?.section) {
+      exportData.section = formValue.section || selectedClass?.section;
+    }
+    if (formValue.instructorId || selectedClass?.instructor_id || selectedClass?.instructorId) {
+      exportData.instructorId = formValue.instructorId
+        ? parseInt(formValue.instructorId)
+        : (selectedClass?.instructor_id || selectedClass?.instructorId);
+    }
+    if (formValue.professorName) exportData.professorName = formValue.professorName;
 
     const endpoint = formValue.reportType === 'professor'
       ? '/api/admin/attendance/export/professor'
@@ -342,5 +431,21 @@ export class AttendanceReportsComponent implements OnInit {
     // For now, just show an alert with class details
     // In a real app, you might open a modal or navigate to a detail view
     alert(`Class: ${classReport.report_title}\nRecords: ${classReport.records.length}\nAttendance Rate: ${classReport.class_summary.attendance_percentage}%`);
+  }
+
+  private getSelectedClass(classId: string | number | undefined): any | undefined {
+    if (!classId) {
+      return undefined;
+    }
+
+    const classIdNumber = typeof classId === 'number' ? classId : parseInt(classId, 10);
+    if (Number.isNaN(classIdNumber)) {
+      return undefined;
+    }
+
+    return this.myClasses.find((classItem: any) => {
+      const candidateId = classItem?.id ?? classItem?.class_id;
+      return Number(candidateId) === classIdNumber;
+    });
   }
 }

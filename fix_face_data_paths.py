@@ -1,8 +1,9 @@
 import sqlite3
 import os
+from services.db import get_connection
 
-conn = sqlite3.connect('attendance.db')
-cursor = conn.cursor()
+with get_connection() as conn:
+    cursor = conn.cursor()
 
 # Get all students
 cursor.execute('SELECT student_id, student_number FROM students')
@@ -23,7 +24,5 @@ for student_id, student_number in students:
         count += 1
         print(f'Updated {student_number}: {face_data_path}')
 
-conn.commit()
-conn.close()
-
-print(f'\nTotal updated: {count} students')
+    # commit handled by connection wrapper
+    print(f'\nTotal updated: {count} students')

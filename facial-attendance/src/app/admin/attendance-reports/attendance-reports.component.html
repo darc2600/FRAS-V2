@@ -1,5 +1,9 @@
-<div class="container-fluid py-4">
-  <h2 class="mb-4 fw-bold">Attendance Reports</h2>
+<div class="report-wrapper">
+  <div class="container py-4">
+  <div class="page-header mb-4">
+    <h2>Attendance Reports</h2>
+    <p class="text-muted mb-0">Generate and export attendance insights</p>
+  </div>
 
   <div class="card shadow-sm">
     <div class="card-header bg-white fw-semibold">
@@ -10,32 +14,41 @@
 
       <form [formGroup]="reportForm" (ngSubmit)="onSubmit()">
 
-        <!-- Report Type -->
-        <div class="mb-3">
-          <label class="form-label">Report Type</label>
-          <select class="form-select" formControlName="reportType" (change)="onReportTypeChange()">
-            <option *ngFor="let type of reportTypes" [value]="type.value">{{ type.label }}</option>
-          </select>
-        </div>
+        <!-- Main Filters Row -->
+        <div class="row g-3 mb-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Report Type</label>
+            <select class="form-select" formControlName="reportType" (change)="onReportTypeChange()">
+              <option *ngFor="let type of reportTypes" [value]="type.value">{{ type.label }}</option>
+            </select>
+          </div>
 
-        <!-- Class Selector -->
-        <div class="mb-3" *ngIf="requiresClassSelection">
-          <label class="form-label">Select Class</label>
-          <select class="form-select" formControlName="classId">
-            <option value="">Select a class...</option>
-            <option *ngFor="let cls of myClasses" [value]="cls.id">
-              {{ cls.course_code }} - {{ cls.section }} ({{ cls.instructor_name }})
-            </option>
-          </select>
-        </div>
+          <div class="col-md-3" *ngIf="isClassReportType">
+            <label class="form-label">Select Class</label>
+            <select class="form-select" formControlName="classId">
+              <option value="">Select a class...</option>
+              <option *ngFor="let cls of myClasses" [value]="cls.id || cls.class_id">
+                {{ cls.course_code }} - {{ cls.section }} ({{ cls.instructor_name }})
+              </option>
+            </select>
+          </div>
 
-        <!-- Date Range -->
-        <div class="row mb-3">
-          <div class="col-md-6">
+          <div class="col-md-3" *ngIf="isProfessorReportType">
+            <label class="form-label">Select Professor</label>
+            <select class="form-select" formControlName="professorName" (change)="onProfessorSelectionChange()">
+              <option value="">Select professor...</option>
+              <option *ngFor="let professor of instructorList" [value]="professor">
+                {{ professor }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
             <label class="form-label">From</label>
             <input type="date" class="form-control" formControlName="dateFrom">
           </div>
-          <div class="col-md-6">
+
+          <div class="col-md-3">
             <label class="form-label">To</label>
             <input type="date" class="form-control" formControlName="dateTo">
           </div>
@@ -48,28 +61,54 @@
           </button>
         </div>
 
-        <div *ngIf="showAdvanced" class="border rounded p-3 mb-3 bg-light">
+        <div *ngIf="showAdvanced" class="advanced-panel mb-3">
 
-          <!-- Students -->
-          <div class="mb-3" *ngIf="studentList?.length">
-            <label class="form-label">Student</label>
-            <select class="form-select" formControlName="studentId">
-              <option value="">All Students</option>
-              <option *ngFor="let stu of studentList" [value]="stu.id">
-                {{ stu.name }}
-              </option>
-            </select>
-          </div>
+          <div class="row g-3">
 
-          <!-- Status Filter -->
-          <div class="mb-3">
-            <label class="form-label">Status</label>
-            <div class="d-flex flex-wrap gap-3">
-              <div *ngFor="let status of statusOptions" class="form-check">
-                <input type="checkbox" class="form-check-input" [value]="status.value" formControlName="statusFilter">
-                <label class="form-check-label">{{ status.label }}</label>
+            <!-- Class Report: Student Filter -->
+            <div class="col-md-4" *ngIf="isClassReportType && studentList?.length">
+              <label class="form-label">Student</label>
+              <select class="form-select" formControlName="studentId">
+                <option value="">All Students</option>
+                <option *ngFor="let stu of studentList" [value]="stu.id">
+                  {{ stu.name }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Professor Report: Classes Under Professor -->
+            <div class="col-md-4" *ngIf="isProfessorReportType">
+              <label class="form-label">Select Class (Under Professor)</label>
+              <select class="form-select" formControlName="classId">
+                <option value="">All classes under selected professor</option>
+                <option
+                  *ngFor="let cls of filteredProfessorClasses"
+                  [value]="cls.id || cls.class_id"
+                >
+                  {{ cls.course_code }} - {{ cls.section }} ({{ cls.instructor_name }})
+                </option>
+              </select>
+            </div>
+
+            <!-- Status Filter (scrollable checklist for both report types) -->
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <div class="status-scroll-list">
+                <div class="form-check" *ngFor="let status of statusOptions">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    [id]="'status-' + status.value"
+                    [checked]="isStatusSelected(status.value)"
+                    (change)="onStatusToggle(status.value, $any($event.target).checked)"
+                  >
+                  <label class="form-check-label" [for]="'status-' + status.value">
+                    {{ status.label }}
+                  </label>
+                </div>
               </div>
             </div>
+
           </div>
         </div>
 
@@ -80,7 +119,7 @@
             {{ isLoading ? 'Generating...' : 'Generate Report' }}
           </button>
 
-          <button class="btn btn-outline-secondary" type="button" (click)="clearForm()">
+          <button class="btn btn-clear" type="button" (click)="clearForm()">
             Clear
           </button>
         </div>
@@ -90,7 +129,7 @@
   </div>
 
   <!-- Results Here -->
-  <div *ngIf="reportData" class="mt-4">
+  <div *ngIf="reportData" class="results-section">
     <!-- Class Report -->
     <div *ngIf="!isProfessorReport(reportData)" class="card shadow-sm">
       <div class="card-header bg-success text-white">
@@ -117,37 +156,37 @@
           <div class="card-body">
             <div class="row text-center">
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-primary">
                   <h4 class="text-primary">{{ reportData.class_summary.total_students }}</h4>
                   <small>Total Students</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-success">
                   <h4 class="text-success">{{ reportData.class_summary.present_count }}</h4>
                   <small>Present</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-danger">
                   <h4 class="text-danger">{{ reportData.class_summary.absent_count }}</h4>
                   <small>Absent</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-warning">
                   <h4 class="text-warning">{{ reportData.class_summary.late_count }}</h4>
                   <small>Late</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-info">
                   <h4 class="text-info">{{ reportData.class_summary.excused_count }}</h4>
                   <small>Excused</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-primary">
                   <h4 class="text-primary">{{ reportData.class_summary.attendance_percentage }}%</h4>
                   <small>Attendance Rate</small>
                 </div>
@@ -174,8 +213,8 @@
           </div>
           <div class="card-body p-0">
             <div class="table-responsive">
-              <table class="table table-striped mb-0">
-                <thead class="table-dark">
+              <table class="table custom-table mb-0">
+                <thead>
                   <tr>
                     <th>Student ID</th>
                     <th>Student Name</th>
@@ -216,7 +255,14 @@
     <!-- Professor Report -->
     <div *ngIf="isProfessorReport(reportData)" class="card shadow-sm">
       <div class="card-header bg-info text-white">
-        <h5 class="mb-0">Professor Report: {{ reportData.professor_name }}</h5>
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Professor Report: {{ reportData.professor_name }}</h5>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-light" (click)="exportCurrentReport('csv')">Export CSV</button>
+            <button class="btn btn-outline-light" (click)="exportCurrentReport('excel')">Export Excel</button>
+            <button class="btn btn-outline-light" (click)="exportCurrentReport('pdf')">Export PDF</button>
+          </div>
+        </div>
       </div>
       <div class="card-body">
         <div class="mb-3">
@@ -231,37 +277,37 @@
           <div class="card-body">
             <div class="row text-center">
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-primary">
                   <h4 class="text-primary">{{ reportData.consolidated_summary.total_students }}</h4>
                   <small>Total Students</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-success">
                   <h4 class="text-success">{{ reportData.consolidated_summary.present_count }}</h4>
                   <small>Present</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-danger">
                   <h4 class="text-danger">{{ reportData.consolidated_summary.absent_count }}</h4>
                   <small>Absent</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-warning">
                   <h4 class="text-warning">{{ reportData.consolidated_summary.late_count }}</h4>
                   <small>Late</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-info">
                   <h4 class="text-info">{{ reportData.consolidated_summary.excused_count }}</h4>
                   <small>Excused</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-2">
+                <div class="summary-card summary-primary">
                   <h4 class="text-primary">{{ reportData.consolidated_summary.attendance_percentage }}%</h4>
                   <small>Attendance Rate</small>
                 </div>
@@ -286,37 +332,37 @@
             </div>
             <div class="row text-center">
               <div class="col-md-2">
-                <div class="border rounded p-1">
+                <div class="summary-card summary-compact summary-success">
                   <strong>{{ classReport.class_summary.present_count }}</strong><br>
                   <small>Present</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-1">
+                <div class="summary-card summary-compact summary-danger">
                   <strong>{{ classReport.class_summary.absent_count }}</strong><br>
                   <small>Absent</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-1">
+                <div class="summary-card summary-compact summary-warning">
                   <strong>{{ classReport.class_summary.late_count }}</strong><br>
                   <small>Late</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-1">
+                <div class="summary-card summary-compact summary-info">
                   <strong>{{ classReport.class_summary.excused_count }}</strong><br>
                   <small>Excused</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <div class="border rounded p-1">
+                <div class="summary-card summary-compact summary-primary">
                   <strong>{{ classReport.class_summary.attendance_percentage }}%</strong><br>
                   <small>Rate</small>
                 </div>
               </div>
               <div class="col-md-2">
-                <button class="btn btn-sm btn-outline-primary w-100" (click)="viewClassDetails(classReport)">
+                <button class="btn btn-sm btn-view-details w-100" (click)="viewClassDetails(classReport)">
                   View Details
                 </button>
               </div>
@@ -325,5 +371,6 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 </div>

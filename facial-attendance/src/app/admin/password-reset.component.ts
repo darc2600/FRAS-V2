@@ -47,6 +47,6 @@ export class PasswordResetComponent {
 
   hasPermission(permission: string): boolean {
     const currentUser = this.authService.getCurrentUser();
-    return currentUser ? (currentUser.permissions.includes(permission) || currentUser.user_type === 'super_admin') : false;
+    return currentUser ? (this.authService.hasPermission(permission) || currentUser.user_type === 'super_admin') : false;
   }
 }

@@ -1,3 +1,4 @@
+import os
 import json
 from typing import List, Optional, Tuple
 
@@ -5,8 +6,10 @@ from deepface import DeepFace
 
 
 def ensure_embeddings_table(cursor) -> None:
-    cursor.execute(
-        '''
+    # Create SQL compatible with the active database dialect.
+    db_url = os.getenv('DATABASE_URL', 'sqlite:///attendance.db')
+    if db_url.startswith('sqlite'):
+        create_sql = '''
         CREATE TABLE IF NOT EXISTS student_face_embeddings (
             embedding_id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER NOT NULL,
@@ -18,7 +21,22 @@ def ensure_embeddings_table(cursor) -> None:
             UNIQUE(student_id, model_name)
         )
         '''
-    )
+    else:
+        # PostgreSQL compatible definition
+        create_sql = '''
+        CREATE TABLE IF NOT EXISTS student_face_embeddings (
+            embedding_id SERIAL PRIMARY KEY,
+            student_id INTEGER NOT NULL,
+            model_name TEXT NOT NULL,
+            embedding_json TEXT NOT NULL,
+            source_image_path TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(student_id, model_name)
+        )
+        '''
+
+    cursor.execute(create_sql)
 
 
 def extract_embedding_from_image(

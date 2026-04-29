@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query
 import sqlite3
 from typing import List, Dict
+from services.db import get_connection
 
 DB_PATH = "attendance.db"
 
@@ -11,7 +12,7 @@ def get_courses_for_student(student_id: str = Query(...)) -> List[Dict]:
     """
     Returns a list of courses and sections a student is enrolled in.
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """

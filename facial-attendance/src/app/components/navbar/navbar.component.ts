@@ -1,5 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../auth.service';
+import { Router } from '@angular/router';
+import { Input } from '@angular/core';
 
 @Component({
   selector: 'app-navbar',
@@ -7,6 +9,8 @@ import { AuthService } from '../../auth.service';
   styleUrls: ['./navbar.component.css']
 })
 export class NavbarComponent implements OnInit {
+  @Input() isOpen = true;
+
   // Permission-based flags
   canMonitor = false;
   canViewLogs = false;
@@ -17,10 +21,11 @@ export class NavbarComponent implements OnInit {
   canResetPasswords = false;
   canConfigureSystem = false;
   canViewAnalytics = false;
+  canViewReports = false;
   canSubmitSupport = false;
   canManageSupport = false;
 
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService, private router: Router) {}
 
   ngOnInit(): void {
     this.authService.currentUser$.subscribe(user => {
@@ -35,9 +40,10 @@ export class NavbarComponent implements OnInit {
         this.canViewSchedule = permissions.includes('view_own_schedule');
         this.canEditSchedule = permissions.includes('manage_rooms_schedule') || isSuperAdmin;
         this.canManageUsers = permissions.includes('manage_users') || isSuperAdmin;
-        this.canResetPasswords = permissions.includes('reset_passwords') || isSuperAdmin;
+        this.canResetPasswords = permissions.includes('reset_passwords') || permissions.includes('manage_users') || isSuperAdmin;
         this.canConfigureSystem = (permissions.includes('system_admin') || permissions.includes('manage_content')) || isSuperAdmin;
-        this.canViewAnalytics = permissions.includes('view_analytics') || isSuperAdmin;
+        this.canViewAnalytics = permissions.includes('view_analytics') || permissions.includes('view_all_data') || isSuperAdmin;
+        this.canViewReports = permissions.includes('view_all_data') || this.canViewAnalytics || isSuperAdmin;
         this.canSubmitSupport = permissions.includes('submit_support');
         this.canManageSupport = permissions.includes('manage_support') || isSuperAdmin;
       } else {
@@ -51,9 +57,15 @@ export class NavbarComponent implements OnInit {
         this.canResetPasswords = false;
         this.canConfigureSystem = false;
         this.canViewAnalytics = false;
+        this.canViewReports = false;
         this.canSubmitSupport = false;
         this.canManageSupport = false;
       }
     });
+  }
+
+  logout(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }
