@@ -1,174 +1,269 @@
+<div align="center">
+
 # FRAS — Facial Recognition Attendance System
 
-![Angular](https://img.shields.io/badge/Frontend-Angular%2018-DD0031?style=for-the-badge&logo=angular&logoColor=white)
-![Ionic](https://img.shields.io/badge/UI-Ionic%208-3880FF?style=for-the-badge&logo=ionic&logoColor=white)
-![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![SQLite](https://img.shields.io/badge/Demo%20Database-SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![PostgreSQL Ready](https://img.shields.io/badge/PostgreSQL-Optional%20Deployment-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-![Computer Vision](https://img.shields.io/badge/AI-Face%20Recognition-111827?style=for-the-badge)
+### A full-stack attendance management platform with face recognition, schedule-aware monitoring, reports, analytics, support workflows, and admin controls.
 
-**FRAS** is a full-stack facial recognition attendance platform built for classroom and institutional attendance workflows. It combines a modern Angular/Ionic dashboard with a FastAPI backend, student face registration, attendance monitoring, reporting, admin controls, room scheduling, analytics, and support ticket handling.
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi)
+![Angular](https://img.shields.io/badge/Angular-Frontend-DD0031?style=for-the-badge&logo=angular)
+![Ionic](https://img.shields.io/badge/Ionic-Mobile%20Ready-3880FF?style=for-the-badge&logo=ionic)
+![SQLite](https://img.shields.io/badge/SQLite-Demo%20Database-003B57?style=for-the-badge&logo=sqlite)
+![Docker](https://img.shields.io/badge/Docker-Deployment-2496ED?style=for-the-badge&logo=docker)
 
-The system is designed for thesis demonstration, school operations, and future production hardening where attendance can be captured, reviewed, exported, and managed from a centralized web application.
+</div>
 
 ---
 
-## Project Snapshot
+## Project Overview
 
-| Area | Details |
-|---|---|
-| Project Name | FRAS — Facial Recognition Attendance System |
-| Frontend | Angular 18, Ionic UI, TypeScript |
-| Backend | FastAPI, Python |
-| Database | SQLite for demo/local branch, PostgreSQL-compatible deployment path |
-| Core Domain | Student attendance, face registration, classroom schedules, reports |
-| Primary Users | Super Admin, Admin, Instructor, Student |
-| Demo Focus | Clean attendance workflow, visual admin dashboard, face-data readiness, report exports |
+**FRAS** is a Facial Recognition Attendance System built for academic attendance monitoring and administrative reporting. The system combines student identity records, facial data capture, class schedules, attendance logs, reports, analytics, and support workflows into one centralized platform.
+
+This repository has been updated to become more presentation-ready, panel-ready, and maintainable. The latest update cycle focuses on stronger documentation, cleaner deployment direction, repeatable demo data, analytics improvements, report polish, and feedback-driven UI updates.
+
+---
+
+## What FRAS Does
+
+FRAS helps schools or departments manage attendance with a more automated and auditable flow:
+
+1. Administrators manage users, students, instructors, rooms, classes, and schedules.
+2. Students register profile and face data.
+3. The system supports face-recognition attendance workflows.
+4. Attendance records are stored and made available for review.
+5. Admin users can generate reports and review analytics.
+6. Support tickets and system settings help manage operations.
 
 ---
 
 ## Core Modules
 
-### Authentication and Role-Based Access
-
-FRAS includes login, protected routes, role-based access, admin guards, and user-specific dashboard access. The platform separates access between administrative users, instructors, and students.
-
-### Student Registration and Face Data Capture
-
-The system supports student registration, student number tracking, class association, image capture, local dataset storage, and face-data path management for recognition readiness.
-
-### Attendance Monitoring
-
-The attendance monitor module is designed to support face-based attendance workflows, record attendance activity, and connect recognized students to stored attendance logs.
-
-### Attendance Logs and Reports
-
-Admins can review attendance history, filter records, and generate report outputs for class-based or professor-based review. Export-oriented workflows are included for CSV, Excel, and PDF-style reporting.
-
-### Room and Schedule Management
-
-The platform includes room schedule viewing and editing so classroom schedules can be managed alongside attendance operations.
-
-### Admin User Management
-
-The admin panel includes user listing, account status handling, role/user-type visibility, password reset workflows, and permission-based administrative tools.
-
-### System Analytics
-
-FRAS includes system-wide metrics for students, instructors, attendance records, recent attendance activity, and face registration readiness. This module is planned for visual chart improvements in the next update.
-
-### Support Ticket System
-
-Users can submit support concerns and administrators can review support tickets from the admin dashboard.
-
-### System Settings
-
-The settings module centralizes configurable system values used by the attendance platform.
+| Module | Description |
+|---|---|
+| Authentication | Login and protected admin access flow. |
+| User Management | Admin, instructor, and student account management. |
+| Student Management | Student records, identifiers, and face registration readiness. |
+| Instructor Management | Instructor records used for class and report workflows. |
+| Face Registration | Captures and stores student facial reference data. |
+| Face Recognition | Supports automated attendance workflows using registered faces. |
+| Schedule Management | Manages rooms, classes, instructors, and schedule assignments. |
+| Attendance Logs | Stores attendance records for reporting and analysis. |
+| Attendance Reports | Provides class and professor attendance report views. |
+| System Analytics | Shows student, instructor, attendance, and face registration insights. |
+| Contact Support | Allows users to submit support requests with category and priority. |
+| System Settings | Central place for configurable system behavior. |
 
 ---
 
-## Current Demo Database Snapshot
+## Latest Update Highlights
 
-The latest deployed branch includes a prepared SQLite demo database with sample data suitable for presentation and local testing.
+### Documentation and Repository Polish
 
-| Data Area | Included |
-|---|---:|
-| Users | Yes |
-| Students | Yes |
-| Instructors | Yes |
-| Rooms | Yes |
-| Courses | Yes |
-| Classes | Yes |
-| Enrollments | Yes |
-| Attendance Logs | Yes |
-| Support Tickets | Yes |
+- Showcase-style README.
+- Dedicated setup, deployment, demo, troubleshooting, and roadmap docs.
+- Contributor and changelog tracking.
+- Pull request templates for cleaner GitHub workflow.
+
+### Deployment and Environment Cleanup
+
+- Fixed Dockerfile direction.
+- Added Nginx frontend-to-backend proxy notes.
+- Added safe `.env.example` pattern.
+- Added deployment validation script.
+- Added secret generator utility.
+
+### Panel Feedback Fixes
+
+- Contact Support now uses placeholder selections.
+- `Create User` wording was changed to `Add User`.
+- User Management filters were cleaned up.
+- Reports display was polished.
+- Analytics now includes visual insight direction.
+- Face embedding wording was replaced with clearer face registration wording.
+
+### Reliability Improvements
+
+- Duplicate room protection.
+- Room number normalization.
+- Duplicate room cleanup script.
+- Repeatable demo data reset workflow.
+- Demo database backup before reset.
 
 ---
 
 ## System Architecture
 
-```mermaid
-graph TD
-    A[Angular / Ionic Frontend] --> B[FastAPI Backend]
-    B --> C[SQLite Demo Database]
-    B --> D[Dataset Folder / Face Images]
-    B --> E[Admin APIs]
-    B --> F[Attendance APIs]
-    B --> G[Reports APIs]
-    B --> H[Support APIs]
-    C --> I[Students]
-    C --> J[Users]
-    C --> K[Rooms and Schedules]
-    C --> L[Attendance Logs]
+```txt
+FRAS
+├── Angular/Ionic Frontend
+│   ├── Login
+│   ├── Admin Dashboard
+│   ├── User Management
+│   ├── Attendance Reports
+│   ├── Analytics
+│   ├── Schedule Management
+│   └── Support UI
+│
+├── FastAPI Backend
+│   ├── Auth APIs
+│   ├── Admin APIs
+│   ├── Attendance APIs
+│   ├── Recognition APIs
+│   ├── Schedule APIs
+│   └── Support APIs
+│
+├── Database Layer
+│   ├── SQLite demo database
+│   ├── Repository modules
+│   ├── Migration helpers
+│   └── Demo data reset script
+│
+└── Deployment Layer
+    ├── Dockerfile
+    ├── Docker Compose
+    ├── Nginx proxy config
+    └── Environment templates
 ```
 
 ---
 
-## Repository Structure
+## Recommended Demo Direction
+
+For thesis and panel review, the recommended official demo path is:
+
+| Area | Recommended Choice |
+|---|---|
+| Backend | FastAPI |
+| Frontend | Angular/Ionic |
+| Demo Database | SQLite |
+| Demo Data | `scripts/reset_demo_data.py` |
+| Deployment | Docker/Nginx after local validation |
+| PostgreSQL | Future/optional production path |
+
+This keeps the demo stable and avoids unnecessary database/deployment confusion.
+
+---
+
+## Demo Readiness Features
+
+FRAS now includes a repeatable demo workflow:
+
+- Backup existing database.
+- Reset database to clean demo state.
+- Seed users, students, instructors, classes, rooms, schedules, attendance logs, support tickets, and face registration coverage.
+- Provide consistent demo accounts.
+- Support analytics charts across monthly attendance and registration data.
+
+See:
 
 ```txt
-FRAS/
-├── api/                     # FastAPI routers and backend modules
-├── config/                  # Default system settings and configuration helpers
-├── database/                # Database-related support files
-├── dataset/                 # Registered student face image folders
-├── docs/                    # Project setup, deployment, demo, and troubleshooting docs
-├── facial-attendance/       # Angular/Ionic frontend application
-├── models/                  # Backend data/model helpers
-├── repositories/            # Database access and persistence layer
-├── services/                # Shared backend services such as database connections
-├── backend.py               # Official FastAPI backend entry point
-├── attendance.db            # SQLite demo database for the current branch
-├── database_indexes.sql     # Database index/constraint helper script
-├── docker-compose.prod.yml  # Production-oriented compose file
-└── README.md                # Project showcase overview
+docs/DEMO_GUIDE.md
+docs/DEMO_DATA_RESET.md
 ```
 
 ---
 
 ## Documentation
 
-Detailed usage and operational instructions are intentionally separated from this showcase README.
-
-| Document | Purpose |
+| File | Purpose |
 |---|---|
-| [`docs/SETUP.md`](docs/SETUP.md) | Local development setup and run guide |
-| [`docs/DEMO_GUIDE.md`](docs/DEMO_GUIDE.md) | Suggested thesis/demo presentation flow |
-| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Deployment notes and environment strategy |
-| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Common issues and quick fixes |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Next planned improvements and patch sequence |
+| `DOCUMENTATION_INDEX.md` | Quick map of all major docs. |
+| `docs/SETUP.md` | Local development setup. |
+| `docs/DEPLOYMENT.md` | Deployment direction and server notes. |
+| `docs/DOCKER_NOTES.md` | Docker-specific notes. |
+| `docs/DEMO_GUIDE.md` | Suggested demo walkthrough. |
+| `docs/DEMO_DATA_RESET.md` | Demo data reset workflow. |
+| `docs/TROUBLESHOOTING.md` | Common issues and fixes. |
+| `docs/ROADMAP.md` | Planned development sequence. |
+| `docs/PROJECT_STATUS_REPORT.md` | Current system status. |
+| `docs/SECURITY_NOTES.md` | Security and credential-handling notes. |
+| `CONTRIBUTORS.md` | Contributors and update-cycle change summary. |
+| `CHANGELOG.md` | Project change history. |
 
 ---
 
-## Current Stabilization Direction
+## Repository Health Check
 
-This branch is being cleaned and upgraded through small PR-based updates. The immediate priority is to make FRAS more stable, easier to review, and more presentation-ready.
+A lightweight project checker is included:
 
-Planned upgrade sequence:
+```bash
+python scripts/project_health_check.py
+```
 
-1. Documentation, environment, and repo cleanup
-2. Docker/environment correction
-3. Panel feedback UI fixes
-4. Duplicate room protection
-5. Attendance report display improvements
-6. Analytics graphs and clearer face-registration metrics
-7. Repeatable demo data reset workflow
-8. Authentication and deployment hardening
+It checks for common issues such as:
+
+- Missing important files.
+- Dockerfile encoding problems.
+- Local `.env` visibility.
+- Sensitive placeholder patterns.
 
 ---
 
-## Project Value
+## Business and Thesis Value
 
-FRAS is more than a simple attendance tracker. It demonstrates a complete institutional workflow:
+FRAS is designed to demonstrate more than simple attendance tracking. It shows a complete system workflow:
 
-- Face-data registration
-- Attendance capture
-- Administrative review
-- Schedule and room context
-- Report generation
-- User management
-- Support ticket handling
-- System analytics
-- Deployment-aware backend/frontend separation
+- Identity and access management.
+- Face registration and recognition readiness.
+- Schedule-aware attendance tracking.
+- Operational dashboards.
+- Reports and analytics.
+- Support request handling.
+- Deployment and demo preparation.
+- Maintainable full-stack project structure.
 
-This makes it a strong thesis and portfolio project because it combines real-world school operations with full-stack software development and computer vision support.
+This makes it suitable as a thesis system, portfolio project, and base for a real attendance-monitoring product.
+
+---
+
+## Current Roadmap
+
+Completed in latest update cycle:
+
+- Documentation polish.
+- Docker/environment cleanup.
+- Panel feedback UI fixes.
+- Duplicate room protection.
+- Attendance Reports polish.
+- Analytics charts and clearer face registration wording.
+- Repeatable demo data reset workflow.
+- Contributor and PR workflow documentation.
+
+Recommended next:
+
+1. Security hardening for auth and password reset.
+2. Archive old debug scripts and backup files.
+3. Add automated smoke tests.
+4. Run final deployment validation.
+5. Final UI polish for dashboard/login if time allows.
+
+---
+
+## Security Reminder
+
+Do not commit real credentials.
+
+Never commit:
+
+- `.env`
+- Server passwords
+- Database passwords
+- JWT secrets
+- SSH credentials
+- Production database dumps
+- Sensitive feedback documents
+
+Use:
+
+```txt
+.env.example
+```
+
+as the safe template.
+
+---
+
+## Project Status
+
+FRAS is now significantly closer to being demo-ready and panel-ready. The project already had strong core functionality; the latest updates improve structure, clarity, visual reporting, deployment direction, and repeatable demo preparation.
+
