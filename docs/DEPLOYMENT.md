@@ -1,101 +1,94 @@
-# FRAS Deployment Notes
+# FRAS Deployment Guide
 
-This document defines the deployment direction for the current branch.
+This guide is for the cleaned Docker-based deployment flow.
 
-## Current Recommended Demo Deployment Strategy
+## What this deployment uses
 
-Use one official path at a time.
+- FastAPI backend served by Uvicorn on port `8000`
+- Angular frontend served by Nginx on port `8080`
+- Nginx proxy for `/api/*` requests from the frontend to the backend
+- SQLite demo database mounted from `./attendance.db`
+- Local dataset folder mounted from `./dataset`
 
-For the current cleanup branch, the recommended demo path is:
+## First-time setup
 
-```txt
-FastAPI backend + Angular build + SQLite demo database
+```bash
+cp .env.example .env
+python scripts/generate_secret.py
 ```
 
-PostgreSQL support exists, but it should be treated as an optional production path until the database workflow is fully stabilized.
-
----
-
-## Environment Variables
-
-Create a real `.env` file from `.env.example` when deploying.
-
-Never place real passwords, SSH credentials, database passwords, or JWT secrets inside README files, feedback documents, screenshots, or committed docs.
-
-Recommended environment variables:
+Paste the generated value into `.env`:
 
 ```env
-JWT_SECRET=replace-with-a-long-random-secret
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=1440
-DATABASE_URL=sqlite:///attendance.db
-DATASET_PATH=dataset
-FRAS_ENV=production
+JWT_SECRET=your-generated-secret-here
 ```
 
----
+The default demo database config is:
 
-## SQLite Demo Deployment
+```env
+DATABASE_URL=sqlite:////app/attendance.db
+SQLITE_DB_PATH=/app/attendance.db
+DATASET_PATH=/app/dataset
+```
 
-SQLite is easiest for a controlled thesis demonstration.
+## Build the Angular frontend
 
-Benefits:
+Run this from the project root:
 
-- Simple to copy and back up
-- No database server required
-- Easy to reset for demo
-- Lower deployment complexity
+```bash
+cd facial-attendance
+npm install
+npm run build
+cd ..
+```
 
-Risks:
+The Docker frontend service expects the Angular build output at:
 
-- Not ideal for multi-server production
-- Requires careful file backup
-- Concurrent write behavior is limited compared to PostgreSQL
+```txt
+facial-attendance/dist/facial-attendance
+```
 
----
+## Check deployment config
 
-## PostgreSQL Production Path
+```bash
+python scripts/check_deployment_config.py
+```
 
-PostgreSQL should be used only after the schema and migration workflow are finalized.
+## Start production containers
 
-Before switching to PostgreSQL, confirm:
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
 
-- All tables exist in PostgreSQL
-- Face data paths remain valid
-- Demo data can be seeded again
-- Backups are working
-- The frontend/backend are using the same deployed API path
+Open:
 
----
+```txt
+http://localhost:8080
+```
 
-## Docker Notes
+Backend API docs:
 
-The repository includes Docker-related files, but Docker should be finalized in a dedicated patch.
+```txt
+http://localhost:8080/docs
+```
 
-Before relying on Docker in production, verify:
+## Stop containers
 
-- `Dockerfile` is valid UTF-8 text
-- `.env` is present on the server but not committed
-- volumes are mapped correctly
-- dataset storage is persistent
-- database storage is persistent
-- frontend build output exists before serving with Nginx
+```bash
+docker compose -f docker-compose.prod.yml down
+```
 
----
+## View logs
 
-## Deployment Safety Checklist
+```bash
+docker compose -f docker-compose.prod.yml logs -f backend
+docker compose -f docker-compose.prod.yml logs -f frontend
+```
 
-Before a live demo:
+## Important notes
 
-- [ ] Backend starts successfully
-- [ ] Frontend loads successfully
-- [ ] Login works
-- [ ] Student list loads
-- [ ] Attendance logs load
-- [ ] Reports page loads
-- [ ] Room schedule loads
-- [ ] Support ticket page loads
-- [ ] Analytics page loads
-- [ ] `dataset/` exists and is readable/writable
-- [ ] `attendance.db` exists and is backed up
-- [ ] No real credentials are committed
+Do not commit `.env`.
+
+Do not write real server passwords or database passwords in markdown files.
+
+For the thesis/demo branch, SQLite is the official database mode. PostgreSQL can be re-enabled later after schema migration and seed data are finalized.
