@@ -3,6 +3,11 @@ import os
 import sys
 print("UNIQUE BACKEND LOADED MARKER")
 print(f"Current working directory: {os.getcwd()}")
+# Ensure the application root is on sys.path so top-level imports (e.g. `models`) work
+BASE_DIR = os.path.dirname(__file__)
+if BASE_DIR and BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+    print(f"Inserted BASE_DIR to sys.path: {BASE_DIR}")
 import asyncio
 import sys
 
