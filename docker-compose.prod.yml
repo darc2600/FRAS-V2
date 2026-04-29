@@ -7,34 +7,33 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - DATASET_PATH=/app/dataset
+      FRAS_ENV: ${FRAS_ENV:-production}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/attendance.db}
+      SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/attendance.db}
+      DATASET_PATH: ${DATASET_PATH:-/app/dataset}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
     volumes:
-      - ./data:/app/data
-      # mount the host dataset directory (writable) and the repo into the container
-      - /home/frasijbmapua/FRAS/dataset:/app/dataset:rw
-      - ./:/app:rw
+      - ./attendance.db:/app/attendance.db
+      - ./dataset:/app/dataset:rw
+      - ./data:/app/data:rw
     ports:
       - "8000:8000"
-    depends_on:
-      - db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/docs >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
 
   frontend:
     image: nginx:stable-alpine
     restart: unless-stopped
+    depends_on:
+      - backend
     volumes:
       - ./facial-attendance/dist/facial-attendance:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "8080:80"
-
-  db:
-    image: postgres:15
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=fras_user
-      - POSTGRES_PASSWORD=change_me
-      - POSTGRES_DB=frasdb
-    volumes:
-      - ./pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
