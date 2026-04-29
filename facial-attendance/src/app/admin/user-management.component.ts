@@ -53,8 +53,9 @@ export class UserManagementComponent implements OnInit {
   searchTerm = '';
   selectedUserType = '';
   selectedStatus = '';
+  showFilters = false;
 
-  // Create user form
+  // Add user form
   showCreateForm = false;
   newUser: CreateUserRequest = {
     email: '',
@@ -144,6 +145,25 @@ export class UserManagementComponent implements OnInit {
     this.filteredUsers = filtered;
   }
 
+  get activeFilterCount(): number {
+    let count = 0;
+    if (this.searchTerm.trim()) count++;
+    if (this.selectedUserType) count++;
+    if (this.selectedStatus) count++;
+    return count;
+  }
+
+  toggleFilters(): void {
+    this.showFilters = !this.showFilters;
+  }
+
+  clearFilters(): void {
+    this.searchTerm = '';
+    this.selectedUserType = '';
+    this.selectedStatus = '';
+    this.applyFilters();
+  }
+
   onSearchChange(): void {
     this.applyFilters();
   }
@@ -160,13 +180,13 @@ export class UserManagementComponent implements OnInit {
 
     this.apiService.createUser(this.newUser).subscribe({
       next: (response) => {
-        this.success = `User ${this.newUser.email} created successfully`;
+        this.success = `User ${this.newUser.email} added successfully`;
         this.showCreateForm = false;
         this.resetNewUserForm();
         this.loadUsers(); // Reload to show new user
       },
       error: (err) => {
-        this.error = 'Failed to create user: ' + this.getErrorMessage(err, 'Unknown error');
+        this.error = 'Failed to add user: ' + this.getErrorMessage(err, 'Unknown error');
       }
     });
   }

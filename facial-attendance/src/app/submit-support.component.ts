@@ -15,8 +15,8 @@ export class SubmitSupportComponent {
   ticket = {
     subject: '',
     description: '',
-    category: 'technical',
-    priority: 'medium'
+    category: '',
+    priority: ''
   };
 
   loading = false;
@@ -44,7 +44,7 @@ export class SubmitSupportComponent {
   ) {}
 
   submitTicket(): void {
-    if (!this.ticket.subject || !this.ticket.description) {
+    if (!this.ticket.subject || !this.ticket.description || !this.ticket.category || !this.ticket.priority) {
       this.error = 'Please fill in all required fields';
       return;
     }
@@ -56,7 +56,7 @@ export class SubmitSupportComponent {
     this.apiService.submitSupportTicket(this.ticket).subscribe({
       next: (response: any) => {
         this.success = 'Support ticket submitted successfully! Ticket ID: ' + response.ticket_id;
-        this.ticket = { subject: '', description: '', category: 'technical', priority: 'medium' };
+        this.ticket = { subject: '', description: '', category: '', priority: '' };
         this.loading = false;
       },
       error: (err: any) => {
