@@ -1,11 +1,12 @@
-import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ApiService } from '../../api.service';
+import { Component, OnInit } from '@angular/core';
 import { HttpClientModule } from '@angular/common/http';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { finalize } from 'rxjs/operators';
+import { ApiService } from '../../api.service';
 
 interface AttendanceRecord {
-  student_id: string;
+  student_id: string | number;
   student_name: string;
   date: string;
   time_in: string;
@@ -40,6 +41,17 @@ interface ProfessorReport {
   consolidated_summary: ClassSummary;
 }
 
+interface DateGroup {
+  date: string;
+  records: AttendanceRecord[];
+}
+
+interface SummaryTile {
+  label: string;
+  value: string | number;
+  tone: 'primary' | 'success' | 'danger' | 'warning' | 'info';
+}
+
 @Component({
   selector: 'app-attendance-reports',
   standalone: true,
@@ -50,28 +62,35 @@ interface ProfessorReport {
 export class AttendanceReportsComponent implements OnInit {
   reportForm: FormGroup;
   isLoading = false;
+  isExporting = false;
+  showAdvanced = false;
+  errorMessage = '';
+  successMessage = '';
+  activeExportFormat = '';
+  expandedProfessorClassIndex: number | null = null;
+
   reportData: AttendanceReport | ProfessorReport | null = null;
   studentList: any[] = [];
   myClasses: any[] = [];
   instructorList: string[] = [];
-  showAdvanced: boolean = false;
-  exportFormats = [
-    { value: 'json', label: 'JSON' },
-    { value: 'csv', label: 'CSV' },
-    { value: 'excel', label: 'Excel' },
-    { value: 'pdf', label: 'PDF' }
+
+  readonly reportTypes = [
+    { value: 'class', label: 'Class Report' },
+    { value: 'professor', label: 'Professor Report' }
   ];
 
-  statusOptions = [
+  readonly statusOptions = [
     { value: 'Present', label: 'Present' },
     { value: 'Absent', label: 'Absent' },
     { value: 'Late', label: 'Late' },
     { value: 'Excused', label: 'Excused' }
   ];
 
-  reportTypes = [
-    { value: 'class', label: 'Class Report' },
-    { value: 'professor', label: 'Professor Report' }
+  readonly exportFormats = [
+    { value: 'json', label: 'Preview in page' },
+    { value: 'csv', label: 'Download CSV' },
+    { value: 'excel', label: 'Download Excel' },
+    { value: 'pdf', label: 'Download PDF' }
   ];
 
   constructor(
@@ -81,93 +100,21 @@ export class AttendanceReportsComponent implements OnInit {
     this.reportForm = this.fb.group({
       reportType: ['class', Validators.required],
       classId: [''],
-      dateFrom: [''],
-      dateTo: [''],
-        studentId: [''],
-        studentIds: [''],
+      professorName: [''],
+      dateFrom: ['', Validators.required],
+      dateTo: ['', Validators.required],
+      studentId: [''],
+      studentIds: [''],
       statusFilter: [[]],
-      courseCode: [''],
-      section: [''],
-      instructorId: [''],
-        professorName: [''],
       exportFormat: ['json', Validators.required]
     });
   }
 
   ngOnInit(): void {
-    // Set default date range to current month
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    this.reportForm.patchValue({
-      dateFrom: firstDay.toISOString().split('T')[0],
-      dateTo: lastDay.toISOString().split('T')[0]
-    });
-
-    // Load students for dropdown
+    this.setDefaultDateRange();
     this.loadStudents();
-    // Load classes for dropdown
     this.loadClasses();
-    // Load professors for professor report dropdown
     this.loadInstructors();
-  }
-
-  loadStudents(): void {
-    this.apiService.getStudents().subscribe({
-      next: (students: any[]) => {
-        this.studentList = students;
-      },
-      error: (error: any) => {
-        console.error('Error loading students:', error);
-      }
-    });
-  }
-
-  loadClasses(): void {
-    console.log('Loading classes...');
-    this.apiService.getClasses().subscribe({
-      next: (classes: any[]) => {
-        console.log('Classes loaded:', classes);
-        this.myClasses = classes;
-      },
-      error: (error: any) => {
-        console.error('Error loading classes:', error);
-      }
-    });
-  }
-
-  loadInstructors(): void {
-    this.apiService.getInstructors().subscribe({
-      next: (instructors: string[]) => {
-        this.instructorList = instructors;
-      },
-      error: (error: any) => {
-        console.error('Error loading instructors:', error);
-      }
-    });
-  }
-
-  get recordsGroupedByDate(): { date: string; records: AttendanceRecord[] }[] {
-    if (!this.reportData || this.isProfessorReport(this.reportData)) {
-      return [];
-    }
-
-    const grouped = new Map<string, AttendanceRecord[]>();
-    for (const record of this.reportData.records) {
-      if (!grouped.has(record.date)) {
-        grouped.set(record.date, []);
-      }
-      grouped.get(record.date)!.push(record);
-    }
-
-    return Array.from(grouped.entries())
-      .map(([date, records]) => ({ date, records }))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  get requiresClassSelection(): boolean {
-    return this.reportForm.get('reportType')?.value === 'class';
   }
 
   get isClassReportType(): boolean {
@@ -178,18 +125,114 @@ export class AttendanceReportsComponent implements OnInit {
     return this.reportForm.get('reportType')?.value === 'professor';
   }
 
+  get classReportData(): AttendanceReport | null {
+    return this.reportData && !this.isProfessorReport(this.reportData) ? this.reportData : null;
+  }
+
+  get professorReportData(): ProfessorReport | null {
+    return this.reportData && this.isProfessorReport(this.reportData) ? this.reportData : null;
+  }
+
+  get hasReportData(): boolean {
+    if (!this.reportData) return false;
+    if (this.isProfessorReport(this.reportData)) {
+      return this.reportData.classes.length > 0;
+    }
+    return this.reportData.records.length > 0;
+  }
+
+  get activeFilterCount(): number {
+    const value = this.reportForm.value;
+    let count = 0;
+
+    if (value.classId) count++;
+    if (value.professorName) count++;
+    if (value.studentId) count++;
+    if (value.studentIds?.trim()) count++;
+    if (value.statusFilter?.length) count++;
+
+    return count;
+  }
+
+  get selectedClassLabel(): string {
+    const selectedClass = this.getSelectedClass(this.reportForm.get('classId')?.value);
+    if (!selectedClass) return 'No class selected';
+
+    const courseCode = selectedClass.course_code || selectedClass.courseCode || 'Course';
+    const section = selectedClass.section || 'Section';
+    const instructor = selectedClass.instructor_name || selectedClass.instructorName || 'Instructor not assigned';
+    return `${courseCode} - ${section} (${instructor})`;
+  }
+
+  get reportDateRangeLabel(): string {
+    const from = this.reportForm.get('dateFrom')?.value || 'Start date';
+    const to = this.reportForm.get('dateTo')?.value || 'End date';
+    return `${from} to ${to}`;
+  }
+
+  get recordsGroupedByDate(): DateGroup[] {
+    const report = this.classReportData;
+    if (!report?.records?.length) return [];
+
+    return this.groupRecordsByDate(report.records);
+  }
+
+  get classSummaryTiles(): SummaryTile[] {
+    const summary = this.classReportData?.class_summary;
+    return summary ? this.buildSummaryTiles(summary) : [];
+  }
+
+  get professorSummaryTiles(): SummaryTile[] {
+    const summary = this.professorReportData?.consolidated_summary;
+    return summary ? this.buildSummaryTiles(summary) : [];
+  }
+
   get filteredProfessorClasses(): any[] {
     const selectedProfessor = this.reportForm.get('professorName')?.value;
-    if (!selectedProfessor) {
-      return [];
-    }
+    if (!selectedProfessor) return [];
 
-    return this.myClasses.filter((classItem: any) =>
-      classItem?.instructor_name === selectedProfessor
-    );
+    return this.myClasses.filter((classItem: any) => classItem?.instructor_name === selectedProfessor);
+  }
+
+  loadStudents(): void {
+    this.apiService.getStudents().subscribe({
+      next: (students: any[]) => {
+        this.studentList = Array.isArray(students) ? students : [];
+      },
+      error: () => {
+        this.studentList = [];
+      }
+    });
+  }
+
+  loadClasses(): void {
+    this.apiService.getClasses().subscribe({
+      next: (classes: any[]) => {
+        this.myClasses = Array.isArray(classes) ? classes : [];
+      },
+      error: () => {
+        this.myClasses = [];
+      }
+    });
+  }
+
+  loadInstructors(): void {
+    this.apiService.getInstructors().subscribe({
+      next: (instructors: string[]) => {
+        this.instructorList = Array.isArray(instructors) ? instructors : [];
+      },
+      error: () => {
+        this.instructorList = [];
+      }
+    });
   }
 
   onReportTypeChange(): void {
+    this.reportData = null;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.expandedProfessorClassIndex = null;
+
     if (this.isProfessorReportType) {
       this.reportForm.patchValue({
         classId: '',
@@ -198,14 +241,14 @@ export class AttendanceReportsComponent implements OnInit {
       });
     } else {
       this.reportForm.patchValue({
-        instructorId: '',
         professorName: ''
       });
     }
   }
 
   onProfessorSelectionChange(): void {
-    this.reportForm.patchValue({ classId: '' });
+    this.reportData = null;
+    this.expandedProfessorClassIndex = null;
   }
 
   isStatusSelected(status: string): boolean {
@@ -217,134 +260,110 @@ export class AttendanceReportsComponent implements OnInit {
     const selected: string[] = [...(this.reportForm.get('statusFilter')?.value || [])];
     const statusIndex = selected.indexOf(status);
 
-    if (checked && statusIndex === -1) {
-      selected.push(status);
-    }
-
-    if (!checked && statusIndex !== -1) {
-      selected.splice(statusIndex, 1);
-    }
+    if (checked && statusIndex === -1) selected.push(status);
+    if (!checked && statusIndex !== -1) selected.splice(statusIndex, 1);
 
     this.reportForm.patchValue({ statusFilter: selected });
   }
 
+  clearStatuses(): void {
+    this.reportForm.patchValue({ statusFilter: [] });
+  }
+
   onSubmit(): void {
-    if (this.reportForm.valid) {
-      this.generateReport();
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    if (!this.validateReportForm()) return;
+
+    const format = this.reportForm.get('exportFormat')?.value;
+    if (format === 'json') {
+      this.generateReportPreview();
+    } else {
+      this.exportReport(format);
     }
   }
 
-  generateReport(): void {
+  generateReportPreview(): void {
     this.isLoading = true;
     this.reportData = null;
+    this.expandedProfessorClassIndex = null;
 
-    const formValue = this.reportForm.value;
-    const selectedClass = this.getSelectedClass(formValue.classId);
-    const requestData: any = {
-      dateFrom: formValue.dateFrom || undefined,
-      dateTo: formValue.dateTo || undefined,
-      classId: formValue.classId ? parseInt(formValue.classId, 10) : undefined,
-      // Support either single student selection or comma-separated list
-      studentIds: formValue.studentId ? [parseInt(formValue.studentId)] : (formValue.studentIds ? formValue.studentIds.split(',').map((id: string) => parseInt(id.trim())) : undefined),
-      statusFilter: formValue.statusFilter.length > 0 ? formValue.statusFilter : undefined,
-      courseCode: formValue.courseCode || selectedClass?.course_code || selectedClass?.courseCode || undefined,
-      section: formValue.section || selectedClass?.section || undefined,
-      instructorId: formValue.instructorId ? parseInt(formValue.instructorId) : (selectedClass?.instructor_id || selectedClass?.instructorId || undefined),
-      professorName: formValue.professorName || undefined,
-      exportFormat: formValue.exportFormat
-    };
+    const endpoint = this.getReportEndpoint();
+    const requestData = this.buildRequestData('json');
 
-    // Client-side validation for professor reports (prevent accidental empty requests)
-    if (formValue.reportType === 'professor' && !requestData.instructorId && !requestData.professorName) {
-      this.isLoading = false;
-      alert('Please provide either Instructor ID or Professor name when generating a Professor report.');
-      return;
-    }
-
-    // Remove undefined values
-    Object.keys(requestData).forEach((key: string) => {
-      if (requestData[key] === undefined) {
-        delete requestData[key];
-      }
-    });
-
-    const endpoint = formValue.reportType === 'professor'
-      ? '/api/admin/attendance/export/professor'
-      : '/api/admin/attendance/export';
-
-    if (formValue.exportFormat === 'json') {
-      // For JSON responses, display in UI
-      this.apiService.post(endpoint, requestData).subscribe({
-        next: (response: any) => {
+    this.apiService.post(endpoint, requestData)
+      .pipe(finalize(() => (this.isLoading = false)))
+      .subscribe({
+        next: (response: AttendanceReport | ProfessorReport) => {
           this.reportData = response;
-          this.isLoading = false;
+          this.successMessage = this.hasReportData
+            ? 'Report generated successfully.'
+            : 'Report generated, but no attendance records matched the selected filters.';
         },
         error: (error: any) => {
-          console.error('Error generating report:', error);
-          this.isLoading = false;
-          alert('Error generating report: ' + (error.error?.detail || error.message));
+          this.errorMessage = this.getApiErrorMessage(error, 'Unable to generate report.');
         }
       });
-    } else {
-      // For file downloads
-      console.log('Attempting file download with format:', formValue.exportFormat);
-      this.apiService.postBlob(endpoint, requestData).subscribe({
-        next: (blob: Blob) => {
-          console.log('Blob received, size:', blob.size, 'type:', blob.type);
-          this.downloadFile(blob, formValue.exportFormat);
-          this.isLoading = false;
-        },
-        error: (error: any) => {
-          console.error('Error generating report:', error);
-          this.isLoading = false;
-          alert('Error generating report: ' + (error.error?.detail || error.message));
-        }
-      });
-    }
   }
 
-  private downloadFile(blob: Blob, format: string): void {
-    try {
-      console.log('DownloadFile called with format:', format, 'blob size:', blob.size);
+  exportCurrentReport(format: string): void {
+    if (!this.validateReportForm()) return;
+    this.exportReport(format);
+  }
 
-      if (blob.size === 0) {
-        alert('The exported file is empty. Please check your filters and try again.');
-        return;
-      }
+  exportReport(format: string): void {
+    this.isExporting = true;
+    this.activeExportFormat = format;
+    this.errorMessage = '';
+    this.successMessage = '';
 
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.style.display = 'none';
+    const endpoint = this.getReportEndpoint();
+    const requestData = this.buildRequestData(format);
 
-      let filename = 'attendance_report';
-      switch (format.toLowerCase()) {
-        case 'csv':
-          filename += '.csv';
-          break;
-        case 'excel':
-          filename += '.xlsx';
-          break;
-        case 'pdf':
-          filename += '.pdf';
-          break;
-        default:
-          filename += '.txt';
-      }
-      a.download = filename;
+    this.apiService.postBlob(endpoint, requestData)
+      .pipe(finalize(() => {
+        this.isExporting = false;
+        this.activeExportFormat = '';
+      }))
+      .subscribe({
+        next: (blob: Blob) => {
+          if (!blob || blob.size === 0) {
+            this.errorMessage = 'The exported file is empty. Please adjust the filters and try again.';
+            return;
+          }
 
-      console.log('Creating download link for:', filename);
+          this.downloadFile(blob, format);
+          this.successMessage = `${format.toUpperCase()} export downloaded successfully.`;
+        },
+        error: (error: any) => {
+          this.errorMessage = this.getApiErrorMessage(error, 'Unable to export report.');
+        }
+      });
+  }
 
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+  clearForm(): void {
+    this.reportData = null;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.expandedProfessorClassIndex = null;
+    this.setDefaultDateRange(true);
+  }
 
-      console.log('File download initiated');
-    } catch (error) {
-      console.error('Error in downloadFile:', error);
-      alert('Error downloading file: ' + error);
-    }
+  toggleAdvancedFilters(): void {
+    this.showAdvanced = !this.showAdvanced;
+  }
+
+  clearAdvancedFilters(): void {
+    this.reportForm.patchValue({
+      studentId: '',
+      studentIds: '',
+      statusFilter: []
+    });
+  }
+
+  toggleProfessorClass(index: number): void {
+    this.expandedProfessorClassIndex = this.expandedProfessorClassIndex === index ? null : index;
   }
 
   isProfessorReport(data: AttendanceReport | ProfessorReport): data is ProfessorReport {
@@ -352,7 +371,7 @@ export class AttendanceReportsComponent implements OnInit {
   }
 
   getStatusBadgeClass(status: string): string {
-    switch (status.toLowerCase()) {
+    switch ((status || '').toLowerCase()) {
       case 'present': return 'badge-success';
       case 'absent': return 'badge-danger';
       case 'late': return 'badge-warning';
@@ -361,91 +380,193 @@ export class AttendanceReportsComponent implements OnInit {
     }
   }
 
-  clearForm(): void {
-    this.reportData = null;
-    // Reset to default values
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    this.reportForm.reset({
-      reportType: 'class',
-      dateFrom: firstDay.toISOString().split('T')[0],
-      dateTo: lastDay.toISOString().split('T')[0],
-      studentIds: '',
-      statusFilter: [],
-      courseCode: '',
-      section: '',
-      instructorId: '',
-      professorName: '',
-      exportFormat: 'json'
-    });
+  getSummaryToneClass(tone: SummaryTile['tone']): string {
+    return `summary-${tone}`;
   }
 
-  exportCurrentReport(format: string): void {
-    if (!this.reportData) return;
+  getClassRecordGroups(classReport: AttendanceReport): DateGroup[] {
+    return this.groupRecordsByDate(classReport.records || []);
+  }
 
-    // Create a temporary form data for export
-    const exportData: any = {
-      exportFormat: format
+  private validateReportForm(): boolean {
+    this.reportForm.markAllAsTouched();
+
+    const formValue = this.reportForm.value;
+    if (!formValue.dateFrom || !formValue.dateTo) {
+      this.errorMessage = 'Please select both From and To dates.';
+      return false;
+    }
+
+    if (new Date(formValue.dateFrom) > new Date(formValue.dateTo)) {
+      this.errorMessage = 'The From date cannot be later than the To date.';
+      return false;
+    }
+
+    if (formValue.reportType === 'class' && !formValue.classId) {
+      this.errorMessage = 'Please select a class before generating a class report.';
+      return false;
+    }
+
+    if (formValue.reportType === 'professor' && !formValue.professorName) {
+      this.errorMessage = 'Please select a professor before generating a professor report.';
+      return false;
+    }
+
+    return true;
+  }
+
+  private buildRequestData(exportFormat: string): any {
+    const formValue = this.reportForm.value;
+    const selectedClass = this.getSelectedClass(formValue.classId);
+    const parsedStudentIds = this.parseStudentIds(formValue.studentId, formValue.studentIds);
+
+    const requestData: any = {
+      dateFrom: formValue.dateFrom,
+      dateTo: formValue.dateTo,
+      exportFormat
     };
 
-    // Copy current filter values
-    const formValue = this.reportForm.value;
-    if (formValue.dateFrom) exportData.dateFrom = formValue.dateFrom;
-    if (formValue.dateTo) exportData.dateTo = formValue.dateTo;
-    const selectedClass = this.getSelectedClass(formValue.classId);
-    if (formValue.classId) exportData.classId = parseInt(formValue.classId, 10);
-    if (formValue.studentIds) exportData.studentIds = formValue.studentIds.split(',').map((id: string) => parseInt(id.trim()));
-    if (formValue.studentId) exportData.studentIds = [parseInt(formValue.studentId)];
-    if (formValue.statusFilter.length > 0) exportData.statusFilter = formValue.statusFilter;
-    if (formValue.courseCode || selectedClass?.course_code || selectedClass?.courseCode) {
-      exportData.courseCode = formValue.courseCode || selectedClass?.course_code || selectedClass?.courseCode;
+    if (formValue.reportType === 'class') {
+      requestData.classId = parseInt(formValue.classId, 10);
+      requestData.courseCode = selectedClass?.course_code || selectedClass?.courseCode;
+      requestData.section = selectedClass?.section;
+      requestData.instructorId = selectedClass?.instructor_id || selectedClass?.instructorId;
     }
-    if (formValue.section || selectedClass?.section) {
-      exportData.section = formValue.section || selectedClass?.section;
-    }
-    if (formValue.instructorId || selectedClass?.instructor_id || selectedClass?.instructorId) {
-      exportData.instructorId = formValue.instructorId
-        ? parseInt(formValue.instructorId)
-        : (selectedClass?.instructor_id || selectedClass?.instructorId);
-    }
-    if (formValue.professorName) exportData.professorName = formValue.professorName;
 
-    const endpoint = formValue.reportType === 'professor'
-      ? '/api/admin/attendance/export/professor'
-      : '/api/admin/attendance/export';
+    if (formValue.reportType === 'professor') {
+      requestData.professorName = formValue.professorName;
+    }
 
-    this.apiService.postBlob(endpoint, exportData).subscribe({
-      next: (blob: Blob) => {
-        this.downloadFile(blob, format);
-      },
-      error: (error: any) => {
-        console.error('Error exporting report:', error);
-        alert('Error exporting report: ' + (error.error?.detail || error.message));
+    if (parsedStudentIds.length > 0) requestData.studentIds = parsedStudentIds;
+    if (formValue.statusFilter?.length > 0) requestData.statusFilter = formValue.statusFilter;
+
+    Object.keys(requestData).forEach((key) => {
+      if (requestData[key] === undefined || requestData[key] === null || requestData[key] === '') {
+        delete requestData[key];
       }
     });
+
+    return requestData;
   }
 
-  viewClassDetails(classReport: AttendanceReport): void {
-    // For now, just show an alert with class details
-    // In a real app, you might open a modal or navigate to a detail view
-    alert(`Class: ${classReport.report_title}\nRecords: ${classReport.records.length}\nAttendance Rate: ${classReport.class_summary.attendance_percentage}%`);
+  private parseStudentIds(studentId: string, studentIds: string): number[] {
+    const ids = new Set<number>();
+
+    if (studentId) {
+      const parsed = parseInt(studentId, 10);
+      if (!Number.isNaN(parsed)) ids.add(parsed);
+    }
+
+    if (studentIds?.trim()) {
+      studentIds
+        .split(',')
+        .map((id: string) => parseInt(id.trim(), 10))
+        .filter((id: number) => !Number.isNaN(id))
+        .forEach((id: number) => ids.add(id));
+    }
+
+    return Array.from(ids);
+  }
+
+  private getReportEndpoint(): string {
+    return this.isProfessorReportType
+      ? '/api/admin/attendance/export/professor'
+      : '/api/admin/attendance/export';
+  }
+
+  private downloadFile(blob: Blob, format: string): void {
+    const extensionMap: Record<string, string> = {
+      csv: 'csv',
+      excel: 'xlsx',
+      pdf: 'pdf'
+    };
+
+    const extension = extensionMap[format.toLowerCase()] || 'txt';
+    const reportType = this.reportForm.get('reportType')?.value || 'attendance';
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const filename = `${reportType}_attendance_report_${dateStamp}.${extension}`;
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  private getApiErrorMessage(error: any, fallback: string): string {
+    const detail = error?.error?.detail || error?.message;
+    return detail ? `${fallback} ${detail}` : fallback;
   }
 
   private getSelectedClass(classId: string | number | undefined): any | undefined {
-    if (!classId) {
-      return undefined;
-    }
+    if (!classId) return undefined;
 
     const classIdNumber = typeof classId === 'number' ? classId : parseInt(classId, 10);
-    if (Number.isNaN(classIdNumber)) {
-      return undefined;
-    }
+    if (Number.isNaN(classIdNumber)) return undefined;
 
     return this.myClasses.find((classItem: any) => {
       const candidateId = classItem?.id ?? classItem?.class_id;
       return Number(candidateId) === classIdNumber;
     });
+  }
+
+  private groupRecordsByDate(records: AttendanceRecord[]): DateGroup[] {
+    const grouped = new Map<string, AttendanceRecord[]>();
+
+    for (const record of records) {
+      const dateKey = record.date || 'No date';
+      if (!grouped.has(dateKey)) grouped.set(dateKey, []);
+      grouped.get(dateKey)!.push(record);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([date, recordsForDate]) => ({
+        date,
+        records: recordsForDate.sort((a, b) => String(a.time_in || '').localeCompare(String(b.time_in || '')))
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  private buildSummaryTiles(summary: ClassSummary): SummaryTile[] {
+    return [
+      { label: 'Total Students', value: summary.total_students || 0, tone: 'primary' },
+      { label: 'Present', value: summary.present_count || 0, tone: 'success' },
+      { label: 'Absent', value: summary.absent_count || 0, tone: 'danger' },
+      { label: 'Late', value: summary.late_count || 0, tone: 'warning' },
+      { label: 'Excused', value: summary.excused_count || 0, tone: 'info' },
+      { label: 'Attendance Rate', value: `${summary.attendance_percentage || 0}%`, tone: 'primary' }
+    ];
+  }
+
+  private setDefaultDateRange(resetWholeForm = false): void {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const defaults = {
+      reportType: 'class',
+      classId: '',
+      professorName: '',
+      dateFrom: firstDay.toISOString().split('T')[0],
+      dateTo: lastDay.toISOString().split('T')[0],
+      studentId: '',
+      studentIds: '',
+      statusFilter: [],
+      exportFormat: 'json'
+    };
+
+    if (resetWholeForm) {
+      this.reportForm.reset(defaults);
+    } else {
+      this.reportForm.patchValue({
+        dateFrom: defaults.dateFrom,
+        dateTo: defaults.dateTo
+      });
+    }
   }
 }
