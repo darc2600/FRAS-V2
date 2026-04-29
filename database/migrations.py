@@ -215,7 +215,8 @@ def create_initial_schema_migration():
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(campus_id) REFERENCES campuses(campus_id),
         FOREIGN KEY(building_id) REFERENCES buildings(building_id),
-        FOREIGN KEY(room_type_id) REFERENCES room_types(room_type_id)
+        FOREIGN KEY(room_type_id) REFERENCES room_types(room_type_id),
+        UNIQUE(campus_id, building_id, room_number)
     );
 
     -- School terms table
