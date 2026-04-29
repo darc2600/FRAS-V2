@@ -5,7 +5,7 @@
       *ngIf="hasPermission('manage_users')"
       (click)="showCreateForm = !showCreateForm"
       class="btn btn-primary">
-      <i class="fas fa-plus"></i> Create User
+      <i class="fas fa-plus"></i> Add User
     </button>
   </div>
 
@@ -13,10 +13,10 @@
   <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
   <div *ngIf="success" class="alert alert-success">{{ success }}</div>
 
-  <!-- Create User Form -->
+  <!-- Add User Form -->
   <div *ngIf="showCreateForm && hasPermission('manage_users')" class="create-user-form card">
     <div class="card-header">
-      <h5>Create New User</h5>
+      <h5>Add New User</h5>
     </div>
     <div class="card-body">
       <form (ngSubmit)="createUser()" #createForm="ngForm">
@@ -106,7 +106,7 @@
 
         <div class="form-actions">
           <button type="submit" class="btn btn-success" [disabled]="!createForm.form.valid">
-            <i class="fas fa-save"></i> Create User
+            <i class="fas fa-save"></i> Add User
           </button>
           <button type="button" class="btn btn-secondary" (click)="showCreateForm = false; resetNewUserForm()">
             <i class="fas fa-times"></i> Cancel
@@ -117,7 +117,32 @@
   </div>
 
   <!-- Search and Filter Section -->
-  <div class="filters-section card">
+  <div class="filter-toolbar card">
+    <div class="card-body filter-toolbar-body">
+      <div>
+        <h5>User Directory</h5>
+        <p class="text-muted mb-0">Users are shown by default. Use filters only to narrow the list.</p>
+      </div>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-outline-secondary" (click)="toggleFilters()">
+          <i class="fas fa-filter"></i>
+          Filters
+          <span *ngIf="activeFilterCount > 0" class="filter-count">{{ activeFilterCount }}</span>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" (click)="loadUsers()">
+          <i class="fas fa-sync"></i> Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="showFilters" class="filters-section card">
+    <div class="card-header filter-card-header">
+      <h5><i class="fas fa-filter"></i> Filter Users</h5>
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearFilters()" [disabled]="activeFilterCount === 0">
+        Clear Filters
+      </button>
+    </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-4">
@@ -161,18 +186,13 @@
             </select>
           </div>
         </div>
-        <div class="col-md-2">
-          <div class="form-group">
-            <label>&nbsp;</label>
-            <button class="btn btn-outline-secondary w-100" (click)="loadUsers()">
-              <i class="fas fa-sync"></i> Refresh
-            </button>
-          </div>
+        <div class="col-md-2 filter-summary">
+          <span class="filter-chip" *ngIf="activeFilterCount === 0">No filters applied</span>
+          <span class="filter-chip active" *ngIf="activeFilterCount > 0">{{ activeFilterCount }} active filter(s)</span>
         </div>
       </div>
     </div>
   </div>
-
   <!-- Bulk Operations -->
   <div *ngIf="selectedUsers.size > 0 && hasPermission('manage_users')" class="bulk-actions card">
     <div class="card-body">

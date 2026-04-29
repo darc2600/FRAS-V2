@@ -133,3 +133,10 @@ select.form-control {
 .card-body {
   padding: 20px;
 }
+select.form-control:invalid {
+  color: #6c757d;
+}
+
+select.form-control option {
+  color: #212529;
+}

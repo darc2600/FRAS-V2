@@ -35,6 +35,7 @@
             [(ngModel)]="ticket.category"
             name="category"
             required>
+            <option value="" disabled>Select a category</option>
             <option *ngFor="let cat of categories" [value]="cat.value">
               {{ cat.label }}
             </option>
@@ -49,6 +50,7 @@
             [(ngModel)]="ticket.priority"
             name="priority"
             required>
+            <option value="" disabled>Select a priority</option>
             <option *ngFor="let pri of priorities" [value]="pri.value">
               {{ pri.label }}
             </option>
