@@ -40,6 +40,7 @@
               <select class="form-select" formControlName="reportType" (change)="onReportTypeChange()">
                 <option *ngFor="let type of reportTypes" [value]="type.value">{{ type.label }}</option>
               </select>
+              <div class="form-hint">Select the type of report you want to generate.</div>
             </div>
 
             <div class="col-md-4" *ngIf="isClassReportType">
@@ -65,19 +66,16 @@
             <div class="col-md-2">
               <label class="form-label">From</label>
               <input type="date" class="form-control" formControlName="dateFrom">
+              <div class="form-hint">Start Date</div>
             </div>
 
             <div class="col-md-2">
               <label class="form-label">To</label>
               <input type="date" class="form-control" formControlName="dateTo">
+              <div class="form-hint">End Date</div>
             </div>
+            
 
-            <div class="col-md-1 d-grid">
-              <button class="btn btn-primary" type="submit" [disabled]="isLoading || isExporting">
-                <span *ngIf="isLoading" class="spinner-border spinner-border-sm"></span>
-                <span *ngIf="!isLoading">Run</span>
-              </button>
-            </div>
           </div>
 
           <div class="selected-context mt-3" *ngIf="isClassReportType && reportForm.get('classId')?.value">
@@ -172,8 +170,8 @@
       <div class="card shadow-sm result-card">
         <div class="card-header result-header class-header">
           <div>
-            <span class="eyebrow text-white-50">Class Report</span>
-            <h5 class="mb-0">{{ report.report_title }}</h5>
+            <span class="eyebrow text-white-50" style="color:#000000">Class Report</span>
+            <h5 class="mb-0" style="color:#000000">{{ report.report_title }}</h5>
           </div>
           <div class="export-buttons">
             <button class="btn btn-outline-light btn-sm" (click)="exportCurrentReport('csv')" [disabled]="isExporting">CSV</button>
@@ -259,8 +257,8 @@
       <div class="card shadow-sm result-card">
         <div class="card-header result-header professor-header">
           <div>
-            <span class="eyebrow text-white-50">Professor Report</span>
-            <h5 class="mb-0">{{ report.professor_name }}</h5>
+            <span class="eyebrow text-white-50" style="color:#000000">Professor Report</span>
+            <h5 class="mb-0" style="color:#000000">{{ report.professor_name }}</h5>
           </div>
           <div class="export-buttons">
             <button class="btn btn-outline-light btn-sm" (click)="exportCurrentReport('csv')" [disabled]="isExporting">CSV</button>
