@@ -5,7 +5,7 @@
       *ngIf="hasPermission('manage_users')"
       (click)="showCreateForm = !showCreateForm"
       class="btn btn-primary">
-      <i class="fas fa-plus"></i> Add User
+      <i class="fas fa-plus"></i> Create User
     </button>
   </div>
 
@@ -13,10 +13,10 @@
   <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
   <div *ngIf="success" class="alert alert-success">{{ success }}</div>
 
-  <!-- Add User Form -->
+  <!-- Create User Form -->
   <div *ngIf="showCreateForm && hasPermission('manage_users')" class="create-user-form card">
     <div class="card-header">
-      <h5>Add New User</h5>
+      <h5>Create New User</h5>
     </div>
     <div class="card-body">
       <form (ngSubmit)="createUser()" #createForm="ngForm">
@@ -106,7 +106,7 @@
 
         <div class="form-actions">
           <button type="submit" class="btn btn-success" [disabled]="!createForm.form.valid">
-            <i class="fas fa-save"></i> Add User
+            <i class="fas fa-save"></i> Create User
           </button>
           <button type="button" class="btn btn-secondary" (click)="showCreateForm = false; resetNewUserForm()">
             <i class="fas fa-times"></i> Cancel

@@ -532,7 +532,7 @@ export class AttendanceReportsComponent implements OnInit {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
-  private buildSummaryTiles(summary: ClassSummary): SummaryTile[] {
+  public buildSummaryTiles(summary: ClassSummary): SummaryTile[] {
     return [
       { label: 'Total Students', value: summary.total_students || 0, tone: 'primary' },
       { label: 'Present', value: summary.present_count || 0, tone: 'success' },

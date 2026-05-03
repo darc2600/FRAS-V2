@@ -137,6 +137,10 @@ select.form-control:invalid {
   color: #6c757d;
 }
 
+select.form-control option[disabled] {
+  color: #6c757d;
+}
+
 select.form-control option {
   color: #212529;
 }
