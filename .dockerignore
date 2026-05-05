@@ -26,6 +26,9 @@ node_modules/
 *.bak
 
 # Database backups / generated runtime files
+attendance.db
+attendance.db.*
+dataset/
 *.db-wal
 *.db-shm
 *.sqlite-wal

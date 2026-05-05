@@ -1,93 +1,172 @@
-# GoDaddy Deployment Notes
+# FRAS GoDaddy VPS Deployment
 
-This repo appears to be deployed on a GoDaddy-hosted VPS, not simple shared hosting.
+This deployment path is for a GoDaddy Linux VPS using Docker Compose, PostgreSQL, the FastAPI backend, and nginx serving the Angular frontend.
 
-## What the repo shows
+## What Changed
 
-- Backend is a Dockerized FastAPI app.
-  - `Dockerfile` runs `uvicorn backend:app --host 0.0.0.0 --port 8000`
-  - `docker-compose.prod.yml` defines a `backend` service on port `8000`
-- Frontend is an Angular static build.
-  - `facial-attendance/angular.json` outputs to `dist/facial-attendance`
-  - `facial-attendance/package.json` builds with `ng build`
-  - `docker-compose.prod.yml` mounts `./facial-attendance/dist/facial-attendance` into nginx
-- The deployment host looks like a Linux VPS.
-  - `docker-compose.prod.yml` bind-mounts `/home/frasijbmapua/FRAS/dataset:/app/dataset:rw`
-  - `CHANGELOG.md` says fixes were "copied into the running container and validated on the VPS"
+- Production now uses PostgreSQL instead of SQLite.
+- `docker-compose.prod.yml` starts a `db` service, waits for it before starting the backend, and stores data in the `postgres_data` Docker volume.
+- The frontend nginx container now serves `facial-attendance/dist/facial-attendance/browser`, which is the real Angular browser output folder.
+- Mapua image paths are root-relative (`/assets/...`) so Linux/nginx serves them consistently.
 
-## Important implications
+## 1. Prepare `.env`
 
-- The frontend is built for same-origin API calls.
-  - `facial-attendance/src/app/api.service.ts` uses `backendUrl = ''`
-  - `facial-attendance/src/app/login/login.service.ts` calls `/api/login`
-- That means the live host needs to serve the Angular app and also route `/api/*` to the backend container.
-- The current backend CORS config in `backend.py` only allows localhost dev origins, so production likely relies on same-origin reverse proxying.
-
-## Current local state
-
-- Uncommitted backend change:
-  - `backend.py` adds the repo root to `sys.path` near the top of the file
-- Fresh frontend production build was generated on `2026-04-28`
-- A deployable frontend zip was created:
-  - `deploy_frontend_browser_20260428.zip`
-- The older `deploy_frontend.zip` is not the correct static deployment artifact. It contains the frontend source tree, not only the built browser files.
-
-## Recommended deployment flow
-
-### Frontend
-
-Use the newly built browser files from:
-
-- `facial-attendance/dist/facial-attendance/browser`
-
-Or upload:
-
-- `deploy_frontend_browser_20260428.zip`
-
-If deploying through GoDaddy file manager or SFTP, extract the zip into the document root used by the site, or into the directory your nginx/apache config serves for the frontend.
-
-### Backend
-
-The repo indicates two likely ways the backend has been updated before:
-
-1. Copy changed files into the running container
-2. Rebuild and restart the backend container with Docker Compose
-
-If the server is using this repo layout directly, the safest long-term path is:
-
-1. Upload the updated repo files
-2. Rebuild the backend image
-3. Restart the backend service
-
-If the team has been hot-patching live containers, then the changed `backend.py` also needs to be copied into the running container and the backend process/container restarted.
-
-## Server pieces to verify on GoDaddy
-
-- The frontend web root points at the built Angular files
-- `/api/*` is reverse-proxied to the backend on port `8000`
-- `DATABASE_URL` is present for Postgres if production is using Postgres
-- The dataset mount path exists on the VPS:
-  - `/home/frasijbmapua/FRAS/dataset`
-
-## Suggested command flow on the VPS
-
-From the app directory on the server:
+On the VPS, copy `.env.example` to `.env`:
 
 ```bash
-docker compose -f docker-compose.prod.yml build backend
-docker compose -f docker-compose.prod.yml up -d backend
+cp .env.example .env
 ```
 
-If the frontend is also served by the compose nginx service:
+Edit `.env`:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d frontend
+nano .env
 ```
 
-If the frontend is served outside Docker by GoDaddy/nginx/apache, upload the contents of:
+Use strong values:
+
+```env
+FRAS_ENV=production
+JWT_SECRET=replace-with-a-long-random-secret
+JWT_EXPIRE_MINUTES=1440
+
+POSTGRES_USER=fras_user
+POSTGRES_PASSWORD=replace-with-a-strong-postgres-password
+POSTGRES_DB=frasdb
+DATABASE_URL=postgresql://fras_user:replace-with-a-strong-postgres-password@db:5432/frasdb
+
+DATASET_PATH=/app/dataset
+CORS_ORIGINS=https://your-domain.example,http://your-server-ip:8080
+```
+
+The password in `DATABASE_URL` must match `POSTGRES_PASSWORD`.
+
+## 2. Build The Frontend
+
+From the repo root:
+
+```bash
+cd facial-attendance
+npm ci
+npm run build
+cd ..
+```
+
+The important output folder is:
 
 ```text
 facial-attendance/dist/facial-attendance/browser
 ```
 
-instead of restarting the compose `frontend` service.
+That folder must contain `index.html` and `assets/mapua-logo.png`, `assets/mapua-bg.jpg`, and `assets/mapua-bg2.jpg`.
+
+## 3. Start PostgreSQL
+
+```bash
+docker compose -f docker-compose.prod.yml up -d db
+```
+
+Check it:
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+```
+
+## 4. Migrate SQLite Data To PostgreSQL
+
+Run this once after the cleaned `attendance.db` is in the repo root on the VPS:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile tools run --rm --build migrate
+```
+
+This uses:
+
+```text
+scripts/migrate_sqlite_to_postgres.py
+```
+
+It creates the PostgreSQL schema, imports the cleaned capstone data, and resets identity sequences so new records continue at the correct IDs.
+
+## 5. Start The App
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build backend frontend
+```
+
+Open:
+
+```text
+http://your-server-ip:8080
+```
+
+If your domain points to the VPS through another nginx/apache reverse proxy, point it to `http://127.0.0.1:8080`.
+
+## 6. Verify
+
+Check containers:
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+```
+
+Check backend logs:
+
+```bash
+docker compose -f docker-compose.prod.yml logs --tail=100 backend
+```
+
+Check the API:
+
+```bash
+curl -I http://127.0.0.1:8080/docs
+```
+
+Check frontend assets:
+
+```bash
+curl -I http://127.0.0.1:8080/assets/mapua-logo.png
+curl -I http://127.0.0.1:8080/assets/mapua-bg2.jpg
+```
+
+Both asset checks should return `HTTP/1.1 200 OK`.
+
+## Login Accounts
+
+The cleaned presentation database keeps these main accounts:
+
+```text
+admin@mapua.edu.ph       / admin123
+superadmin@fras.com      / super123
+jane.smith@mapua.edu.ph  / password123
+```
+
+The other instructor accounts from the workbook are also retained with `password123`.
+
+## Common Fixes
+
+If the login background or sidebar logo is missing:
+
+```bash
+ls -la facial-attendance/dist/facial-attendance/browser/assets
+```
+
+Make sure nginx is serving the `browser` folder, not the parent `dist/facial-attendance` folder.
+
+If PostgreSQL connection fails:
+
+```bash
+docker compose -f docker-compose.prod.yml logs --tail=100 db
+docker compose -f docker-compose.prod.yml logs --tail=100 backend
+```
+
+Confirm `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` match in `.env`.
+
+If the VPS already has another service on port `8080`, change the frontend port mapping in `docker-compose.prod.yml`:
+
+```yaml
+ports:
+  - "8081:80"
+```
+
+Then open `http://your-server-ip:8081`.

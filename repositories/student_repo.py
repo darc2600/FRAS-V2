@@ -1,6 +1,12 @@
 from services.db import get_connection
 
 
+def _is_postgres_backend():
+    import os
+    db_url = (os.environ.get("DATABASE_URL") or "").strip().lower()
+    return bool(db_url) and not db_url.startswith("sqlite")
+
+
 class StudentRepository:
     def add_student(self, student_number, last_name, first_name, email, face_data_path=None):
         with get_connection() as conn:
@@ -10,6 +16,10 @@ class StudentRepository:
                 VALUES (?, ?, ?, ?, ?)
             ''', (student_number, last_name, first_name, email, face_data_path))
             conn.commit()
+            if _is_postgres_backend():
+                cursor.execute('SELECT student_id FROM students WHERE student_number = ?', (student_number,))
+                row = cursor.fetchone()
+                return row[0] if row else None
             try:
                 return cursor.lastrowid
             except Exception:

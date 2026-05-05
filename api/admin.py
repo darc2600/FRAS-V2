@@ -881,10 +881,19 @@ async def update_system_setting(
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
-            """, (setting_key, setting_value))
+            if _is_postgres_backend():
+                cursor.execute("""
+                    INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (setting_key)
+                    DO UPDATE SET setting_value = EXCLUDED.setting_value,
+                                  updated_at = CURRENT_TIMESTAMP
+                """, (setting_key, setting_value))
+            else:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                """, (setting_key, setting_value))
             conn.commit()
 
             # Invalidate settings cache to ensure changes take effect immediately
@@ -906,10 +915,19 @@ async def update_system_settings_bulk(
         with get_connection() as conn:
             cursor = conn.cursor()
             for update in updates:
-                cursor.execute("""
-                    INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                """, (update['key'], update['value']))
+                if _is_postgres_backend():
+                    cursor.execute("""
+                        INSERT INTO system_settings (setting_key, setting_value, updated_at)
+                        VALUES (?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT (setting_key)
+                        DO UPDATE SET setting_value = EXCLUDED.setting_value,
+                                      updated_at = CURRENT_TIMESTAMP
+                    """, (update['key'], update['value']))
+                else:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
+                        VALUES (?, ?, CURRENT_TIMESTAMP)
+                    """, (update['key'], update['value']))
             conn.commit()
 
             # Invalidate settings cache to ensure changes take effect immediately

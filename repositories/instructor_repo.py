@@ -3,10 +3,26 @@ from services.db import get_connection
 
 DB_PATH = "attendance.db"
 
+
+def _is_postgres_backend():
+    import os
+    db_url = (os.environ.get("DATABASE_URL") or "").strip().lower()
+    return bool(db_url) and not db_url.startswith("sqlite")
+
 class InstructorRepository:
     def add_instructor(self, instructor_number, last_name, first_name, email, department):
         with get_connection() as conn:
             cursor = conn.cursor()
+            if _is_postgres_backend():
+                cursor.execute('''
+                    INSERT INTO instructors (instructor_number, last_name, first_name, email, dept_id)
+                    VALUES (?, ?, ?, ?, ?)
+                    RETURNING instructor_id
+                ''', (instructor_number, last_name, first_name, email, department))
+                row = cursor.fetchone()
+                conn.commit()
+                return row[0] if row else None
+
             cursor.execute('''
                 INSERT INTO instructors (instructor_number, last_name, first_name, email, department)
                 VALUES (?, ?, ?, ?, ?)

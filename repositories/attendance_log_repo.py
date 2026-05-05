@@ -1,6 +1,12 @@
 from services.db import get_connection
 
 
+def _is_postgres_backend():
+    import os
+    db_url = (os.environ.get("DATABASE_URL") or "").strip().lower()
+    return bool(db_url) and not db_url.startswith("sqlite")
+
+
 class AttendanceLogRepository:
     def add_log(self, student_id, class_id, status):
         with get_connection() as conn:
@@ -18,6 +24,16 @@ class AttendanceLogRepository:
             from datetime import datetime
             note = f"Manually recorded as {status} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             
+            if _is_postgres_backend():
+                cursor.execute('''
+                    INSERT INTO attendance_logs (student_id, class_id, status_id, notes)
+                    VALUES (?, ?, ?, ?)
+                    RETURNING log_id
+                ''', (student_id, class_id, status_id, note))
+                row = cursor.fetchone()
+                conn.commit()
+                return row[0] if row else None
+
             cursor.execute('''
                 INSERT INTO attendance_logs (student_id, class_id, status_id, notes)
                 VALUES (?, ?, ?, ?)

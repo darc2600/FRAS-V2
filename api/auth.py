@@ -168,7 +168,7 @@ def get_user_permissions(user_type: str) -> list:
     elif user_type == 'it_admin':
         permissions.update({
             'view_own_attendance', 'mark_attendance', 'manage_users', 'reset_passwords',
-            'view_system_logs', 'submit_support', 'manage_support', 'view_analytics'
+            'view_system_logs', 'submit_support', 'manage_support'
         })
     elif user_type == 'instructor':
         permissions.update({
