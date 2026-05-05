@@ -357,3 +357,10 @@ async def login(payload: LoginRequest):
         "permissions": permissions,
         "user_id": user_id
     }
+
+
+# Backwards-compatible alias: allow frontend to call /login (or relative api/login)
+@router.post("/login")
+async def login_alias(payload: LoginRequest):
+    """Alias endpoint for legacy frontends that POST to /login."""
+    return await login(payload)

@@ -1,0 +1,35 @@
+{
+  "sample_image": "dataset\\2025103001\\capture_1.jpg",
+  "registration": {
+    "status": 200,
+    "text": "{\"status\":\"success\",\"message\":\"Student registered and images saved.\",\"image_paths\":[\"/app/dataset\\\\TEST1777862629\\\\capture_1.jpg\"]}"
+  },
+  "capture_sample": {
+    "student_id": 116,
+    "course_code": "CIS101",
+    "section": "AM1"
+  },
+  "capture": {
+    "status": 200,
+    "text": "{\"captured\":true,\"student_id\":\"116\"}"
+  },
+  "recognize_sample": {
+    "class_id": 10
+  },
+  "recognize": {
+    "status": 200,
+    "body": {
+      "status": "failed",
+      "student_id": null,
+      "student_name": null,
+      "attendance_status": null,
+      "message": "No match found"
+    }
+  },
+  "attendance": {
+    "status": 200,
+    "body": {
+      "attendance": []
+    }
+  }
+}

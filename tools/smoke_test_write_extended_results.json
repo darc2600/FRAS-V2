@@ -1,0 +1,31 @@
+{
+  "login": {
+    "email": "superadmin@fras.com",
+    "status": 200
+  },
+  "create_ticket": {
+    "status": 200,
+    "text": "{\"message\":\"Support ticket created successfully\",\"ticket_id\":10}"
+  },
+  "update_ticket": {
+    "status": 200,
+    "text": "{\"message\":\"Ticket updated successfully\"}"
+  },
+  "reply_ticket": {
+    "status": 200,
+    "text": "{\"message\":\"Reply added successfully\",\"reply_id\":3}"
+  },
+  "room_sample": {
+    "room": "101",
+    "course": "CIS101",
+    "instructor": "Brown, Michael"
+  },
+  "create_schedule": {
+    "status": 200,
+    "text": "{\"schedule\":[{\"courseCode\":\"CIS101\",\"section\":\"SMK\",\"professor\":\"Brown, Michael\",\"day\":\"Monday\",\"startTime\":\"07:00AM\",\"endTime\":\"08:10AM\"}]}"
+  },
+  "delete_schedule": {
+    "status": 200,
+    "text": "{\"detail\":\"Room schedule deleted\"}"
+  }
+}

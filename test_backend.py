@@ -13,5 +13,5 @@ app.add_middleware(
 )
 
 @app.get("/test")
-async def test_endpoint():
+async def endpoint():
     return {"message": "Test server is running with CORS enabled!"}

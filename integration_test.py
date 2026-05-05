@@ -49,7 +49,8 @@ class ServerManager:
             response = requests.post('http://127.0.0.1:8000/api/login', json=login_data, timeout=5)
             if response.status_code == 200:
                 data = response.json()
-                print("✅ Admin login successful!"                print(f"   User Type: {data.get('user_type')}")
+                print("✅ Admin login successful!")
+                print(f"   User Type: {data.get('user_type')}")
                 print(f"   Token: {data.get('access_token')[:30]}...")
                 self.admin_token = data.get('access_token')
             else:
@@ -60,7 +61,8 @@ class ServerManager:
             response = requests.post('http://127.0.0.1:8000/api/login', json=login_data, timeout=5)
             if response.status_code == 200:
                 data = response.json()
-                print("✅ Instructor login successful!"                print(f"   User Type: {data.get('user_type')}")
+                print("✅ Instructor login successful!")
+                print(f"   User Type: {data.get('user_type')}")
             else:
                 print(f"❌ Instructor login failed: {response.status_code}")
 
@@ -68,7 +70,8 @@ class ServerManager:
             response = requests.get('http://127.0.0.1:8000/api/admin/analytics', timeout=5)
             if response.status_code == 200:
                 data = response.json()
-                print("✅ Admin analytics retrieved!"                print(f"   Total Users: {data.get('total_users')}")
+                print("✅ Admin analytics retrieved!")
+                print(f"   Total Users: {data.get('total_users')}")
                 print(f"   Students: {data.get('total_students')}, Instructors: {data.get('total_instructors')}, Admins: {data.get('total_admins')}")
             else:
                 print(f"❌ Admin analytics failed: {response.status_code}")

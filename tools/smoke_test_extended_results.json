@@ -1,0 +1,364 @@
+{
+  "openapi": {
+    "status": 200,
+    "title": "FastAPI"
+  },
+  "login": {
+    "email": "superadmin@fras.com",
+    "status": 200
+  },
+  "endpoints": {
+    "/api/rooms": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 6
+      }
+    },
+    "/api/rooms/{room_id}/courses": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 0
+      }
+    },
+    "/api/rooms/{room_id}/courses/{course_code}/sections": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 0
+      }
+    },
+    "/api/floors": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 4
+      }
+    },
+    "/api/floors/{floor_level}/rooms": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 2
+      }
+    },
+    "/api/rooms/{room_id}/courses-sections": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 1
+      }
+    },
+    "/api/attendance": {
+      "get": {
+        "method": "get",
+        "status": 422,
+        "ok": false,
+        "content_type": "application/json"
+      }
+    },
+    "/api/user/register": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/register": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/capture": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/room-schedule/{room_id}": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "keys": [
+          "schedule"
+        ]
+      },
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      },
+      "delete": {
+        "method": "delete",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/courses": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 13
+      }
+    },
+    "/api/courses/{course_code}/sections": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 0
+      }
+    },
+    "/api/instructors": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 21
+      }
+    },
+    "/api/students/{student_number}": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json"
+      }
+    },
+    "/api/students": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 150
+      }
+    },
+    "/api/classes": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "items": 6
+      }
+    },
+    "/test": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json"
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "method": "get",
+        "status": 403,
+        "ok": false,
+        "content_type": "application/json",
+        "status_with_auth": 200,
+        "items_with_auth": 27
+      },
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/face-embedding-coverage": {
+      "get": {
+        "method": "get",
+        "status": 403,
+        "ok": false,
+        "content_type": "application/json",
+        "status_with_auth": 200
+      }
+    },
+    "/api/debug/face-embedding-coverage-public": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "keys": [
+          "total_students",
+          "students_with_face_path",
+          "students_with_embeddings",
+          "students_with_any_face_data",
+          "students_missing_all_face_data",
+          "embedding_coverage_percent"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}": {
+      "put": {
+        "method": "put",
+        "skipped": "non-GET method - skip in this run"
+      },
+      "delete": {
+        "method": "delete",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/reset-password": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/users/bulk": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/system-settings": {
+      "get": {
+        "method": "get",
+        "status": 403,
+        "ok": false,
+        "content_type": "application/json",
+        "status_with_auth": 200
+      },
+      "put": {
+        "method": "put",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/system-settings/bulk": {
+      "put": {
+        "method": "put",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/analytics": {
+      "get": {
+        "method": "get",
+        "status": 403,
+        "ok": false,
+        "content_type": "application/json",
+        "status_with_auth": 200
+      }
+    },
+    "/api/admin/mark-automatic-absents": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/support/tickets": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/support/tickets": {
+      "get": {
+        "method": "get",
+        "status": 403,
+        "ok": false,
+        "content_type": "application/json",
+        "status_with_auth": 200,
+        "items_with_auth": 8
+      }
+    },
+    "/api/admin/support/tickets/{ticket_id}": {
+      "put": {
+        "method": "put",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/support/tickets/{ticket_id}/replies": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      },
+      "get": {
+        "method": "get",
+        "status": 403,
+        "ok": false,
+        "content_type": "application/json",
+        "status_with_auth": 200,
+        "items_with_auth": 1
+      }
+    },
+    "/api/admin/attendance/export": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/admin/attendance/export/professor": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/login": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/recognize": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/mark-absents": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/registration": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/api/room-schedule/{room_code}": {
+      "get": {
+        "method": "get",
+        "status": 200,
+        "ok": true,
+        "content_type": "application/json",
+        "keys": [
+          "schedule"
+        ]
+      },
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      },
+      "delete": {
+        "method": "delete",
+        "skipped": "non-GET method - skip in this run"
+      }
+    },
+    "/test-bulk": {
+      "post": {
+        "method": "post",
+        "skipped": "non-GET method - skip in this run"
+      }
+    }
+  }
+}

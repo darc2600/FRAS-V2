@@ -1,0 +1,9 @@
+# Example /etc/fras/env
+# Copy to /etc/fras/env and adjust values, then `sudo chown root:root /etc/fras/env && sudo chmod 640 /etc/fras/env`
+
+# PostgreSQL connection (example)
+DATABASE_URL=postgresql://fras_user:fras_password@127.0.0.1:5432/fras_db
+
+# Optional app settings
+#SECRET_KEY=replace_with_secret
+#OTHER_SETTING=value

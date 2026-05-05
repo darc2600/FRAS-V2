@@ -30,8 +30,8 @@ def get_user_auth(email: str):
         result = cursor.fetchone()
         return result
 
-def test_login(email: str, password: str):
-    """Test login functionality"""
+def _login_check(email: str, password: str):
+    """Helper to validate login credentials against the DB"""
     print(f"Testing login for: {email}")
 
     # Get user data
@@ -45,13 +45,13 @@ def test_login(email: str, password: str):
 
     # Verify password
     valid = False
-    if stored_password.startswith('$'):
+    if stored_password and stored_password.startswith('$'):
         # Hashed password
         try:
             import importlib
             _pb = importlib.import_module("passlib.hash")
-            bcrypt = getattr(_pb, "bcrypt")
-            pbkdf2_sha256 = getattr(_pb, "pbkdf2_sha256")
+            bcrypt = getattr(_pb, "bcrypt", None)
+            pbkdf2_sha256 = getattr(_pb, "pbkdf2_sha256", None)
             if pbkdf2_sha256 and stored_password.startswith('$pbkdf2-sha256$'):
                 valid = pbkdf2_sha256.verify(password, stored_password)
             elif bcrypt and stored_password.startswith('$2b$'):
@@ -80,6 +80,18 @@ def test_login(email: str, password: str):
     print(f"User Type: {user_type}")
     print(f"Permissions: {['read'] if user_type == 'student' else ['read', 'write', 'admin']}")
     return True
+
+
+def test_admin_login():
+    # Use seeded super admin from seed_database.py if present
+    assert _login_check("test.superadmin@fras.com", "password123") or _login_check("superadmin@fras.com", "super123")
+
+
+def test_instructor_login():
+    # Verify instructor accounts exist (passwords may vary in seed)
+    user_a = get_user_auth("test.instructor@fras.com")
+    user_b = get_user_auth("isaac.romance@mapua.edu.ph")
+    assert (user_a and user_a[1] == 'instructor') or (user_b and user_b[1] == 'instructor'), "No seeded instructor account found"
 
 def test_admin_endpoints():
     """Test admin functionality"""

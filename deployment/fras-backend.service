@@ -1,0 +1,18 @@
+# systemd unit for FRAS backend
+# Place at /etc/systemd/system/fras-backend.service
+[Unit]
+Description=FRAS FastAPI Uvicorn
+After=network.target
+
+[Service]
+User=fras
+Group=fras
+WorkingDirectory=/home/fras/fras-repo
+EnvironmentFile=/etc/fras/env
+Environment="PATH=/home/fras/fras-repo/.venv/bin"
+ExecStart=/home/fras/fras-repo/.venv/bin/uvicorn backend:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

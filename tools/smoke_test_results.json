@@ -1,0 +1,92 @@
+{
+  "openapi": {
+    "status": 200,
+    "ok": true
+  },
+  "login": {
+    "email": "superadmin@fras.com",
+    "result": {
+      "status": 200,
+      "ok": true,
+      "text": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdXBlcmFkbWluQGZyYXMuY29tIiwidXNlcl90eXBlIjoic3VwZXJfYWRtaW4iLCJwZXJtaXNzaW9ucyI6WyJhdWRpdF9sb2dzIiwiY29udGVudF9tYW5hZ2VtZW50IiwibWFuYWdlX2FkbWlucyIsIm1hbmFnZV9jb250ZW50IiwibWFuYWdlX3Jvb21zX3NjaGVkdWxlIiwibWFuYWdlX3N1cHBvcnQiLCJtYW5hZ2VfdXNlcnMiLCJtYXJrX2F0dGVuZGFuY2UiLCJyZWdpc3Rlcl9zdHVkZW50cyIsInJlc2V0X3Bhc3N3b3JkcyIsInN1Ym1pdF9zdXBwb3J0Iiwic3lzdGVtX2FkbWluIiwic3lzdGVtX2NvbmZpZyIsInZpZXdfYWxsX2RhdGEiLCJ2aWV3X2FuYWx5dGljcyIsInZpZXdfYXR0ZW5kYW5jZV9sb2dzIiwidmlld19vd25fYXR0ZW5kYW5jZSIsInZpZXdfb3duX3NjaGVkdWxlIiwidmlld19zeXN0ZW1fbG9ncyJdLCJ1c2VyX2lkIjoxMywiZXhwIjoxNzc3OTQ3ODE1fQ._6mM5bVOwNWUd_ySG0BRbiXw_JmD-6rJu-oIRKkuSFg\",\"token_type\":\"bearer\",\"user_type\":\"super_admin\",\"permissions\":[\"audit_logs\",\"content_management\",\"manage_admins\",\"manage_content\",\"manage_rooms_schedule\",\"manage_support\",\"manage_users\",\"mark_attendance\",\"register_students\",\"reset_passwords\",\"submit_support\",\"system_admin\",\"system_config\",\"view_all_data\",\"view_analytics\",\"view_attendance_logs\",\"view_own_attendance\",\"view_own_schedule\",\"view_system_logs\"],\"user_id\":13}"
+    },
+    "token_obtained": true
+  },
+  "paths": {
+    "/api/rooms": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/api/floors": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/api/attendance": {
+      "status": 422,
+      "ok": false,
+      "auth_used": false
+    },
+    "/api/courses": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/api/instructors": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/api/students": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/api/classes": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/test": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/api/admin/users": {
+      "status": 403,
+      "ok": false,
+      "auth_used": false,
+      "status_with_auth": 200
+    },
+    "/api/admin/face-embedding-coverage": {
+      "status": 403,
+      "ok": false,
+      "auth_used": false,
+      "status_with_auth": 200
+    },
+    "/api/debug/face-embedding-coverage-public": {
+      "status": 200,
+      "ok": true,
+      "auth_used": false
+    },
+    "/api/admin/system-settings": {
+      "status": 403,
+      "ok": false,
+      "auth_used": false,
+      "status_with_auth": 200
+    },
+    "/api/admin/analytics": {
+      "status": 403,
+      "ok": false,
+      "auth_used": false,
+      "status_with_auth": 200
+    },
+    "/api/admin/support/tickets": {
+      "status": 403,
+      "ok": false,
+      "auth_used": false,
+      "status_with_auth": 200
+    }
+  }
+}

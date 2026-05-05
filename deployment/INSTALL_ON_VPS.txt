@@ -1,0 +1,52 @@
+Instructions to install the provided deployment files on your VPS
+
+1) Upload these files to the VPS (scp or git):
+
+  scp deployment/nginx_fras.conf user@vps:/tmp/nginx_fras.conf
+  scp deployment/fras-backend.service user@vps:/tmp/fras-backend.service
+  scp deployment/fras_env.example user@vps:/tmp/fras_env
+
+2) Backup existing files (if any) and move new ones into place:
+
+  sudo cp /etc/nginx/sites-available/fras /etc/nginx/sites-available/fras.bak || true
+  sudo mv /tmp/nginx_fras.conf /etc/nginx/sites-available/fras
+
+  sudo mkdir -p /etc/fras
+  sudo cp /etc/fras/env /etc/fras/env.bak || true
+  sudo mv /tmp/fras_env /etc/fras/env
+  sudo chown root:root /etc/fras/env
+  sudo chmod 640 /etc/fras/env
+
+  sudo cp /etc/systemd/system/fras-backend.service /etc/systemd/system/fras-backend.service.bak || true
+  sudo mv /tmp/fras-backend.service /etc/systemd/system/fras-backend.service
+
+3) Enable nginx site and reload nginx:
+
+  sudo ln -sf /etc/nginx/sites-available/fras /etc/nginx/sites-enabled/fras
+  sudo nginx -t
+  sudo systemctl reload nginx
+
+4) Start backend service:
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now fras-backend
+  sudo systemctl status fras-backend
+  sudo journalctl -u fras-backend -f
+
+5) Verify endpoints from VPS or local machine:
+
+  # asset file
+  curl -I https://fras-ijb.site/assets/mapua-logo.png
+
+  # API route
+  curl -I https://fras-ijb.site/api/rooms
+
+6) (Optional) Obtain TLS cert via certbot on the VPS:
+
+  sudo apt install -y certbot python3-certbot-nginx
+  sudo certbot --nginx -d fras-ijb.site -d www.fras-ijb.site
+
+Notes:
+- The `WorkingDirectory` and `PATH` in the unit assume the repo is at `/home/fras/fras-repo` and venv at `/home/fras/fras-repo/.venv`.
+- Adjust `fras_env` values (DATABASE_URL, SECRET_KEY) before starting the service.
+- If the app still serves index.html for assets, double-check that `/var/www/fras/browser/assets/<file>` exists and nginx `root` is correct.

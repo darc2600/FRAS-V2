@@ -1,0 +1,38 @@
+{
+  "room": "101",
+  "course": "CIS101",
+  "section": "TF4248",
+  "create_schedule": {
+    "status": 200,
+    "text": "{\"schedule\":[{\"courseCode\":\"CIS101\",\"section\":\"TF4248\",\"professor\":\"Brown, Michael\",\"day\":\"Monday\",\"startTime\":\"10:45AM\",\"endTime\":\"11:20AM\"}]}"
+  },
+  "student_folder": "2025103001",
+  "registration": {
+    "status": 200,
+    "text": "{\"status\":\"success\",\"message\":\"Student face data updated successfully.\",\"image_paths\":[\"/app/dataset\\\\2025103001\\\\capture_1.jpg\",\"/app/dataset\\\\2025103001\\\\capture_2.jpg\",\"/app/dataset\\\\2025103001\\\\capture_3.jpg\"]}"
+  },
+  "class_id": 12,
+  "recognize": {
+    "status": 200,
+    "body": {
+      "status": "success",
+      "student_id": "1",
+      "student_name": "Doe",
+      "attendance_status": "Present",
+      "message": null
+    }
+  },
+  "attendance": {
+    "status": 200,
+    "body": {
+      "attendance": [
+        [
+          "2025103001",
+          "Doe, John",
+          "2026-05-04 10:50:48",
+          "Present"
+        ]
+      ]
+    }
+  }
+}

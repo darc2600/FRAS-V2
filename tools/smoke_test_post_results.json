@@ -1,0 +1,14 @@
+{
+  "login": {
+    "email": "superadmin@fras.com",
+    "status": 200
+  },
+  "create_user": {
+    "status": 200,
+    "text": "{\"message\":\"User created successfully\",\"user_id\":31,\"user_type\":\"instructor\"}"
+  },
+  "delete_user": {
+    "status": 200,
+    "text": "{\"message\":\"User deleted successfully\"}"
+  }
+}
