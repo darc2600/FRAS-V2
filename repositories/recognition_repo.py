@@ -34,7 +34,9 @@ class RecognitionRepository:
     def _db_timestamp_value(self, local_dt: datetime):
         if self._is_postgres():
             return local_dt.astimezone(timezone.utc)
-        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
+        # Store SQLite timestamps in UTC as naive strings so they can be consistently
+        # filtered and displayed using the same timezone conversion logic.
+        return local_dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     def _parse_db_timestamp(self, value):
         if isinstance(value, datetime):
@@ -67,12 +69,18 @@ class RecognitionRepository:
                 "%Y-%m-%d %H:%M:%S",
             ):
                 try:
-                    return datetime.strptime(candidate, fmt)
+                    parsed = datetime.strptime(candidate, fmt)
+                    if parsed.tzinfo is None:
+                        return parsed.replace(tzinfo=timezone.utc)
+                    return parsed
                 except ValueError:
                     continue
 
         try:
-            return datetime.fromisoformat(normalized)
+            parsed = datetime.fromisoformat(normalized)
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed
         except Exception:
             LOG.warning("Could not parse attendance timestamp value: %s", value)
             return None
