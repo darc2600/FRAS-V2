@@ -372,7 +372,7 @@ export class RoomScheduleEditorComponent implements OnInit, OnDestroy {
   }
 
   confirmDeleteSchedule() {
-    if (this.deleteConfirmationText !== 'DELETE') {
+    if ((this.deleteConfirmationText || '').trim().toUpperCase() !== 'DELETE') {
       this.message = 'Please type "DELETE" to confirm.';
       this.messageType = 'error';
       return;

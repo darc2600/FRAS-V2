@@ -47,6 +47,11 @@
   font-style: italic;
   margin-top: 2px;
 }
+.confirmation-input input {
+  text-transform: none;
+  font-variant: normal;
+  letter-spacing: normal;
+}
 .editor-actions {
   display: flex;
   flex-wrap: wrap;

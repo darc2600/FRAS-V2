@@ -137,6 +137,10 @@
           type="text"
           [(ngModel)]="deleteConfirmationText"
           placeholder="Type DELETE here"
+          autocapitalize="none"
+          spellcheck="false"
+          autocomplete="off"
+          inputmode="text"
           (keyup.enter)="confirmDeleteSchedule()"
           maxlength="6">
       </div>

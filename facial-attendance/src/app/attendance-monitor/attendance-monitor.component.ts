@@ -129,10 +129,11 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
     console.log('Fetching course sections for room_id:', selectedRoom.room_id);
     this.api.getCoursesSectionsByRoom(selectedRoom.room_id).subscribe(
       (coursesSections: any[]) => {
-        this.availableCourseSectionObjects = coursesSections;
-        this.availableCourseSections = coursesSections.map(cs => cs.course_section);
+        const filteredCourseSections = coursesSections.filter(cs => cs.course_section && cs.course_section.toString().trim().length > 0);
+        this.availableCourseSectionObjects = filteredCourseSections;
+        this.availableCourseSections = filteredCourseSections.map(cs => cs.course_section);
         console.log('Available course sections:', this.availableCourseSections);
-        this.courseSection = this.availableCourseSections[0] || '';
+        this.courseSection = this.availableCourseSections.length > 0 ? this.availableCourseSections[0] : '';
         console.log('Selected course section:', this.courseSection);
         this.updateSelectedClassId();
         this.fetchLogs();
