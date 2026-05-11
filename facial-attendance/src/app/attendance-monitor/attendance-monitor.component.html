@@ -17,6 +17,7 @@
           <label>
             Course-Section:
             <select [(ngModel)]="courseSection" (change)="onCourseSectionChange()">
+              <option *ngIf="availableCourseSections.length === 0" value="" disabled>No current classes</option>
               <option *ngFor="let cs of availableCourseSections" [value]="cs">{{cs}}</option>
             </select>
           </label>

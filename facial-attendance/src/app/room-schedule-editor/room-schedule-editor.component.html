@@ -147,7 +147,7 @@
       <button
         class="confirm-delete-btn"
         (click)="confirmDeleteSchedule()"
-        [disabled]="deleteConfirmationText !== 'DELETE' || isDeleting">
+        [disabled]="(deleteConfirmationText || '').toUpperCase() !== 'DELETE' || isDeleting">
         <span *ngIf="isDeleting">DELETING...</span>
         <span *ngIf="!isDeleting">🗑️ Delete Schedule</span>
       </button>

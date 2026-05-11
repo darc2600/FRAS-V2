@@ -32,8 +32,12 @@ class AttendanceRepository:
             class_id = class_row[0]
             if start_date and end_date and start_date.strip() and end_date.strip():
                 if is_postgres:
+                    # Return timestamp normalized to Asia/Manila ISO string with offset (+08:00)
                     cursor.execute("""
-                        SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, ast.status_name
+                        SELECT s.student_number,
+                               (s.last_name || ', ' || s.first_name) AS student_name,
+                               (to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI:SS') || '+08:00') AS timestamp,
+                               ast.status_name
                         FROM attendance_logs a
                         LEFT JOIN students s ON a.student_id = s.student_id
                         LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
@@ -43,8 +47,12 @@ class AttendanceRepository:
                         ORDER BY a.timestamp
                     """, (class_id, start_date, end_date))
                 else:
+                    # For sqlite, shift timestamp by +8 hours and format as ISO-like string
                     cursor.execute("""
-                        SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, ast.status_name
+                        SELECT s.student_number,
+                               (s.last_name || ', ' || s.first_name) AS student_name,
+                               (strftime('%Y-%m-%dT%H:%M:%S', datetime(a.timestamp, '+8 hours')) || '+08:00') AS timestamp,
+                               ast.status_name
                         FROM attendance_logs a
                         LEFT JOIN students s ON a.student_id = s.student_id
                         LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
@@ -54,14 +62,30 @@ class AttendanceRepository:
                         ORDER BY a.timestamp
                     """, (class_id, start_date, end_date))
             else:
-                cursor.execute("""
-                    SELECT s.student_number, (s.last_name || ', ' || s.first_name) AS student_name, a.timestamp, ast.status_name 
-                    FROM attendance_logs a
-                    LEFT JOIN students s ON a.student_id = s.student_id
-                    LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
-                    WHERE a.class_id = ?
-                    ORDER BY a.timestamp
-                """, (class_id,))
+                if is_postgres:
+                    cursor.execute("""
+                        SELECT s.student_number,
+                               (s.last_name || ', ' || s.first_name) AS student_name,
+                               (to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI:SS') || '+08:00') AS timestamp,
+                               ast.status_name
+                        FROM attendance_logs a
+                        LEFT JOIN students s ON a.student_id = s.student_id
+                        LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
+                        WHERE a.class_id = ?
+                        ORDER BY a.timestamp
+                    """, (class_id,))
+                else:
+                    cursor.execute("""
+                        SELECT s.student_number,
+                               (s.last_name || ', ' || s.first_name) AS student_name,
+                               (strftime('%Y-%m-%dT%H:%M:%S', datetime(a.timestamp, '+8 hours')) || '+08:00') AS timestamp,
+                               ast.status_name
+                        FROM attendance_logs a
+                        LEFT JOIN students s ON a.student_id = s.student_id
+                        LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
+                        WHERE a.class_id = ?
+                        ORDER BY a.timestamp
+                    """, (class_id,))
             return cursor.fetchall()
 
 
