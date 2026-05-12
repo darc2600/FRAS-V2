@@ -228,7 +228,11 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
         if (res.status === 'success') {
           // Avoid duplicate marking within 10 seconds
           if (this.lastRecognizedId !== res.student_id || Date.now() - this.lastRecognizedTime > 10000) {
-            this.message = `Attendance marked for ${res.student_name || 'Unknown'}: ${res.attendance_status || 'Unknown'}`;
+            if (res.attendance_recorded) {
+              this.message = `Attendance marked for ${res.student_name || 'Unknown'}: ${res.attendance_status || 'Unknown'}`;
+            } else {
+              this.message = res.message || `Attendance already recorded for ${res.student_name || 'Unknown'} within the buffer period.`;
+            }
             this.lastRecognizedId = res.student_id;
             this.lastRecognizedTime = Date.now();
             console.log('autoMarkAttendance: Calling fetchLogs after successful recognition');
@@ -265,12 +269,16 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
     this.api.recognizeFace(file, this.selectedClassId).subscribe(
       res => {
         console.log('performAttendanceRecognition: API response:', res);
-        this.message = res.status === 'success'
-          ? `Attendance marked for ${res.student_name || 'Unknown'}: ${res.attendance_status || 'Unknown'}`
-          : res.message;
         if (res.status === 'success') {
+          if (res.attendance_recorded) {
+            this.message = `Attendance marked for ${res.student_name || 'Unknown'}: ${res.attendance_status || 'Unknown'}`;
+          } else {
+            this.message = res.message || `Attendance already recorded for ${res.student_name || 'Unknown'} within the buffer period.`;
+          }
           console.log('performAttendanceRecognition: Calling fetchLogs after successful recognition');
           this.fetchLogs();
+        } else {
+          this.message = res.message;
         }
       },
       err => {
@@ -296,7 +304,9 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
       this.attendanceLogs = [];
       return;
     }
-    const [courseCode, section] = this.courseSection.split('-');
+    const dashIndex = this.courseSection.lastIndexOf('-');
+    const courseCode = dashIndex >= 0 ? this.courseSection.slice(0, dashIndex) : this.courseSection;
+    const section = dashIndex >= 0 ? this.courseSection.slice(dashIndex + 1) : '';
     // Get today's date in local timezone (not UTC)
     const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
     console.log('fetchLogs: Fetching logs for:', courseCode, section, 'date:', today, 'class_id:', this.selectedClassId);

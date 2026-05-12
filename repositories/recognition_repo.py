@@ -21,6 +21,7 @@ from services.face_embeddings import (
 
 LOG = logging.getLogger(__name__)
 MANILA_TZ = ZoneInfo("Asia/Manila")
+ATTENDANCE_TZ = 'Asia/Manila'
 
 
 class RecognitionRepository:
@@ -174,10 +175,10 @@ class RecognitionRepository:
         student_name = name_row[0] if name_row else "Unknown"
 
         if self._is_postgres():
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT timestamp FROM attendance_logs
                 WHERE student_id = ? AND class_id = ?
-                AND ((timestamp AT TIME ZONE 'Asia/Manila')::date = ?::date)
+                AND ((timestamp AT TIME ZONE '{ATTENDANCE_TZ}')::date = ?::date)
                 ORDER BY timestamp DESC LIMIT 1
             """, (student_id, class_id, attendance_date))
         else:
@@ -212,6 +213,7 @@ class RecognitionRepository:
                     should_insert = True
                     print(f"[DEBUG] Allowing attendance: {time_diff:.2f} mins since last check-in (>= {buffer_minutes} mins buffer)")
 
+        recorded = False
         if should_insert:
             note = f"Face recognized at {now.strftime('%H:%M:%S')} - {status_name}"
             cursor.execute("""
@@ -220,12 +222,23 @@ class RecognitionRepository:
             """, (student_id, class_id, timestamp_value, status_id, note))
             conn.commit()
             print(f"[DEBUG] Attendance logged for student {student_id} in class {class_id}")
+            recorded = True
+        else:
+            note = None
+            recorded = False
+
+        message = None
+        if not recorded:
+            message = f"Attendance already recorded within the last {buffer_minutes} minutes."
+            print(f"[DEBUG] Duplicate attendance not inserted for student {student_id} in class {class_id}")
 
         return RecognitionResponse(
             status="success",
             student_id=str(student_id),
             student_name=student_name,
             attendance_status=status_name,
+            attendance_recorded=recorded,
+            message=message
         )
 
     async def recognize_face(self, file: UploadFile, class_id: int) -> RecognitionResponse:
@@ -272,7 +285,7 @@ class RecognitionRepository:
                     print(f"[DEBUG] Best embedding match: student_id={best_student_id}, similarity={best_similarity:.4f}, threshold={similarity_threshold:.4f}")
                     if best_student_id is not None and best_similarity >= similarity_threshold:
                         response = self._build_attendance_response(cursor, conn, best_student_id, class_id)
-                        if response.status == "success":
+                        if response.status == "success" and response.attendance_recorded:
                             upsert_student_embedding(
                                 cursor=cursor,
                                 student_id=best_student_id,
@@ -282,7 +295,7 @@ class RecognitionRepository:
                             )
                             conn.commit()
                         return response
-                
+
                 # 2) Fallback: image-to-image verify (legacy path)
                 # Get all students enrolled in this class
                 cursor.execute('''
@@ -293,7 +306,7 @@ class RecognitionRepository:
                 ''', (class_id,))
                 enrolled_students = cursor.fetchall()
                 print(f"[DEBUG] Enrolled students in class {class_id}: {enrolled_students}")
-                
+
                 student_faces = {}
                 use_s3 = os.getenv('USE_S3', '0').lower() in ('1', 'true', 'yes')
                 for student_id, student_number, face_data_path in enrolled_students:
@@ -302,7 +315,7 @@ class RecognitionRepository:
                         student_folder = face_data_path
                     else:
                         student_folder = os.path.join("dataset", str(student_number))
-                    
+
                     # Check if folder exists locally
                     if os.path.isdir(student_folder):
                         images = [os.path.join(student_folder, img) for img in os.listdir(student_folder) if img.lower().endswith('.jpg')]
@@ -317,15 +330,15 @@ class RecognitionRepository:
                             images = []
                     else:
                         images = []
-                    
+
                     if images:
                         student_faces[student_id] = images[0]  # Use first image for comparison
-                
+
                 print(f"[DEBUG] Student faces to compare: {student_faces}")
-                
+
                 # Sort by student_id for consistent matching order (prevents random mismatches)
                 sorted_student_faces = sorted(student_faces.items(), key=lambda x: x[0])
-                
+
                 # Compare faces
                 for student_id, img_path in sorted_student_faces:
                     try:

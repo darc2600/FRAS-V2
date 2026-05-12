@@ -1480,8 +1480,12 @@ async def export_attendance_report(
 
             db_url = os.environ.get('DATABASE_URL', '')
             is_postgres = bool(db_url and not db_url.lower().startswith('sqlite'))
-            date_expr = "CAST(a.timestamp AS DATE)" if is_postgres else "DATE(a.timestamp)"
-            time_expr = "CAST(a.timestamp AS TIME)" if is_postgres else "TIME(a.timestamp)"
+            if is_postgres:
+                date_expr = "(a.timestamp AT TIME ZONE 'Asia/Manila')::date"
+                time_expr = "to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'HH12:MI:SS AM')"
+            else:
+                date_expr = "strftime('%Y-%m-%d', datetime(a.timestamp, '+8 hours'))"
+                time_expr = "strftime('%H:%M:%S', datetime(a.timestamp, '+8 hours'))"
 
             # Build the main query
             base_query = f"""
@@ -1663,8 +1667,12 @@ def _generate_attendance_report(cursor, request: AttendanceExportRequest) -> dic
     """Generate attendance report dict using provided DB cursor and request filters."""
     db_url = os.environ.get('DATABASE_URL', '')
     is_postgres = bool(db_url and not db_url.lower().startswith('sqlite'))
-    date_expr = "CAST(a.timestamp AS DATE)" if is_postgres else "DATE(a.timestamp)"
-    time_expr = "CAST(a.timestamp AS TIME)" if is_postgres else "TIME(a.timestamp)"
+    if is_postgres:
+        date_expr = "(a.timestamp AT TIME ZONE 'Asia/Manila')::date"
+        time_expr = "to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'HH12:MI:SS AM')"
+    else:
+        date_expr = "strftime('%Y-%m-%d', datetime(a.timestamp, '+8 hours'))"
+        time_expr = "strftime('%H:%M:%S', datetime(a.timestamp, '+8 hours'))"
 
     # Build the main query
     base_query = f"""

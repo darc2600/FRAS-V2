@@ -6,4 +6,5 @@ class RecognitionResponse(BaseModel):
     student_id: Optional[str] = None
     student_name: Optional[str] = None
     attendance_status: Optional[str] = None
+    attendance_recorded: Optional[bool] = None
     message: Optional[str] = None
