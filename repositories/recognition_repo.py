@@ -86,6 +86,39 @@ class RecognitionRepository:
             LOG.warning("Could not parse attendance timestamp value: %s", value)
             return None
 
+    def _try_upsert_student_embedding(
+        self,
+        cursor,
+        conn,
+        student_id: int,
+        model_name: str,
+        embedding,
+        source_image_path: str,
+    ) -> None:
+        if not embedding:
+            return
+
+        try:
+            upsert_student_embedding(
+                cursor=cursor,
+                student_id=student_id,
+                model_name=model_name,
+                embedding=embedding,
+                source_image_path=source_image_path,
+            )
+            conn.commit()
+        except Exception:
+            rollback = getattr(conn, "rollback", None)
+            if callable(rollback):
+                try:
+                    rollback()
+                except Exception:
+                    LOG.exception("Failed to rollback after face embedding update error")
+            LOG.exception(
+                "Face embedding cache update failed for student_id=%s; attendance recognition will continue",
+                student_id,
+            )
+
     def _build_attendance_response(self, cursor, conn, student_id: int, class_id: int) -> RecognitionResponse:
         cursor.execute('''
             SELECT day_of_week, start_time, end_time FROM classes WHERE class_id = ?
@@ -285,14 +318,14 @@ class RecognitionRepository:
                     if best_student_id is not None and best_similarity >= similarity_threshold:
                         response = self._build_attendance_response(cursor, conn, best_student_id, class_id)
                         if response.status == "success" and response.attendance_recorded:
-                            upsert_student_embedding(
-                                cursor=cursor,
-                                student_id=best_student_id,
-                                model_name=model_name,
-                                embedding=query_embedding,
-                                source_image_path=temp_path,
+                            self._try_upsert_student_embedding(
+                                cursor,
+                                conn,
+                                best_student_id,
+                                model_name,
+                                query_embedding,
+                                temp_path,
                             )
-                            conn.commit()
                         return response
 
                 # 2) Fallback: image-to-image verify (legacy path)
@@ -352,15 +385,14 @@ class RecognitionRepository:
                         )
                         print(f"[DEBUG] DeepFace result for {student_id}: {result}")
                         if result["verified"]:
-                            if query_embedding:
-                                upsert_student_embedding(
-                                    cursor=cursor,
-                                    student_id=student_id,
-                                    model_name=model_name,
-                                    embedding=query_embedding,
-                                    source_image_path=temp_path,
-                                )
-                                conn.commit()
+                            self._try_upsert_student_embedding(
+                                cursor,
+                                conn,
+                                student_id,
+                                model_name,
+                                query_embedding,
+                                temp_path,
+                            )
                             response = self._build_attendance_response(cursor, conn, student_id, class_id)
                             return response
                     except Exception as e:
