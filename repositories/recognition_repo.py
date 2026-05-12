@@ -35,9 +35,8 @@ class RecognitionRepository:
     def _db_timestamp_value(self, local_dt: datetime):
         if self._is_postgres():
             return local_dt.astimezone(timezone.utc)
-        # Store SQLite timestamps in UTC as naive strings so they can be consistently
-        # filtered and displayed using the same timezone conversion logic.
-        return local_dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        # Store SQLite timestamps in Manila local time as naive strings.
+        return local_dt.astimezone(MANILA_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
     def _parse_db_timestamp(self, value):
         if isinstance(value, datetime):
@@ -72,7 +71,7 @@ class RecognitionRepository:
                 try:
                     parsed = datetime.strptime(candidate, fmt)
                     if parsed.tzinfo is None:
-                        return parsed.replace(tzinfo=timezone.utc)
+                        return parsed.replace(tzinfo=MANILA_TZ)
                     return parsed
                 except ValueError:
                     continue
@@ -80,7 +79,7 @@ class RecognitionRepository:
         try:
             parsed = datetime.fromisoformat(normalized)
             if parsed.tzinfo is None:
-                return parsed.replace(tzinfo=timezone.utc)
+                return parsed.replace(tzinfo=MANILA_TZ)
             return parsed
         except Exception:
             LOG.warning("Could not parse attendance timestamp value: %s", value)
@@ -185,10 +184,9 @@ class RecognitionRepository:
             cursor.execute("""
                 SELECT timestamp FROM attendance_logs
                 WHERE student_id = ? AND class_id = ?
-                AND DATE(datetime(timestamp, '+8 hours')) = DATE(?)
+                AND DATE(timestamp) = DATE(?)
                 ORDER BY timestamp DESC LIMIT 1
             """, (student_id, class_id, attendance_date))
-
         last_attendance_row = cursor.fetchone()
         buffer_minutes = self.settings.attendance_buffer_minutes
 
@@ -402,7 +400,7 @@ class RecognitionRepository:
             else:
                 cursor.execute('''
                     SELECT DISTINCT student_id FROM attendance_logs
-                    WHERE class_id = ? AND DATE(datetime(timestamp, '+8 hours')) = DATE(?)
+                    WHERE class_id = ? AND DATE(timestamp) = DATE(?)
                 ''', (class_id, date))
             attended_students = {row[0] for row in cursor.fetchall()}
             

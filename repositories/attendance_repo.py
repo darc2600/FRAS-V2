@@ -47,18 +47,18 @@ class AttendanceRepository:
                         ORDER BY a.timestamp
                     """, (class_id, start_date, end_date))
                 else:
-                    # For sqlite, shift timestamp by +8 hours and format as ISO-like string
+                    # For sqlite, store timestamps in Manila local time and format them as ISO-like strings with offset.
                     cursor.execute("""
                         SELECT s.student_number,
                                (s.last_name || ', ' || s.first_name) AS student_name,
-                               (strftime('%Y-%m-%dT%H:%M:%S', datetime(a.timestamp, '+8 hours')) || '+08:00') AS timestamp,
+                               (strftime('%Y-%m-%dT%H:%M:%S', a.timestamp) || '+08:00') AS timestamp,
                                ast.status_name
                         FROM attendance_logs a
                         LEFT JOIN students s ON a.student_id = s.student_id
                         LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
                         WHERE a.class_id = ?
-                        AND DATE(datetime(a.timestamp, '+8 hours')) >= DATE(?)
-                        AND DATE(datetime(a.timestamp, '+8 hours')) <= DATE(?)
+                        AND DATE(a.timestamp) >= DATE(?)
+                        AND DATE(a.timestamp) <= DATE(?)
                         ORDER BY a.timestamp
                     """, (class_id, start_date, end_date))
             else:
@@ -78,7 +78,7 @@ class AttendanceRepository:
                     cursor.execute("""
                         SELECT s.student_number,
                                (s.last_name || ', ' || s.first_name) AS student_name,
-                               (strftime('%Y-%m-%dT%H:%M:%S', datetime(a.timestamp, '+8 hours')) || '+08:00') AS timestamp,
+                               (strftime('%Y-%m-%dT%H:%M:%S', a.timestamp) || '+08:00') AS timestamp,
                                ast.status_name
                         FROM attendance_logs a
                         LEFT JOIN students s ON a.student_id = s.student_id

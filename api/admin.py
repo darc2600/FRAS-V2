@@ -1484,8 +1484,8 @@ async def export_attendance_report(
                 date_expr = "(a.timestamp AT TIME ZONE 'Asia/Manila')::date"
                 time_expr = "to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'HH12:MI:SS AM')"
             else:
-                date_expr = "strftime('%Y-%m-%d', datetime(a.timestamp, '+8 hours'))"
-                time_expr = "strftime('%H:%M:%S', datetime(a.timestamp, '+8 hours'))"
+                date_expr = "strftime('%Y-%m-%d', a.timestamp)"
+                time_expr = "strftime('%H:%M:%S', a.timestamp)"
 
             # Build the main query
             base_query = f"""
@@ -1671,8 +1671,8 @@ def _generate_attendance_report(cursor, request: AttendanceExportRequest) -> dic
         date_expr = "(a.timestamp AT TIME ZONE 'Asia/Manila')::date"
         time_expr = "to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'HH12:MI:SS AM')"
     else:
-        date_expr = "strftime('%Y-%m-%d', datetime(a.timestamp, '+8 hours'))"
-        time_expr = "strftime('%H:%M:%S', datetime(a.timestamp, '+8 hours'))"
+        date_expr = "strftime('%Y-%m-%d', a.timestamp)"
+        time_expr = "strftime('%H:%M:%S', a.timestamp)"
 
     # Build the main query
     base_query = f"""
