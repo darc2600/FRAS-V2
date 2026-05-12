@@ -67,7 +67,7 @@
               <tr *ngFor="let log of attendanceLogs">
                 <td>{{ log.studentId }}</td>
                 <td>{{ log.studentName }}</td>
-                <td>{{ log.time | date:'hh:mm:ss a' }}</td>
+                <td>{{ log.time | date:'hh:mm:ss a':'+0800' }}</td>
                 <td class="status-cell">
                   <span [ngClass]="getStatusClass(log.status)">{{ log.status }}</span>
                 </td>

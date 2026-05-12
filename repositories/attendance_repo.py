@@ -32,18 +32,18 @@ class AttendanceRepository:
             class_id = class_row[0]
             if start_date and end_date and start_date.strip() and end_date.strip():
                 if is_postgres:
-                    # Return timestamp normalized to Asia/Manila ISO string with offset (+08:00)
+                    # attendance_logs.timestamp stores Manila wall time.
                     cursor.execute("""
                         SELECT s.student_number,
                                (s.last_name || ', ' || s.first_name) AS student_name,
-                               (to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI:SS') || '+08:00') AS timestamp,
+                               (to_char(a.timestamp, 'YYYY-MM-DD"T"HH24:MI:SS') || '+08:00') AS timestamp,
                                ast.status_name
                         FROM attendance_logs a
                         LEFT JOIN students s ON a.student_id = s.student_id
                         LEFT JOIN attendance_status_types ast ON a.status_id = ast.status_id
                         WHERE a.class_id = ?
-                        AND ((a.timestamp AT TIME ZONE 'Asia/Manila')::date >= ?::date)
-                        AND ((a.timestamp AT TIME ZONE 'Asia/Manila')::date <= ?::date)
+                        AND a.timestamp::date >= ?::date
+                        AND a.timestamp::date <= ?::date
                         ORDER BY a.timestamp
                     """, (class_id, start_date, end_date))
                 else:
@@ -66,7 +66,7 @@ class AttendanceRepository:
                     cursor.execute("""
                         SELECT s.student_number,
                                (s.last_name || ', ' || s.first_name) AS student_name,
-                               (to_char(a.timestamp AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI:SS') || '+08:00') AS timestamp,
+                               (to_char(a.timestamp, 'YYYY-MM-DD"T"HH24:MI:SS') || '+08:00') AS timestamp,
                                ast.status_name
                         FROM attendance_logs a
                         LEFT JOIN students s ON a.student_id = s.student_id

@@ -3,7 +3,7 @@ import shutil
 import logging
 from fastapi import UploadFile
 from deepface import DeepFace
-from datetime import datetime, time as dt_time, timezone
+from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 from models.recognition import RecognitionResponse
 from services.db import get_connection
@@ -21,7 +21,6 @@ from services.face_embeddings import (
 
 LOG = logging.getLogger(__name__)
 MANILA_TZ = ZoneInfo("Asia/Manila")
-ATTENDANCE_TZ = 'Asia/Manila'
 
 
 class RecognitionRepository:
@@ -33,10 +32,12 @@ class RecognitionRepository:
         return bool(database_url) and not database_url.startswith('sqlite')
 
     def _db_timestamp_value(self, local_dt: datetime):
+        # attendance_logs.timestamp is a plain timestamp in both SQLite and Postgres.
+        # Store Manila wall time consistently so date filters do not drift by timezone.
+        manila_dt = local_dt.astimezone(MANILA_TZ)
         if self._is_postgres():
-            return local_dt.astimezone(timezone.utc)
-        # Store SQLite timestamps in Manila local time as naive strings.
-        return local_dt.astimezone(MANILA_TZ).strftime("%Y-%m-%d %H:%M:%S")
+            return manila_dt.replace(tzinfo=None)
+        return manila_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     def _parse_db_timestamp(self, value):
         if isinstance(value, datetime):
@@ -174,10 +175,10 @@ class RecognitionRepository:
         student_name = name_row[0] if name_row else "Unknown"
 
         if self._is_postgres():
-            cursor.execute(f"""
+            cursor.execute("""
                 SELECT timestamp FROM attendance_logs
                 WHERE student_id = ? AND class_id = ?
-                AND ((timestamp AT TIME ZONE '{ATTENDANCE_TZ}')::date = ?::date)
+                AND timestamp::date = ?::date
                 ORDER BY timestamp DESC LIMIT 1
             """, (student_id, class_id, attendance_date))
         else:
@@ -395,7 +396,7 @@ class RecognitionRepository:
                 cursor.execute('''
                     SELECT DISTINCT student_id FROM attendance_logs
                     WHERE class_id = ?
-                    AND ((timestamp AT TIME ZONE 'Asia/Manila')::date = ?::date)
+                    AND timestamp::date = ?::date
                 ''', (class_id, date))
             else:
                 cursor.execute('''

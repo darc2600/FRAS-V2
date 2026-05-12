@@ -2,6 +2,8 @@
 import { Component, OnInit } from '@angular/core';
 import { ApiService } from '../api.service';
 
+const MANILA_TIME_ZONE = 'Asia/Manila';
+
 @Component({
   selector: 'app-attendance-logs',
   templateUrl: './attendance-logs.component.html',
@@ -219,17 +221,34 @@ export class AttendanceLogsComponent implements OnInit {
 
     const parsedDate = new Date(normalized);
     if (!Number.isNaN(parsedDate.getTime())) {
-      return this.toLocalDateString(parsedDate);
+      return this.toManilaDateString(parsedDate);
     }
 
     return normalized;
   }
 
   private toLocalDateString(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return this.toManilaDateString(date);
+  }
+
+  private toManilaDateString(date: Date): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: MANILA_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values['year']}-${values['month']}-${values['day']}`;
+  }
+
+  private formatManilaTime(date: Date): string {
+    return date.toLocaleTimeString('en-US', {
+      timeZone: MANILA_TIME_ZONE,
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   }
 
   toggleDateMode() {
@@ -246,7 +265,7 @@ export class AttendanceLogsComponent implements OnInit {
 
   formatDateTime(dt: string): string {
     const d = new Date(dt);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+    return `${this.toManilaDateString(d)} ${this.formatManilaTime(d)}`;
   }
 
   exportToCSV() {
@@ -264,7 +283,8 @@ export class AttendanceLogsComponent implements OnInit {
     Object.keys(this.groupedLogs).forEach(date => {
       this.groupedLogs[date].forEach(log => {
         const time = this.formatDateTime(log.time);
-        const [dateStr, timeStr] = time.split(' ');
+        const [dateStr, ...timeParts] = time.split(' ');
+        const timeStr = timeParts.join(' ');
         const row = [
           rowNumber++,
           log.studentNumber,

@@ -7,6 +7,8 @@ import { ApiService } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { NavbarComponent } from '../components/navbar/navbar.component';
 
+const MANILA_TIME_ZONE = 'Asia/Manila';
+
 @Component({
   selector: 'app-attendance-monitor',
   templateUrl: './attendance-monitor.component.html',
@@ -160,8 +162,9 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
 
   updateClock() {
     const now = new Date();
-    const timeString = now.toLocaleTimeString();
+    const timeString = now.toLocaleTimeString('en-US', { timeZone: MANILA_TIME_ZONE });
     const dateString = now.toLocaleDateString('en-US', { 
+      timeZone: MANILA_TIME_ZONE,
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
@@ -307,8 +310,7 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
     const dashIndex = this.courseSection.lastIndexOf('-');
     const courseCode = dashIndex >= 0 ? this.courseSection.slice(0, dashIndex) : this.courseSection;
     const section = dashIndex >= 0 ? this.courseSection.slice(dashIndex + 1) : '';
-    // Get today's date in local timezone (not UTC)
-    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
+    const today = this.toManilaDateString(new Date());
     console.log('fetchLogs: Fetching logs for:', courseCode, section, 'date:', today, 'class_id:', this.selectedClassId);
     
     this.api.getAttendance(courseCode, section, undefined, today, today).subscribe(
@@ -342,5 +344,16 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
       bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
     for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
     return new Blob([u8arr], { type: mime });
+  }
+
+  private toManilaDateString(date: Date): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: MANILA_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values['year']}-${values['month']}-${values['day']}`;
   }
 }

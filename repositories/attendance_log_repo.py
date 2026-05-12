@@ -1,4 +1,8 @@
 from services.db import get_connection
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+MANILA_TZ = ZoneInfo("Asia/Manila")
 
 
 def _is_postgres_backend():
@@ -21,23 +25,24 @@ class AttendanceLogRepository:
             status_id = status_row[0]
             
             # Create descriptive note
-            from datetime import datetime
-            note = f"Manually recorded as {status} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            now = datetime.now(MANILA_TZ)
+            timestamp = now.replace(tzinfo=None) if _is_postgres_backend() else now.strftime('%Y-%m-%d %H:%M:%S')
+            note = f"Manually recorded as {status} at {now.strftime('%Y-%m-%d %H:%M:%S')} Manila time"
             
             if _is_postgres_backend():
                 cursor.execute('''
-                    INSERT INTO attendance_logs (student_id, class_id, status_id, notes)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)
+                    VALUES (?, ?, ?, ?, ?)
                     RETURNING log_id
-                ''', (student_id, class_id, status_id, note))
+                ''', (student_id, class_id, timestamp, status_id, note))
                 row = cursor.fetchone()
                 conn.commit()
                 return row[0] if row else None
 
             cursor.execute('''
-                INSERT INTO attendance_logs (student_id, class_id, status_id, notes)
-                VALUES (?, ?, ?, ?)
-            ''', (student_id, class_id, status_id, note))
+                INSERT INTO attendance_logs (student_id, class_id, timestamp, status_id, notes)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (student_id, class_id, timestamp, status_id, note))
             conn.commit()
             try:
                 return cursor.lastrowid
