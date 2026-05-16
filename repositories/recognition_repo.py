@@ -317,7 +317,7 @@ class RecognitionRepository:
                     print(f"[DEBUG] Best embedding match: student_id={best_student_id}, similarity={best_similarity:.4f}, threshold={similarity_threshold:.4f}")
                     if best_student_id is not None and best_similarity >= similarity_threshold:
                         response = self._build_attendance_response(cursor, conn, best_student_id, class_id)
-                        if response.status == "success" and response.attendance_recorded:
+                        if response.status == "success" and getattr(response, "attendance_recorded", False):
                             self._try_upsert_student_embedding(
                                 cursor,
                                 conn,
