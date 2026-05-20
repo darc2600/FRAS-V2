@@ -1,0 +1,11 @@
+file,first_date,first_hash,first_subject,last_date,last_hash,last_subject
+seed_database.py,2025-12-09,a3bca8c0,added attendancce export,2025-12-09,a3bca8c0,added attendancce export
+scripts/cleanup_capstone_database.py,2026-05-05,3d4437e3,database changes, sqlite to postgress migration,2026-05-05,3d4437e3,database changes, sqlite to postgress migration
+services/face_embeddings.py,2026-02-24,0fdaf7db,chore: patch Postgres datetime conversion and face-embedding DDL,2026-02-24,0fdaf7db,chore: patch Postgres datetime conversion and face-embedding DDL
+docker-compose.prod.yml,2026-05-05,3d4437e3,database changes, sqlite to postgress migration,2026-05-05,3d4437e3,database changes, sqlite to postgress migration
+package.json,2025-09-05,64e0c05f,added ionic and app.modules.ts,2025-09-05,64e0c05f,added ionic and app.modules.ts
+fras_index.html,2026-05-11,c099bd00,backend time fix for the UTC issue on attendance time stamp,2026-05-11,c099bd00,backend time fix for the UTC issue on attendance time stamp
+CHANGELOG.md,2026-04-29,002db1f6,docs: add final polish and contributors summary,2026-04-29,002db1f6,docs: add final polish and contributors summary
+docs/FINAL_VERIFICATION_REPORT.md,2026-01-08,97e71ea7,fixed backend error in monitor and can read datasets well,2026-01-08,97e71ea7,fixed backend error in monitor and can read datasets well
+docs/OPERATIONAL_VALIDATION_EVIDENCE.md,2026-04-29,40ee3370,docs: add showcase readme and project setup docs,2026-04-29,40ee3370,docs: add showcase readme and project setup docs
+repositories/,2026-05-16,3130fad8,recognition changes for it to refresh after recognition,2026-05-16,3130fad8,recognition changes for it to refresh after recognition
