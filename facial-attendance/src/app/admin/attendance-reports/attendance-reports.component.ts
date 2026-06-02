@@ -57,7 +57,7 @@ interface SummaryTile {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, HttpClientModule],
   templateUrl: './attendance-reports.component.html',
-  styleUrl: './attendance-reports.component.css'
+  styleUrls: ['./attendance-reports.component.css', '../../shared/status-styles.css']
 })
 export class AttendanceReportsComponent implements OnInit {
   reportForm: FormGroup;
@@ -372,11 +372,13 @@ export class AttendanceReportsComponent implements OnInit {
 
   getStatusBadgeClass(status: string): string {
     switch ((status || '').toLowerCase()) {
-      case 'present': return 'badge-success';
-      case 'absent': return 'badge-danger';
-      case 'late': return 'badge-warning';
-      case 'excused': return 'badge-info';
-      default: return 'badge-secondary';
+      case 'present': return 'status-present';
+      case 'absent': return 'status-absent';
+      case 'late': return 'status-late';
+      case 'excused':
+      case 'excused absence':
+        return 'status-excused';
+      default: return 'status-excused';
     }
   }
 

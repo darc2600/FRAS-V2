@@ -222,28 +222,12 @@ class RecognitionRepository:
                 ORDER BY timestamp DESC LIMIT 1
             """, (student_id, class_id, attendance_date))
         last_attendance_row = cursor.fetchone()
-        buffer_minutes = self.settings.attendance_buffer_minutes
+        should_insert = last_attendance_row is None
 
-        if last_attendance_row is None:
-            should_insert = True
+        if should_insert:
             print(f"[DEBUG] No previous attendance for student {student_id} in class {class_id} today")
         else:
-            last_timestamp = self._parse_db_timestamp(last_attendance_row[0])
-            if last_timestamp is None:
-                should_insert = True
-                print("[DEBUG] Unparseable previous attendance timestamp; allowing insert")
-            else:
-                if last_timestamp.tzinfo:
-                    now_ref = now.astimezone(last_timestamp.tzinfo)
-                else:
-                    now_ref = now.replace(tzinfo=None)
-                time_diff = (now_ref - last_timestamp).total_seconds() / 60.0
-                if time_diff < buffer_minutes:
-                    should_insert = False
-                    print(f"[DEBUG] Duplicate attendance blocked: last check-in {time_diff:.2f} mins ago (< {buffer_minutes} mins buffer)")
-                else:
-                    should_insert = True
-                    print(f"[DEBUG] Allowing attendance: {time_diff:.2f} mins since last check-in (>= {buffer_minutes} mins buffer)")
+            print(f"[DEBUG] Duplicate attendance blocked: student {student_id} already has attendance in class {class_id} today")
 
         recorded = False
         if should_insert:
@@ -261,7 +245,7 @@ class RecognitionRepository:
 
         message = None
         if not recorded:
-            message = f"Attendance already recorded within the last {buffer_minutes} minutes."
+            message = f"Attendance already marked for {student_name}."
             print(f"[DEBUG] Duplicate attendance not inserted for student {student_id} in class {class_id}")
 
         return RecognitionResponse(

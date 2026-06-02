@@ -31,20 +31,20 @@
         </select>
       </div>
       <div class="field">
-        <label>&nbsp;</label>
+        <label>Date Mode:</label>
         <div class="date-mode-toggle">
           <button 
             class="mode-btn" 
             [class.active]="!isDateRangeMode"
             (click)="toggleDateMode()"
-            [disabled]="isDateRangeMode">
+            [disabled]="!isDateRangeMode">
             Single Date
           </button>
           <button 
             class="mode-btn" 
             [class.active]="isDateRangeMode"
             (click)="toggleDateMode()"
-            [disabled]="!isDateRangeMode">
+            [disabled]="isDateRangeMode">
             Date Range
           </button>
         </div>

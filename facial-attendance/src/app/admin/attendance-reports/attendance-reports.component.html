@@ -241,7 +241,7 @@
                       <td>{{ record.student_name }}</td>
                       <td>{{ record.time_in || '—' }}</td>
                       <td>
-                        <span class="badge" [ngClass]="getStatusBadgeClass(record.status)">{{ record.status }}</span>
+                        <span [ngClass]="getStatusBadgeClass(record.status)">{{ record.status }}</span>
                       </td>
                     </tr>
                   </ng-container>
@@ -328,7 +328,7 @@
                           <td>{{ group.date | date:'MMM d, y' }}</td>
                           <td>{{ record.student_name }}</td>
                           <td>{{ record.time_in || '—' }}</td>
-                          <td><span class="badge" [ngClass]="getStatusBadgeClass(record.status)">{{ record.status }}</span></td>
+                          <td><span [ngClass]="getStatusBadgeClass(record.status)">{{ record.status }}</span></td>
                         </tr>
                       </ng-container>
                     </tbody>

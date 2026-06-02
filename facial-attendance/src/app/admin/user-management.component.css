@@ -163,6 +163,10 @@
 .role-lock-text {
   font-size: 0.7rem;
   white-space: nowrap;
+  background: transparent !important;
+  color: #6c757d !important;
+  padding: 0;
+  font-weight: 600;
 }
 
 .badge {
