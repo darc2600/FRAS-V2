@@ -1,0 +1,15 @@
+<section class="v2-filter-bar">
+  <label class="filter-field" *ngFor="let field of fields">
+    <span>{{ field.label }}</span>
+    <input
+      *ngIf="field.type !== 'select'"
+      [type]="field.type === 'search' ? 'search' : 'text'"
+      [(ngModel)]="field.value"
+      (input)="field.type === 'search' && search.emit(field.value || '')" />
+    <select *ngIf="field.type === 'select'" [(ngModel)]="field.value">
+      <option *ngFor="let option of field.options || []" [value]="option">{{ option }}</option>
+    </select>
+  </label>
+
+  <app-v2-action-button label="Apply" variant="secondary" size="sm" (action)="apply.emit(fields)"></app-v2-action-button>
+</section>

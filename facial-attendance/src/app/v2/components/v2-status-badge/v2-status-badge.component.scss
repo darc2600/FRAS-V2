@@ -1,0 +1,21 @@
+.v2-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-table-label);
+  font-weight: var(--font-weight-heavy);
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tone-success { color: var(--color-success); background: var(--color-success-soft); }
+.tone-warning { color: var(--color-warning); background: var(--color-warning-soft); }
+.tone-danger { color: var(--color-danger); background: var(--color-danger-soft); }
+.tone-info { color: var(--color-info); background: var(--color-info-soft); }
+.tone-neutral { color: var(--color-neutral); background: var(--color-neutral-soft); }
+.tone-excused { color: var(--color-excused); background: var(--color-excused-soft); }
+.tone-primary { color: var(--color-primary-maroon); background: var(--color-primary-soft); }

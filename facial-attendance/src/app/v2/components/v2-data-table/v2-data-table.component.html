@@ -1,0 +1,37 @@
+<div class="v2-table-shell">
+  <table>
+    <thead>
+      <tr>
+        <th
+          *ngFor="let column of columns"
+          [style.width]="column.width || null"
+          [class]="'align-' + (column.align || 'left')">
+          {{ column.label }}
+        </th>
+        <th *ngIf="actionLabel" class="align-right">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let row of rows">
+        <td
+          *ngFor="let column of columns"
+          [class]="'align-' + (column.align || 'left')">
+          {{ valueFor(row, column.key) }}
+        </td>
+        <td *ngIf="actionLabel" class="align-right">
+          <app-v2-action-button
+            [label]="actionLabel"
+            variant="primary"
+            size="sm"
+            (action)="rowAction.emit(row)">
+          </app-v2-action-button>
+        </td>
+      </tr>
+      <tr *ngIf="!rows.length">
+        <td class="empty-cell" [attr.colspan]="columns.length + (actionLabel ? 1 : 0)">
+          {{ emptyText }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

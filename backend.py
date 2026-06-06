@@ -706,6 +706,13 @@ for module_name in ['admin', 'auth', 'recognition', 'capture', 'registration', '
     except Exception as e:
         print(f"Warning: could not include {module_name} router: {e}")
 
+try:
+    from v2.api import router as v2_router
+    app.include_router(v2_router)
+    print("✅ v2 router included")
+except Exception as e:
+    print(f"Warning: could not include v2 router: {e}")
+
 # Try direct imports
 try:
     print("Attempting to import auth module...")

@@ -24,6 +24,26 @@ LOG = logging.getLogger(__name__)
 # Read DATABASE_URL at call-time to avoid import-time stale values when containers are recreated
 
 
+def _load_local_env_if_needed():
+    if os.environ.get("DATABASE_URL"):
+        return
+
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    if not os.path.exists(env_path):
+        return
+
+    try:
+        with open(env_path, "r", encoding="utf-8") as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip())
+    except Exception:
+        LOG.exception("Failed to load local .env file")
+
+
 class PGCursorWrapper:
     def __init__(self, cur):
         self._cur = cur
@@ -107,6 +127,7 @@ class PGConnectionWrapper:
 
 def get_connection():
     """Return a connection-like object. Use Postgres if DATABASE_URL is set, otherwise sqlite."""
+    _load_local_env_if_needed()
     # Read env var at call time so recreated containers pick up updated .env
     DATABASE_URL = os.environ.get('DATABASE_URL')
     # If DATABASE_URL explicitly points to a sqlite file use sqlite3

@@ -19,6 +19,10 @@ import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.compo
 import { RoomScheduleEditorComponent } from './room-schedule-editor/room-schedule-editor.component';
 import { ProfileSidebarComponent } from './components/profile-sidebar/profile-sidebar.component';
 import { AuthInterceptor } from './auth.interceptor';
+import { V2UiModule } from './v2/components';
+import { V2TodaysClassesComponent } from './v2/pages/todays-classes/todays-classes.component';
+import { V2LiveSessionComponent } from './v2/pages/live-session/live-session.component';
+import { V2PostSessionReviewPlaceholderComponent } from './v2/pages/post-session-review-placeholder/post-session-review-placeholder.component';
 
 @NgModule({
   declarations: [
@@ -31,6 +35,9 @@ import { AuthInterceptor } from './auth.interceptor';
     ScheduleUploadComponent,
     RoomScheduleEditorComponent,
     ProfileSidebarComponent,
+    V2TodaysClassesComponent,
+    V2LiveSessionComponent,
+    V2PostSessionReviewPlaceholderComponent,
     LoginComponent,
     RegistrationComponent
   ],
@@ -42,6 +49,7 @@ import { AuthInterceptor } from './auth.interceptor';
   HttpClientModule,
   IonicModule.forRoot(),
   WebcamModule,
+  V2UiModule,
   RouterModule.forRoot(routes)
   ],
   providers: [

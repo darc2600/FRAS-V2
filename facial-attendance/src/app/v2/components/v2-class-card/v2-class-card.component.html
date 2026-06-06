@@ -1,0 +1,31 @@
+<article class="v2-class-card" [class.completed]="status === 'completed'">
+  <div class="card-board">
+    <div>
+      <div class="course-code">{{ courseCode }}</div>
+      <h3>{{ courseName }}</h3>
+    </div>
+    <app-v2-status-badge [label]="status.replace('_', ' ')" [tone]="statusTone"></app-v2-status-badge>
+  </div>
+
+  <div class="class-meta">
+    <span>Room {{ room }}</span>
+    <span>{{ schedule }}</span>
+    <span>{{ studentCount }} students</span>
+  </div>
+
+  <div class="class-actions">
+    <app-v2-action-button
+      [label]="primaryActionLabel"
+      [variant]="status === 'completed' ? 'outline' : 'primary'"
+      [disabled]="primaryActionDisabled"
+      (action)="primaryAction.emit()">
+    </app-v2-action-button>
+    <button
+      *ngFor="let action of secondaryActions"
+      class="secondary-action"
+      type="button"
+      (click)="secondaryAction.emit(action)">
+      {{ action }}
+    </button>
+  </div>
+</article>

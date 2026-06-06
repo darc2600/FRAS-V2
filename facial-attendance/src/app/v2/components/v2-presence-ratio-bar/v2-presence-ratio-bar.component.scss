@@ -1,0 +1,38 @@
+.v2-ratio {
+  height: 14px;
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-soft);
+}
+
+.inside { background: var(--color-success); }
+.outside { background: var(--color-danger); }
+.untracked { background: var(--color-neutral); }
+
+.ratio-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.ratio-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+i {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border-radius: var(--radius-circle);
+}
+
+.inside-dot { background: var(--color-success); }
+.outside-dot { background: var(--color-danger); }
+.untracked-dot { background: var(--color-neutral); }

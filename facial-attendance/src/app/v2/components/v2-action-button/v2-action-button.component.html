@@ -1,0 +1,9 @@
+<button
+  class="v2-action-button"
+  [class]="'variant-' + variant + ' size-' + size"
+  [type]="type"
+  [disabled]="disabled"
+  (click)="action.emit()">
+  <span *ngIf="icon" class="button-icon" aria-hidden="true">{{ icon }}</span>
+  <span>{{ label }}</span>
+</button>

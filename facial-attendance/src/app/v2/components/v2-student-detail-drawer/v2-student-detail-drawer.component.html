@@ -1,0 +1,70 @@
+<aside class="v2-drawer" [class.open]="open" aria-label="Student detail">
+  <button class="drawer-close" type="button" (click)="closeDrawer.emit()">×</button>
+  <div class="student-heading">
+    <div class="student-name">{{ studentName }}</div>
+    <div class="student-number">{{ studentNumber }}</div>
+    <app-v2-status-badge [label]="currentStatus" [tone]="currentStatusTone"></app-v2-status-badge>
+  </div>
+
+  <div class="detail-grid">
+    <div class="detail-card">
+      <span>Time In</span>
+      <strong>{{ timeIn || '-' }}</strong>
+    </div>
+    <div class="detail-card">
+      <span>Presence</span>
+      <strong>{{ presenceDuration || '-' }}</strong>
+    </div>
+    <div class="detail-card">
+      <span>Outside</span>
+      <strong>{{ outsideDuration || '-' }}</strong>
+    </div>
+    <div class="detail-card">
+      <span>Breaks</span>
+      <strong>{{ breakCount }}</strong>
+    </div>
+  </div>
+
+  <section class="event-summary">
+    <h3>Activity Summary</h3>
+    <div class="event-log" *ngIf="eventLog.length; else emptyEventLog">
+      <div class="event-row" *ngFor="let item of eventLog">
+        <span>{{ item.time }}</span>
+        <strong>{{ item.label }}</strong>
+      </div>
+    </div>
+    <ng-template #emptyEventLog>
+      <p>No attendance events yet.</p>
+    </ng-template>
+  </section>
+
+  <section class="student-break-control">
+    <div>
+      <span>Student Break Limit</span>
+      <strong *ngIf="activeBreakTimerLabel; else breakReady">{{ activeBreakTimerLabel }}</strong>
+      <ng-template #breakReady><strong>{{ isStudentOut ? 'Break In pending' : 'Set break time' }}</strong></ng-template>
+    </div>
+    <label>
+      <input
+        type="number"
+        min="1"
+        max="120"
+        [ngModel]="breakLimitMinutes"
+        (ngModelChange)="breakLimitMinutesChange.emit($event)" />
+      <span>min</span>
+    </label>
+  </section>
+
+  <div class="drawer-actions">
+    <app-v2-action-button label="Excuse" variant="outline" (action)="markExcused.emit()"></app-v2-action-button>
+    <app-v2-action-button [label]="isStudentOut ? 'Break In' : 'Break Out'" variant="warning" (action)="bathroomBreak.emit()"></app-v2-action-button>
+    <app-v2-action-button label="Override" variant="primary" (action)="toggleOverride()"></app-v2-action-button>
+  </div>
+
+  <div class="quick-override-panel" *ngIf="overrideOpen">
+    <button type="button" class="present" (click)="selectOverride('present')">Present</button>
+    <button type="button" class="absent" (click)="selectOverride('absent')">Absent</button>
+    <button type="button" class="late" (click)="selectOverride('late')">Late</button>
+    <button type="button" class="excused" (click)="selectOverride('excused')">Excused</button>
+  </div>
+</aside>

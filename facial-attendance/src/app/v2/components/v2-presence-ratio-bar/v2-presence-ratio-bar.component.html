@@ -1,0 +1,11 @@
+<div class="v2-ratio" aria-label="Presence ratio">
+  <span class="inside" [style.width.%]="percent(insideSeconds)"></span>
+  <span class="outside" [style.width.%]="percent(outsideSeconds)"></span>
+  <span class="untracked" [style.width.%]="percent(untrackedSeconds)"></span>
+</div>
+
+<div class="ratio-legend" *ngIf="showLegend">
+  <span><i class="inside-dot"></i>Inside {{ percent(insideSeconds) | number:'1.0-0' }}%</span>
+  <span><i class="outside-dot"></i>Outside {{ percent(outsideSeconds) | number:'1.0-0' }}%</span>
+  <span><i class="untracked-dot"></i>Untracked {{ percent(untrackedSeconds) | number:'1.0-0' }}%</span>
+</div>

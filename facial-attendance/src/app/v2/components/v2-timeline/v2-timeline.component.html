@@ -1,0 +1,11 @@
+<ol class="v2-timeline" [class.compact]="compact">
+  <li *ngFor="let event of events" [class]="'tone-' + toneFor(event.type)">
+    <div class="timeline-node"></div>
+    <div class="timeline-time">{{ event.time }}</div>
+    <div class="timeline-card">
+      <div class="timeline-title">{{ event.title }}</div>
+      <p *ngIf="event.description">{{ event.description }}</p>
+      <app-v2-status-badge *ngIf="event.evidenceLabel" [label]="event.evidenceLabel" [tone]="toneFor(event.type)"></app-v2-status-badge>
+    </div>
+  </li>
+</ol>

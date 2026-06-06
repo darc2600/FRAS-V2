@@ -1,0 +1,5 @@
+<article class="v2-stat-card" [class]="'tone-' + tone">
+  <div class="stat-label">{{ label }}</div>
+  <div class="stat-value">{{ value }}</div>
+  <div class="stat-helper" *ngIf="helperText">{{ helperText }}</div>
+</article>

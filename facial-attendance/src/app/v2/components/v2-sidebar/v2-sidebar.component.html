@@ -1,0 +1,28 @@
+<aside class="v2-sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-mark">M</div>
+    <div>
+      <div class="brand-name">{{ brandName }}</div>
+      <div class="product-name">{{ productName }}</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav" aria-label="Professor navigation">
+    <a
+      *ngFor="let item of items"
+      class="sidebar-item"
+      [class.active]="item.active"
+      [routerLink]="item.href || null">
+      <span class="item-icon" aria-hidden="true">{{ item.icon || '' }}</span>
+      <span>{{ item.label }}</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-user" *ngIf="userName">
+    <div class="user-avatar">{{ userInitials || userName.slice(0, 2) }}</div>
+    <div>
+      <div class="user-name">{{ userName }}</div>
+      <div class="user-role">{{ userRole }}</div>
+    </div>
+  </div>
+</aside>

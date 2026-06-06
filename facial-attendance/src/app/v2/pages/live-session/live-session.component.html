@@ -1,0 +1,339 @@
+<section class="v2-page-content live-session-page">
+  <div class="v2-page-topbar">
+    <div class="session-crumb">Classroom Presence Monitoring</div>
+    <app-v2-status-badge
+      [label]="session ? statusLabel(session.session_status) : 'Loading'"
+      [tone]="session ? statusTone(session.session_status) : 'neutral'">
+    </app-v2-status-badge>
+  </div>
+
+  <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading live session...</div>
+  <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
+  <div class="message success" *ngIf="actionMessage">{{ actionMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && detail">
+    <div class="break-navigation-lock" *ngIf="isBreakMode && !breakUnlocked" aria-hidden="true"></div>
+
+    <article class="session-header-card">
+      <div class="session-meta-grid">
+        <div class="meta-box">
+          <span>Course Code</span>
+          <strong>{{ classInfo?.course_code || 'Course' }}</strong>
+          <small>Section {{ classInfo?.section || '-' }}</small>
+        </div>
+        <div class="meta-box wide">
+          <span>Course Name</span>
+          <strong>{{ classInfo?.course_name || 'Course details loading' }}</strong>
+          <small>Laboratory session</small>
+        </div>
+        <div class="meta-box">
+          <span>Room</span>
+          <strong>{{ classInfo?.room || '-' }}</strong>
+        </div>
+        <div class="meta-box">
+          <span>Schedule</span>
+          <strong>{{ formatTime(session?.scheduled_start) }}</strong>
+          <strong class="schedule-end">{{ formatTime(session?.scheduled_end) }}</strong>
+        </div>
+        <div class="meta-box timer-box">
+          <span>Session Timer</span>
+          <strong class="timer">{{ sessionTimerLabel }}</strong>
+        </div>
+        <div class="meta-box">
+          <span>Session Status</span>
+          <strong>{{ statusLabel(session?.session_status || '') }}</strong>
+          <small>Presence monitoring enabled</small>
+        </div>
+      </div>
+
+      <div class="session-header-actions">
+        <app-v2-action-button
+          label="Start Session"
+          variant="outline"
+          [disabled]="session?.session_status === 'in_progress'"
+          (action)="startSession()">
+        </app-v2-action-button>
+        <app-v2-action-button
+          label="End Session"
+          variant="danger"
+          [disabled]="isEnding || session?.session_status === 'under_review' || (isBreakMode && !breakUnlocked)"
+          (action)="endSession()">
+        </app-v2-action-button>
+      </div>
+    </article>
+
+    <div class="workspace-grid">
+      <section class="camera-panel fras-v2-panel">
+        <div class="camera-shell">
+          <div class="recognition-indicator" [class.active]="autoCaptureActive">
+            <span></span>
+            {{ cameraModeLabel }}
+          </div>
+          <div class="camera-id">CAM_FRONT</div>
+          <webcam
+            class="camera-webcam"
+            [trigger]="triggerObservable"
+            (imageCapture)="handleImage($event)">
+          </webcam>
+          <div class="unknown-label" *ngIf="unknownFaceLabel">{{ unknownFaceLabel }}</div>
+          <div class="camera-footer">
+            <span>Camera Status: {{ cameraReady ? 'Capture Ready' : 'Awaiting camera permission' }}</span>
+            <span>Manual capture available</span>
+          </div>
+        </div>
+
+        <div class="activity-grid">
+          <section class="activity-panel">
+            <div class="panel-title">
+              <h2>Recognition Activity</h2>
+              <span>{{ events.length }} events</span>
+            </div>
+
+            <div class="activity-feed" *ngIf="events.length; else emptyEvents">
+              <article class="activity-item" *ngFor="let event of events | slice:0:5">
+                <div class="activity-time">{{ formatTime(event.event_time) }}</div>
+                <div class="activity-copy">
+                  <strong>{{ studentNameForEvent(event) }}</strong>
+                  <span>{{ event.notes || event.event_source }}</span>
+                </div>
+                <app-v2-status-badge [label]="statusLabel(event.event_type)" [tone]="eventTone(event.event_type)"></app-v2-status-badge>
+              </article>
+            </div>
+
+            <ng-template #emptyEvents>
+              <div class="empty-state">No recognition events yet.</div>
+            </ng-template>
+          </section>
+
+          <section class="controls-panel">
+            <div class="panel-title">
+              <h2>Session Controls</h2>
+            </div>
+            <div class="break-mode-card" *ngIf="isBreakMode; else normalSessionControls">
+              <div class="break-status-copy">
+                <span>Session is on break</span>
+                <strong>Return Detection Mode Active</strong>
+                <em *ngIf="breakPreviewMode">Preview mode</em>
+                <p>Students can return through facial recognition only. Professor controls are locked until re-authentication.</p>
+              </div>
+
+              <div class="break-return-grid">
+                <div>
+                  <span>Returned</span>
+                  <strong>{{ returnedFromBreakCount }} / {{ roster.length }}</strong>
+                </div>
+                <div>
+                  <span>Still Outside</span>
+                  <strong>{{ stillOutsideCount }}</strong>
+                </div>
+              </div>
+
+              <div class="break-event-list" *ngIf="breakInEvents.length; else emptyBreakIns">
+                <article *ngFor="let event of breakInEvents | slice:0:3">
+                  <span>{{ formatTime(event.event_time) }}</span>
+                  <strong>{{ studentNameForEvent(event) }}</strong>
+                </article>
+              </div>
+              <ng-template #emptyBreakIns>
+                <div class="break-empty">No Break In events yet.</div>
+              </ng-template>
+
+              <div class="break-unlock" *ngIf="!breakUnlocked; else breakUnlockedControls">
+                <label>
+                  <span>Professor unlock</span>
+                  <input
+                    type="password"
+                    [(ngModel)]="breakUnlockPassword"
+                    placeholder="Enter password"
+                    (keyup.enter)="unlockBreakControls()" />
+                </label>
+                <button type="button" (click)="unlockBreakControls()" [disabled]="isUnlockingBreak">
+                  {{ isUnlockingBreak ? 'Unlocking...' : 'Unlock Controls' }}
+                </button>
+                <small *ngIf="breakUnlockError">{{ breakUnlockError }}</small>
+              </div>
+
+              <ng-template #breakUnlockedControls>
+                <app-v2-action-button
+                  [label]="isBreakEnding ? 'Ending Break...' : 'End Break / Resume Monitoring'"
+                  variant="primary"
+                  size="md"
+                  [disabled]="isBreakEnding"
+                  (action)="endBreak()">
+                </app-v2-action-button>
+              </ng-template>
+            </div>
+
+            <ng-template #normalSessionControls>
+              <div class="control-row">
+              <div class="workflow-control-group">
+                <app-v2-action-button
+                  [label]="autoCaptureActive ? 'Stop Auto Capture' : 'Start Auto Capture'"
+                  class="auto-capture-control"
+                  variant="primary"
+                  size="md"
+                  (action)="toggleAutoCapture()">
+                </app-v2-action-button>
+                <app-v2-action-button
+                  label="Manual Capture"
+                  variant="outline"
+                  size="md"
+                  [disabled]="autoCaptureActive"
+                  (action)="manualCapture()">
+                </app-v2-action-button>
+
+                <app-v2-action-button
+                  [label]="isBreakStarting ? 'Starting Break...' : 'Session Break'"
+                  variant="warning"
+                  size="md"
+                  [disabled]="isBreakStarting"
+                  (action)="startBreak()">
+                </app-v2-action-button>
+
+                <app-v2-action-button label="Manual Attendance" variant="outline" size="md" (action)="manualAttendance()"></app-v2-action-button>
+                <app-v2-action-button
+                  label="End Session"
+                  variant="danger"
+                  size="md"
+                  [disabled]="isEnding"
+                  (action)="endSession()">
+                </app-v2-action-button>
+              </div>
+              </div>
+            </ng-template>
+          </section>
+        </div>
+      </section>
+
+      <aside class="roster-panel fras-v2-panel">
+        <div class="panel-title roster-title">
+          <h2>Live Roster</h2>
+          <span>{{ filteredRoster.length }} students</span>
+        </div>
+
+        <div class="roster-summary">
+          <app-v2-stat-card label="Break" [value]="onBreakCount" tone="break"></app-v2-stat-card>
+          <app-v2-stat-card label="Late" [value]="lateCount" tone="warning"></app-v2-stat-card>
+          <app-v2-stat-card label="Absent" [value]="absentCount" tone="danger"></app-v2-stat-card>
+          <app-v2-stat-card label="Excused" [value]="excusedCount" tone="excused"></app-v2-stat-card>
+          <app-v2-stat-card class="present-summary" label="Present" [value]="presentCount" tone="success"></app-v2-stat-card>
+        </div>
+
+        <label class="roster-search">
+          <input type="search" [(ngModel)]="rosterSearch" placeholder="Search student name or ID..." />
+        </label>
+
+        <div class="student-list" *ngIf="filteredRoster.length; else emptyRoster">
+          <button
+            class="student-row"
+            type="button"
+            *ngFor="let student of filteredRoster"
+            [class.selected]="selectedStudent?.student_id === student.student_id"
+            (click)="selectStudent(student)">
+            <span class="student-avatar">{{ initialsForStudent(student) }}</span>
+            <span class="student-name">
+              <strong>{{ student.student_name }}</strong>
+              <span>{{ student.student_number }}</span>
+            </span>
+            <app-v2-status-badge [label]="studentDisplayStatus(student)" [tone]="studentStatusTone(student)"></app-v2-status-badge>
+          </button>
+        </div>
+
+        <ng-template #emptyRoster>
+          <div class="empty-state">No students match the current search.</div>
+        </ng-template>
+      </aside>
+    </div>
+
+    <app-v2-student-detail-drawer
+      [open]="!!selectedStudent"
+      [studentName]="selectedStudent?.student_name || ''"
+      [studentNumber]="selectedStudent?.student_number || ''"
+      [currentStatus]="selectedStudent ? studentDisplayStatus(selectedStudent) : ''"
+      [currentStatusTone]="selectedStudent ? studentStatusTone(selectedStudent) : 'neutral'"
+      [timeIn]="formatTime(selectedStudent?.time_in)"
+      [presenceDuration]="minutesLabel(selectedStudent?.total_presence_minutes || 0)"
+      [outsideDuration]="minutesLabel(selectedStudent?.total_outside_minutes || 0)"
+      [breakCount]="selectedStudent?.break_count || 0"
+      [breakLimitMinutes]="studentBreakLimitMinutes"
+      [activeBreakTimerLabel]="activeStudentBreakTimerLabel(selectedStudent)"
+      [isStudentOut]="isStudentOut(selectedStudent)"
+      [eventLog]="studentEventLog(selectedStudent)"
+      (closeDrawer)="closeDrawer()"
+      (markExcused)="markExcused()"
+      (bathroomBreak)="bathroomBreak()"
+      (breakLimitMinutesChange)="setStudentBreakLimit($event)"
+      (overrideStatus)="quickOverrideStatus($event)"
+      (updateStatus)="updateStatus()">
+    </app-v2-student-detail-drawer>
+
+    <div
+      class="manual-attendance-backdrop"
+      *ngIf="manualAttendanceOpen"
+      (click)="closeManualAttendanceModal()">
+      <section class="manual-attendance-modal" (click)="$event.stopPropagation()">
+        <header class="manual-modal-header">
+          <div>
+            <h2>Manual Attendance</h2>
+            <span>{{ roster.length }} students</span>
+          </div>
+          <button class="modal-close" type="button" (click)="closeManualAttendanceModal()">×</button>
+        </header>
+
+        <label class="manual-modal-search">
+          <input type="search" [(ngModel)]="manualAttendanceSearch" placeholder="Search student name or ID..." />
+        </label>
+
+        <div class="manual-student-list">
+          <article class="manual-student-row" *ngFor="let student of filteredManualAttendanceRoster">
+            <div class="manual-student-identity">
+              <span class="student-avatar">{{ initialsForStudent(student) }}</span>
+              <div>
+                <strong>{{ student.student_name }}</strong>
+                <span>{{ student.student_number }}</span>
+              </div>
+            </div>
+
+            <div class="manual-status-grid" role="group" [attr.aria-label]="'Manual status for ' + student.student_name">
+              <button
+                type="button"
+                class="manual-status-btn absent"
+                [class.selected]="manualAttendanceStatusFor(student) === 'absent'"
+                (click)="setManualAttendanceStatus(student, 'absent')">
+                <span aria-hidden="true">×</span>
+                Absent
+              </button>
+              <button
+                type="button"
+                class="manual-status-btn excused"
+                [class.selected]="manualAttendanceStatusFor(student) === 'excused'"
+                (click)="setManualAttendanceStatus(student, 'excused')">
+                <span aria-hidden="true">○</span>
+                Excused
+              </button>
+              <button
+                type="button"
+                class="manual-status-btn present"
+                [class.selected]="manualAttendanceStatusFor(student) === 'present'"
+                (click)="setManualAttendanceStatus(student, 'present')">
+                <span aria-hidden="true">✓</span>
+                Present
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <footer class="manual-modal-footer">
+          <button type="button" class="manual-cancel" (click)="closeManualAttendanceModal()" [disabled]="manualAttendanceSaving">Cancel</button>
+          <app-v2-action-button
+            [label]="manualAttendanceSaving ? 'Saving...' : 'Save Attendance'"
+            variant="primary"
+            size="md"
+            [disabled]="manualAttendanceSaving"
+            (action)="saveManualAttendance()">
+          </app-v2-action-button>
+        </footer>
+      </section>
+    </div>
+  </ng-container>
+</section>

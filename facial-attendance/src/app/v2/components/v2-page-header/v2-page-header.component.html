@@ -1,0 +1,16 @@
+<section class="v2-page-header">
+  <div>
+    <h1>{{ title }}</h1>
+    <p *ngIf="subtitle">{{ subtitle }}</p>
+    <div class="metadata" *ngIf="metadata.length">
+      <span *ngFor="let item of metadata">{{ item }}</span>
+    </div>
+  </div>
+
+  <app-v2-action-button
+    *ngIf="primaryActionLabel"
+    [label]="primaryActionLabel"
+    size="lg"
+    (action)="primaryAction.emit()">
+  </app-v2-action-button>
+</section>

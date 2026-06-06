@@ -1,0 +1,23 @@
+<header class="v2-topbar">
+  <div class="topbar-title">{{ title }}</div>
+
+  <nav class="topbar-tabs" *ngIf="tabs.length" aria-label="Page sections">
+    <a
+      *ngFor="let tab of tabs"
+      class="topbar-tab"
+      [class.active]="tab.active"
+      [routerLink]="tab.href || null">
+      {{ tab.label }}
+    </a>
+  </nav>
+
+  <div class="topbar-spacer"></div>
+
+  <label class="topbar-search" *ngIf="searchPlaceholder">
+    <span aria-hidden="true">⌕</span>
+    <input [placeholder]="searchPlaceholder" type="search" />
+  </label>
+
+  <app-v2-status-badge *ngIf="statusLabel" [label]="statusLabel" tone="warning"></app-v2-status-badge>
+  <div class="topbar-avatar" *ngIf="avatarInitials">{{ avatarInitials }}</div>
+</header>

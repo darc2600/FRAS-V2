@@ -1,0 +1,64 @@
+.v2-class-card {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card-lg);
+}
+
+.v2-class-card.completed {
+  opacity: .78;
+}
+
+.card-board {
+  min-height: 132px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-8);
+  background: linear-gradient(135deg, #12201b, #26332d);
+  color: #fff;
+}
+
+.course-code {
+  color: var(--color-accent-yellow);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-black);
+}
+
+h3 {
+  max-width: 360px;
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-panel-title);
+  font-weight: var(--font-weight-black);
+  line-height: 1.25;
+}
+
+.class-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-8) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.class-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-8) var(--space-8);
+}
+
+.secondary-action {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-maroon);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}

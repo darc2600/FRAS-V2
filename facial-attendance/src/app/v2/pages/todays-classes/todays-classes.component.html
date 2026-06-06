@@ -1,0 +1,166 @@
+<section class="v2-page-content today-page">
+  <div class="v2-page-topbar">
+    <label class="page-search">
+      <span aria-hidden="true">⌕</span>
+      <input type="search" placeholder="Search courses or students..." />
+    </label>
+  </div>
+
+      <div class="today-heading">
+        <app-v2-page-header
+          [title]="selectedDateHeading"
+          [subtitle]="'Current time: ' + currentTimeLabel">
+        </app-v2-page-header>
+
+        <div class="heading-tools">
+          <label class="date-control">
+            <span>Date</span>
+            <input type="date" [ngModel]="selectedDate" (ngModelChange)="onDateChange($event)" />
+          </label>
+          <div class="view-toggle" aria-label="View toggle">
+            <button type="button" [class.active]="view === 'cards'" (click)="setView('cards')">Card View</button>
+            <button type="button" [class.active]="view === 'schedule'" (click)="setView('schedule')">Schedule View</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-row" *ngIf="errorMessage || lastSessionId">
+        <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
+        <div class="message success" *ngIf="lastSessionId">Session #{{ lastSessionId }} is ready.</div>
+      </div>
+
+      <div class="priority-grid" *ngIf="view === 'cards'">
+        <article class="focus-card">
+          <div class="focus-copy" *ngIf="focusClass; else noCurrentClass">
+            <div class="focus-label">
+              <span class="pulse" *ngIf="focusClass.status === 'current'"></span>
+              <span>Happening Now</span>
+            </div>
+            <div class="focus-code">{{ focusClass.course_code }}</div>
+            <div class="focus-name">{{ focusClass.course_name }}</div>
+            <div class="focus-meta">
+              <span>{{ formatSchedule(focusClass) }}</span>
+              <span>Room {{ focusClass.room }}</span>
+              <span>{{ focusClass.student_count }} students</span>
+              <span>Section {{ focusClass.section }}</span>
+            </div>
+          </div>
+          <app-v2-action-button
+            *ngIf="focusClass"
+            [label]="actionLabelFor(focusClass)"
+            size="lg"
+            [disabled]="isStartingSession"
+            (action)="handleClassPrimaryAction(focusClass)">
+          </app-v2-action-button>
+
+          <ng-template #noCurrentClass>
+            <div class="focus-copy">
+              <div class="focus-label">No class happening now</div>
+              <div class="focus-code" *ngIf="nextClass">{{ nextClass.course_code }}</div>
+              <div class="focus-name" *ngIf="nextClass">Next class: {{ nextClass.course_name }}</div>
+              <div class="focus-meta" *ngIf="nextClass">
+                <span>{{ nextScheduledLabel || formatScheduleLike(nextClass) }}</span>
+                <span>Room {{ nextClass.room }}</span>
+                <span>{{ nextClass.student_count }} students</span>
+              </div>
+              <div class="focus-name" *ngIf="!nextClass">No assigned classes have been scheduled yet.</div>
+            </div>
+          </ng-template>
+        </article>
+
+        <article class="next-card" *ngIf="nextClass">
+          <div class="next-label">Next Class</div>
+          <div class="next-code">{{ nextClass.course_code }}</div>
+          <div class="next-name">{{ nextClass.course_name }}</div>
+          <div class="next-meta">{{ formatScheduleLike(nextClass) }} · Room {{ nextClass.room }}</div>
+        </article>
+      </div>
+
+      <section *ngIf="view === 'cards'" class="content-grid">
+          <div>
+            <div class="section-row">
+              <h2>Assigned Classes</h2>
+            <span>{{ assignedClasses.length }} total assigned classes</span>
+            </div>
+
+          <div class="class-grid" *ngIf="assignedClasses.length; else emptyClasses">
+            <app-v2-class-card
+              *ngFor="let classItem of assignedClasses"
+              [courseCode]="classItem.course_code"
+              [courseName]="classItem.course_name"
+              [room]="classItem.room"
+              [schedule]="classItem.day_of_week + ' · ' + formatScheduleLike(classItem)"
+              [studentCount]="classItem.student_count"
+              [status]="statusForAssignedClass(classItem)"
+              [primaryActionLabel]="actionLabelForAssignedClass(classItem)"
+              [primaryActionDisabled]="!canStartMonitorForAssignedClass(classItem)"
+              [secondaryActions]="['Student List', 'History']"
+              (primaryAction)="handleAssignedPrimaryAction(classItem)">
+            </app-v2-class-card>
+          </div>
+        </div>
+
+        <aside class="day-panel fras-v2-panel">
+          <h2>Day Schedule</h2>
+          <div class="day-slot" *ngFor="let classItem of allDayClasses">
+            <div class="slot-time">{{ formatTime(classItem.start_time) }}</div>
+            <div class="slot-card" [class.now]="classItem.status === 'current'">
+              <strong>{{ classItem.course_code }}</strong>
+              <span>{{ classItem.section }} · Room {{ classItem.room }}</span>
+              <app-v2-status-badge [label]="classItem.status" [tone]="toneForStatus(classItem.status)"></app-v2-status-badge>
+            </div>
+          </div>
+          <p class="empty-side" *ngIf="!allDayClasses.length">No classes scheduled.</p>
+          <div class="next-mini" *ngIf="!allDayClasses.length && nextClass">
+            <span>Next Class</span>
+            <strong>{{ nextClass.course_code }}</strong>
+            <p>{{ nextScheduledLabel || formatScheduleLike(nextClass) }}</p>
+          </div>
+        </aside>
+      </section>
+
+      <section *ngIf="view === 'schedule'" class="schedule-section">
+        <div class="section-row">
+          <h2>Weekly Schedule</h2>
+        </div>
+
+        <div class="schedule-scroll fras-v2-panel">
+          <div class="week-grid">
+            <div class="grid-head">Time</div>
+            <div class="grid-head" *ngFor="let day of days" [class.today]="isTodayColumn(day)">
+              {{ day }}
+              <small *ngIf="isTodayColumn(day)">Today</small>
+            </div>
+
+            <ng-container *ngFor="let slot of scheduleRows">
+              <div class="time-cell" [class.current-time]="isCurrentTimeSlot(slot)">
+                {{ slotStartLabel(slot) }}
+                <small *ngIf="isCurrentTimeSlot(slot)">Now</small>
+              </div>
+              <div
+                class="day-cell"
+                *ngFor="let day of days"
+                [class.today-col]="isTodayColumn(day)"
+                [class.current-cell]="isCurrentCell(slot, day)">
+                <div
+                  class="schedule-class"
+                  *ngFor="let item of classesForSlotAndDay(slot, day)"
+                  [class.current]="isCurrentCell(slot, day)">
+                  <strong>{{ item.course_code }}</strong>
+                  <span>{{ item.section }}</span>
+                  <span>Room {{ item.room }}</span>
+                </div>
+                <div class="empty-slot" *ngIf="classesForSlotAndDay(slot, day).length === 0"></div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </section>
+
+      <ng-template #emptyClasses>
+        <div class="empty-state fras-v2-panel">
+          <strong>No classes for this date.</strong>
+          <span>The assigned classes list still shows every class handled by this professor.</span>
+        </div>
+      </ng-template>
+</section>

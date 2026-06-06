@@ -10,6 +10,9 @@ import { Input } from '@angular/core';
 })
 export class NavbarComponent implements OnInit {
   @Input() isOpen = true;
+  userName = 'Prof. Maria Santos';
+  userRole = 'SOIT';
+  userInitials = 'MS';
 
   // Permission-based flags
   canMonitor = false;
@@ -30,6 +33,10 @@ export class NavbarComponent implements OnInit {
   ngOnInit(): void {
     this.authService.currentUser$.subscribe(user => {
       if (user) {
+        this.userName = this.displayNameFromEmail(user.email);
+        this.userRole = user.user_type === 'super_admin' ? 'System Administrator' : user.user_type === 'it_admin' ? 'IT Administrator' : 'SOIT';
+        this.userInitials = this.initialsFromName(this.userName);
+
         const permissions = user.permissions || [];
         const isSuperAdmin = user.user_type === 'super_admin';
 
@@ -47,6 +54,10 @@ export class NavbarComponent implements OnInit {
         this.canSubmitSupport = permissions.includes('submit_support');
         this.canManageSupport = permissions.includes('manage_support') || isSuperAdmin;
       } else {
+        this.userName = 'Prof. Maria Santos';
+        this.userRole = 'SOIT';
+        this.userInitials = 'MS';
+
         // Reset all permissions
         this.canMonitor = false;
         this.canViewLogs = false;
@@ -67,5 +78,19 @@ export class NavbarComponent implements OnInit {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  private displayNameFromEmail(email: string): string {
+    if (!email) return 'Prof. Maria Santos';
+    if (email.toLowerCase().includes('maria.santos')) return 'Prof. Maria Santos';
+    const localPart = email.split('@')[0] || email;
+    const words = localPart.split(/[._-]+/).filter(Boolean);
+    const name = words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    return name ? `Prof. ${name}` : 'Prof. Maria Santos';
+  }
+
+  private initialsFromName(name: string): string {
+    const words = name.replace(/^Prof\.\s*/i, '').split(/\s+/).filter(Boolean);
+    return words.slice(0, 2).map(word => word.charAt(0).toUpperCase()).join('') || 'MS';
   }
 }

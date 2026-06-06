@@ -1,6 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import {
+  V2CreateEventRequest,
+  V2ManualAttendanceRequest,
+  V2ProfessorScheduleResponse,
+  V2SessionReviewResponse,
+  V2SessionDetailResponse,
+  V2TodayClassesResponse
+} from './v2/models/v2-attendance.models';
 
 @Injectable({
   providedIn: 'root'
@@ -29,6 +37,53 @@ export class ApiService {
       url += `&end_date=${endDate}`;
     }
     return this.http.get<any>(url);
+  }
+
+  getV2TodayClasses(professorId: number, targetDate?: string): Observable<V2TodayClassesResponse> {
+    let url = `${this.backendUrl}/api/v2/professors/${professorId}/today/classes`;
+    if (targetDate) {
+      url += `?target_date=${encodeURIComponent(targetDate)}`;
+    }
+    return this.http.get<V2TodayClassesResponse>(url);
+  }
+
+  getV2ProfessorSchedule(professorId: number): Observable<V2ProfessorScheduleResponse> {
+    return this.http.get<V2ProfessorScheduleResponse>(`${this.backendUrl}/api/v2/professors/${professorId}/schedule`);
+  }
+
+  startV2Session(classId: number, professorId: number, sessionDate?: string): Observable<V2SessionDetailResponse> {
+    return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/classes/${classId}/sessions/start`, {
+      professor_id: professorId,
+      session_date: sessionDate || null
+    });
+  }
+
+  getV2Session(sessionId: number): Observable<V2SessionDetailResponse> {
+    return this.http.get<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}`);
+  }
+
+  createV2SessionEvent(sessionId: number, payload: V2CreateEventRequest): Observable<V2SessionDetailResponse> {
+    return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/events`, payload);
+  }
+
+  saveV2ManualAttendance(sessionId: number, payload: V2ManualAttendanceRequest): Observable<V2SessionDetailResponse> {
+    return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/manual-attendance`, payload);
+  }
+
+  startV2SessionBreak(sessionId: number): Observable<V2SessionDetailResponse> {
+    return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/break/start`, {});
+  }
+
+  endV2SessionBreak(sessionId: number): Observable<V2SessionDetailResponse> {
+    return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/break/end`, {});
+  }
+
+  endV2Session(sessionId: number): Observable<V2SessionReviewResponse> {
+    return this.http.post<V2SessionReviewResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/end`, {});
+  }
+
+  reauthenticate(email: string, password: string): Observable<any> {
+    return this.http.post<any>(`${this.backendUrl}/api/login`, { email, password });
   }
 
   getRooms(): Observable<any[]> {

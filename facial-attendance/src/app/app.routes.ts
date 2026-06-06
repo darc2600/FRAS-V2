@@ -14,6 +14,9 @@ import { AnalyticsComponent } from './admin/analytics.component';
 import { SupportTicketsComponent } from './admin/support-tickets.component';
 import { AttendanceReportsComponent } from './admin/attendance-reports/attendance-reports.component';
 import { SubmitSupportComponent } from './submit-support.component';
+import { V2TodaysClassesComponent } from './v2/pages/todays-classes/todays-classes.component';
+import { V2LiveSessionComponent } from './v2/pages/live-session/live-session.component';
+import { V2PostSessionReviewPlaceholderComponent } from './v2/pages/post-session-review-placeholder/post-session-review-placeholder.component';
 import { AuthGuard, AdminGuard, AnalyticsGuard } from './auth.guard';
 import { SuperAdminGuard } from './super-admin.guard';
 
@@ -26,6 +29,11 @@ export const routes: Routes = [
   { path: 'register-student', component: RegisterStudentsComponent, canActivate: [AuthGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'registration', component: RegistrationComponent },
+  { path: 'v2/classes', component: V2TodaysClassesComponent },
+  { path: 'v2/today', redirectTo: 'v2/classes', pathMatch: 'full' },
+  { path: 'v2/schedule', component: V2TodaysClassesComponent },
+  { path: 'live-session/:sessionId', component: V2LiveSessionComponent },
+  { path: 'v2/sessions/:sessionId/review', component: V2PostSessionReviewPlaceholderComponent },
 
   // Admin routes (no longer using AdminLayoutComponent)
   { path: 'admin/users', component: UserManagementComponent, canActivate: [AdminGuard] },
