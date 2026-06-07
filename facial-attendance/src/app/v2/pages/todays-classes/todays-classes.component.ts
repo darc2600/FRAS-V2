@@ -157,8 +157,7 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
 
   handleClassPrimaryAction(classItem: V2ClassCard): void {
     if (classItem.status === 'completed') {
-      this.lastSessionId = null;
-      this.errorMessage = 'Session history is not available yet.';
+      this.openClassHistory(classItem.class_id);
       return;
     }
     this.startSession(classItem);
@@ -171,6 +170,16 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
   handleAssignedPrimaryAction(classItem: V2ProfessorScheduleClass): void {
     if (!this.canStartMonitorForAssignedClass(classItem)) return;
     this.startScheduleSession(classItem);
+  }
+
+  handleAssignedSecondaryAction(classItem: V2ProfessorScheduleClass, action: string): void {
+    if (action === 'History') {
+      this.openClassHistory(classItem.class_id);
+      return;
+    }
+    if (action === 'Student List') {
+      this.openClassRoster(classItem.class_id);
+    }
   }
 
   startSessionByClassId(classId: number): void {
@@ -189,6 +198,14 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
         this.isStartingSession = false;
       }
     });
+  }
+
+  openClassHistory(classId: number): void {
+    this.router.navigate(['/classes', classId, 'session-history']);
+  }
+
+  openClassRoster(classId: number): void {
+    this.router.navigate(['/v2/classes', classId, 'students']);
   }
 
   get allDayClasses(): V2ClassCard[] {

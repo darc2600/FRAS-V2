@@ -1,0 +1,153 @@
+<section class="v2-page-content student-history-page">
+  <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading student attendance history...</div>
+  <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && history && header && summary">
+    <div class="breadcrumb">Class Roster / {{ header.student_name }} / Attendance History</div>
+
+    <header class="student-head">
+      <div class="student-avatar">{{ studentInitials(header.student_name) }}</div>
+      <div>
+        <span class="eyebrow">Student Attendance History</span>
+        <h1>{{ header.student_name }}</h1>
+        <div class="context-line">
+          <span>{{ header.student_number }}</span>
+          <span>{{ header.course_code }} - {{ header.course_name }}</span>
+          <span>Section {{ header.section }}</span>
+          <span>Room {{ header.room }}</span>
+        </div>
+      </div>
+      <div class="head-actions">
+        <div class="rate-pill">
+          <span>Attendance Rate</span>
+          <strong>{{ header.attendance_rate }}%</strong>
+        </div>
+        <button type="button" class="back-btn" (click)="backToRoster()">Back to Roster</button>
+      </div>
+    </header>
+
+    <section class="summary-grid" aria-label="Student attendance summary">
+      <article class="metric-card rate">
+        <span>Attendance Rate</span>
+        <strong>{{ summary.attendance_rate }}%</strong>
+        <em>Present, late, partial, and excused sessions</em>
+      </article>
+      <article class="metric-card">
+        <span>Total Sessions</span>
+        <strong>{{ summary.total_sessions }}</strong>
+        <em>Recorded class sessions</em>
+      </article>
+      <article class="metric-card">
+        <span>Present</span>
+        <strong>{{ summary.present_sessions }}</strong>
+        <em>Valid presence records</em>
+      </article>
+      <article class="metric-card warning">
+        <span>Late</span>
+        <strong>{{ summary.late_sessions }}</strong>
+        <em>Late arrival records</em>
+      </article>
+      <article class="metric-card warning">
+        <span>Partial</span>
+        <strong>{{ summary.partial_sessions }}</strong>
+        <em>Presence warning records</em>
+      </article>
+      <article class="metric-card danger">
+        <span>Absent</span>
+        <strong>{{ summary.absent_sessions }}</strong>
+        <em>No valid time-in recorded</em>
+      </article>
+      <article class="metric-card excused">
+        <span>Excused</span>
+        <strong>{{ summary.excused_sessions }}</strong>
+        <em>Professor-approved exceptions</em>
+      </article>
+    </section>
+
+    <section class="filters-panel" aria-label="Student attendance filters">
+      <label>
+        <span>Date From</span>
+        <input type="date" [(ngModel)]="filterStartDate" />
+      </label>
+      <label>
+        <span>Date To</span>
+        <input type="date" [(ngModel)]="filterEndDate" />
+      </label>
+      <label>
+        <span>Attendance Status</span>
+        <select [(ngModel)]="statusFilter">
+          <option value="all">All Statuses</option>
+          <option value="present">Present</option>
+          <option value="late">Late</option>
+          <option value="partial">Partial</option>
+          <option value="absent">Absent</option>
+          <option value="excused">Excused</option>
+        </select>
+      </label>
+      <label>
+        <span>Assessment Type</span>
+        <select [(ngModel)]="assessmentFilter">
+          <option value="all">All Assessments</option>
+          <option value="valid_presence">Valid Presence</option>
+          <option value="attendance_warning">Attendance Warning</option>
+          <option value="requires_review">Requires Review</option>
+          <option value="absent">Absent</option>
+        </select>
+      </label>
+      <button type="button" (click)="applyFilters()">Apply Filters</button>
+      <button type="button" class="clear-btn" (click)="clearFilters()">Clear</button>
+    </section>
+
+    <section class="table-shell" *ngIf="filteredRecords.length; else emptyHistory">
+      <div class="table-scroll">
+        <table aria-label="Student attendance history">
+          <thead>
+            <tr>
+              <th>Session Date</th>
+              <th>Time Range</th>
+              <th>Attendance Status</th>
+              <th>Presence Duration</th>
+              <th>Outside Duration</th>
+              <th>Break Count</th>
+              <th>System Assessment</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of filteredRecords" [class.review]="row.system_assessment === 'requires_review'">
+              <td class="date-cell">
+                <strong>{{ formatDate(row.session_date) }}</strong>
+              </td>
+              <td class="time-cell">
+                <strong>{{ formatTime(row.scheduled_start) }}</strong>
+                <span>{{ formatTime(row.scheduled_end) }}</span>
+              </td>
+              <td>
+                <app-v2-status-badge [label]="statusLabel(row.attendance_status)" [tone]="statusTone(row.attendance_status)"></app-v2-status-badge>
+              </td>
+              <td class="duration-cell">{{ minutesLabel(row.presence_duration_minutes) }}</td>
+              <td class="duration-cell" [class.warn]="row.outside_duration_minutes > 30">{{ minutesLabel(row.outside_duration_minutes) }}</td>
+              <td class="duration-cell">{{ row.break_count }}</td>
+              <td>
+                <app-v2-status-badge [label]="assessmentLabel(row.system_assessment)" [tone]="assessmentTone(row.system_assessment)"></app-v2-status-badge>
+              </td>
+              <td>
+                <button type="button" class="evidence-btn" (click)="viewSessionEvidence(row)">View Session Evidence</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <footer class="table-foot">
+        Showing {{ filteredRecords.length }} of {{ history.records.length }} sessions
+      </footer>
+    </section>
+
+    <ng-template #emptyHistory>
+      <div class="empty-state fras-v2-panel">
+        <strong>No attendance records match the current filters.</strong>
+        <span>Student history appears here after class monitoring sessions are created.</span>
+      </div>
+    </ng-template>
+  </ng-container>
+</section>

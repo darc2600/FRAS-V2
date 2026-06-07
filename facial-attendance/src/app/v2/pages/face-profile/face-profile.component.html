@@ -1,0 +1,118 @@
+<section class="v2-page-content face-page">
+  <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading face profile...</div>
+  <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
+  <div class="message success" *ngIf="successMessage">{{ successMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && context">
+    <div class="breadcrumb">Class Roster / {{ context.student_name }} / Face Profile Registration</div>
+
+    <header class="page-head">
+      <div>
+        <span class="eyebrow">Professor Face Profile Maintenance</span>
+        <h1>{{ pageTitle }}</h1>
+        <div class="context-line">
+          <span>{{ context.student_number }}</span>
+          <span>{{ context.course_code }} - {{ context.course_name }}</span>
+          <span>Section {{ context.section }}</span>
+          <span>Room {{ context.room }}</span>
+          <span>Last update: {{ formatDate(context.last_face_update) }}</span>
+        </div>
+      </div>
+      <app-v2-status-badge [label]="faceStatusLabel(context.face_profile_status)" [tone]="faceTone(context.face_profile_status)"></app-v2-status-badge>
+    </header>
+
+    <section class="capture-layout">
+      <article class="camera-panel">
+        <div class="camera-stage" [class.ready]="cameraReady">
+          <video #videoEl playsinline muted></video>
+          <div class="camera-placeholder" *ngIf="!cameraReady">
+            <strong>Camera Preview</strong>
+            <span>Allow camera permission to begin capture.</span>
+          </div>
+          <div class="face-guide">
+            <span></span>
+          </div>
+          <div class="camera-chip" [class.active]="cameraReady">
+            <i></i>
+            {{ cameraReady ? 'Camera Active' : 'Camera Standby' }}
+          </div>
+          <div class="camera-footer">
+            <strong>{{ currentAngle.label }}</strong>
+            <span>{{ currentAngle.instruction }}</span>
+          </div>
+        </div>
+
+        <canvas #canvasEl class="hidden-canvas"></canvas>
+
+        <div class="controls-grid">
+          <button type="button" class="primary" [disabled]="!cameraReady" (click)="captureCurrentFrame()">Capture Frame</button>
+          <button type="button" (click)="retakeCurrentAngle()" [disabled]="currentAngle.status !== 'captured'">Retake Current Angle</button>
+          <button type="button" (click)="resetCaptures()" [disabled]="capturedCount === 0">Reset Captures</button>
+          <button type="button" class="save" [disabled]="!allCaptured || isSaving" (click)="saveFaceProfile()">
+            {{ isSaving ? 'Saving...' : 'Save Face Profile' }}
+          </button>
+          <button type="button" class="back" (click)="backToRoster()">Back to Student List</button>
+        </div>
+      </article>
+
+      <aside class="side-panels">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Five-Angle Capture</h2>
+            <span>{{ capturedCount }}/{{ angles.length }}</span>
+          </div>
+          <div class="angle-list">
+            <button
+              type="button"
+              *ngFor="let angle of angles; let index = index"
+              [class.active]="index === currentAngleIndex"
+              [class.captured]="angle.status === 'captured'"
+              (click)="selectAngle(index)">
+              <span>{{ angle.label }}</span>
+              <app-v2-status-badge
+                [label]="angle.status === 'captured' ? 'Captured' : 'Pending'"
+                [tone]="angle.status === 'captured' ? 'success' : 'neutral'">
+              </app-v2-status-badge>
+              <img *ngIf="angle.previewUrl" [src]="angle.previewUrl" [alt]="angle.label + ' preview'" />
+            </button>
+          </div>
+        </section>
+
+        <section class="panel quality-panel">
+          <div class="panel-head">
+            <h2>Recognition Quality</h2>
+            <app-v2-status-badge [label]="qualityStatus" [tone]="qualityTone()"></app-v2-status-badge>
+          </div>
+          <div class="quality-meter">
+            <strong>{{ recognitionQuality }}%</strong>
+            <span><i [style.width.%]="recognitionQuality"></i></span>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Environmental Checks</h2>
+          </div>
+          <div class="check-list">
+            <div>
+              <span>Lighting Condition</span>
+              <strong>{{ lightingScore >= 45 ? 'Acceptable' : capturedCount ? 'Needs Improvement' : 'Waiting for capture' }}</strong>
+            </div>
+            <div>
+              <span>Face Position</span>
+              <strong>{{ cameraReady ? 'Use guide frame' : 'Camera inactive' }}</strong>
+            </div>
+            <div>
+              <span>Angle Variation</span>
+              <strong>{{ allCaptured ? 'Complete' : capturedCount + ' captured' }}</strong>
+            </div>
+            <div>
+              <span>Occlusion Warning</span>
+              <strong>Manual review</strong>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </ng-container>
+</section>

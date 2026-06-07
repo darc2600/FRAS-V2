@@ -141,3 +141,142 @@ export interface V2SessionReviewResponse {
   };
   roster: V2StudentRecord[];
 }
+
+export type V2HistorySessionStatus = 'completed' | 'needs_review' | 'in_progress';
+
+export interface V2SessionHistoryResponse {
+  class_context?: {
+    class_id: number;
+    course_code: string;
+    course_name: string;
+    section: string;
+    room: string;
+    professor_name: string;
+  } | null;
+  summary: {
+    total_sessions: number;
+    average_attendance_rate: number;
+    average_presence_minutes: number;
+    sessions_requiring_review: number;
+    excused_students: number;
+  };
+  sessions: Array<{
+    session_id: number;
+    date: string;
+    scheduled_start: string;
+    scheduled_end: string;
+    attendance_count: number;
+    total_students: number;
+    attendance_rate: number;
+    average_presence_minutes: number;
+    warning_count: number;
+    excused_count: number;
+    status: V2HistorySessionStatus;
+  }>;
+}
+
+export type V2FaceProfileStatus = 'registered' | 'needs_update' | 'no_face_profile';
+export type V2RecognitionStatus = 'active' | 'low_confidence' | 'not_recognized_recently' | 'not_available';
+
+export interface V2ClassRosterResponse {
+  class_context: {
+    class_id: number;
+    course_code: string;
+    course_name: string;
+    section: string;
+    room: string;
+    professor_name: string;
+    student_count: number;
+  };
+  students: V2ClassRosterStudent[];
+}
+
+export interface V2ClassRosterStudent {
+  student_id: number;
+  student_number: string;
+  student_name: string;
+  email?: string | null;
+  face_profile_status: V2FaceProfileStatus;
+  recognition_status: V2RecognitionStatus;
+  attendance_rate: number;
+  last_face_update?: string | null;
+  recognition_confidence?: number | null;
+  total_sessions: number;
+  present_sessions: number;
+  late_sessions: number;
+  partial_sessions: number;
+  absent_sessions: number;
+  excused_sessions: number;
+  recent_history: Array<{
+    session_id: number;
+    session_date: string;
+    status: string;
+    note: string;
+  }>;
+}
+
+export interface V2StudentClassHistoryResponse {
+  header: {
+    class_id: number;
+    student_id: number;
+    student_name: string;
+    student_number: string;
+    course_code: string;
+    course_name: string;
+    section: string;
+    room: string;
+    attendance_rate: number;
+  };
+  summary: {
+    total_sessions: number;
+    present_sessions: number;
+    late_sessions: number;
+    partial_sessions: number;
+    absent_sessions: number;
+    excused_sessions: number;
+    attendance_rate: number;
+  };
+  records: V2StudentClassHistoryRecord[];
+}
+
+export interface V2StudentClassHistoryRecord {
+  session_id: number;
+  session_date: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  attendance_status: string;
+  presence_duration_minutes: number;
+  outside_duration_minutes: number;
+  break_count: number;
+  system_assessment: string;
+}
+
+export interface V2FaceProfileContextResponse {
+  class_id: number;
+  student_id: number;
+  student_name: string;
+  student_number: string;
+  course_code: string;
+  course_name: string;
+  section: string;
+  room: string;
+  face_profile_status: V2FaceProfileStatus;
+  last_face_update?: string | null;
+}
+
+export interface V2FaceProfileSaveResponse {
+  status: string;
+  message: string;
+  student_id: number;
+  face_profile_status: V2FaceProfileStatus;
+  saved_angles: string[];
+  image_paths: string[];
+}
+
+export interface V2RecognitionMatchResponse {
+  status: 'success' | 'failed' | 'error';
+  message?: string | null;
+  student_id?: number | null;
+  student_name?: string | null;
+  confidence?: number | null;
+}

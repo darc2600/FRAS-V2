@@ -154,3 +154,151 @@ class V2SessionReviewResponse(BaseModel):
     session: V2SessionResponse
     summary: V2ReviewSummary
     roster: list[V2StudentRecord]
+
+
+class V2SessionHistoryClassContext(BaseModel):
+    class_id: int
+    course_code: str
+    course_name: str
+    section: str
+    room: str
+    professor_name: str
+
+
+class V2SessionHistoryRow(BaseModel):
+    session_id: int
+    date: date
+    scheduled_start: datetime
+    scheduled_end: datetime
+    attendance_count: int
+    total_students: int
+    attendance_rate: float
+    average_presence_minutes: int
+    warning_count: int
+    excused_count: int
+    status: Literal["completed", "needs_review", "in_progress"]
+
+
+class V2SessionHistorySummary(BaseModel):
+    total_sessions: int
+    average_attendance_rate: float
+    average_presence_minutes: int
+    sessions_requiring_review: int
+    excused_students: int
+
+
+class V2SessionHistoryResponse(BaseModel):
+    class_context: Optional[V2SessionHistoryClassContext] = None
+    summary: V2SessionHistorySummary
+    sessions: list[V2SessionHistoryRow]
+
+
+class V2ClassRosterContext(BaseModel):
+    class_id: int
+    course_code: str
+    course_name: str
+    section: str
+    room: str
+    professor_name: str
+    student_count: int
+
+
+class V2ClassRosterHistoryItem(BaseModel):
+    session_id: int
+    session_date: date
+    status: str
+    note: str
+
+
+class V2ClassRosterStudent(BaseModel):
+    student_id: int
+    student_number: str
+    student_name: str
+    email: Optional[str] = None
+    face_profile_status: Literal["registered", "needs_update", "no_face_profile"]
+    recognition_status: Literal["active", "low_confidence", "not_recognized_recently", "not_available"]
+    attendance_rate: float
+    last_face_update: Optional[datetime] = None
+    recognition_confidence: Optional[float] = None
+    total_sessions: int
+    present_sessions: int
+    late_sessions: int
+    partial_sessions: int
+    absent_sessions: int
+    excused_sessions: int
+    recent_history: list[V2ClassRosterHistoryItem]
+
+
+class V2ClassRosterResponse(BaseModel):
+    class_context: V2ClassRosterContext
+    students: list[V2ClassRosterStudent]
+
+
+class V2StudentClassHistoryHeader(BaseModel):
+    class_id: int
+    student_id: int
+    student_name: str
+    student_number: str
+    course_code: str
+    course_name: str
+    section: str
+    room: str
+    attendance_rate: float
+
+
+class V2StudentClassHistorySummary(BaseModel):
+    total_sessions: int
+    present_sessions: int
+    late_sessions: int
+    partial_sessions: int
+    absent_sessions: int
+    excused_sessions: int
+    attendance_rate: float
+
+
+class V2StudentClassHistoryRow(BaseModel):
+    session_id: int
+    session_date: date
+    scheduled_start: datetime
+    scheduled_end: datetime
+    attendance_status: str
+    presence_duration_minutes: int
+    outside_duration_minutes: int
+    break_count: int
+    system_assessment: str
+
+
+class V2StudentClassHistoryResponse(BaseModel):
+    header: V2StudentClassHistoryHeader
+    summary: V2StudentClassHistorySummary
+    records: list[V2StudentClassHistoryRow]
+
+
+class V2FaceProfileContextResponse(BaseModel):
+    class_id: int
+    student_id: int
+    student_name: str
+    student_number: str
+    course_code: str
+    course_name: str
+    section: str
+    room: str
+    face_profile_status: Literal["registered", "needs_update", "no_face_profile"]
+    last_face_update: Optional[datetime] = None
+
+
+class V2FaceProfileSaveResponse(BaseModel):
+    status: str
+    message: str
+    student_id: int
+    face_profile_status: Literal["registered", "needs_update", "no_face_profile"]
+    saved_angles: list[str]
+    image_paths: list[str]
+
+
+class V2RecognitionMatchResponse(BaseModel):
+    status: Literal["success", "failed", "error"]
+    message: Optional[str] = None
+    student_id: Optional[int] = None
+    student_name: Optional[str] = None
+    confidence: Optional[float] = Field(default=None, ge=0, le=100)

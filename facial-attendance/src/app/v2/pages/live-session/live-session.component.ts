@@ -10,6 +10,7 @@ import {
   V2ManualAttendanceStatus,
   V2ProfessorScheduleClass,
   V2ProfessorScheduleResponse,
+  V2RecognitionMatchResponse,
   V2SessionDetailResponse,
   V2StudentRecord
 } from '../../models/v2-attendance.models';
@@ -50,7 +51,11 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
   webcamImage: WebcamImage | null = null;
   now = new Date();
   private timer: any;
+  private autoCaptureTimer: any;
   private trigger: Subject<void> = new Subject<void>();
+  private pendingCaptureMode: 'manual' | 'auto' = 'manual';
+  private recognitionInFlight = false;
+  private lastAutoEventAt: Record<number, number> = {};
 
   constructor(
     private route: ActivatedRoute,
@@ -68,6 +73,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    this.stopAutoCaptureLoop();
     document.removeEventListener('keydown', this.handleKeyDown);
   }
 
@@ -90,7 +96,10 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
         this.selectedStudent = null;
         if (this.isBreakMode) {
           this.autoCaptureActive = true;
+          this.startAutoCaptureLoop();
           this.breakUnlocked = false;
+        } else {
+          this.stopAutoCaptureLoop();
         }
         this.isLoading = false;
       },
@@ -221,29 +230,28 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
       this.actionMessage = 'Manual capture is paused while auto capture is active.';
       return;
     }
+    this.pendingCaptureMode = 'manual';
     this.trigger.next();
-    if (this.selectedStudent) {
-      this.createStudentEvent('manual_capture', 'Manual capture recorded. Camera recognition is not connected yet.');
-      return;
-    }
-    this.actionMessage = 'Manual capture requested. Select a student to attach the capture as an attendance event.';
+    this.actionMessage = 'Manual capture requested. Checking face recognition...';
   }
 
   handleImage(webcamImage: WebcamImage): void {
     this.webcamImage = webcamImage;
     this.cameraReady = true;
-    this.actionMessage = 'Manual camera capture received.';
+    this.processCapturedFrame(webcamImage, this.pendingCaptureMode);
   }
 
   startAutoCapture(): void {
     this.autoCaptureActive = true;
+    this.startAutoCaptureLoop();
     this.actionMessage = this.isBreakMode
       ? 'Return Detection Mode is active. Only Break In events should be recorded during Session Break.'
-      : 'Auto capture placeholder is active. Camera integration will be connected later.';
+      : 'Auto Capture is active. Face recognition will run automatically.';
   }
 
   stopAutoCapture(): void {
     this.autoCaptureActive = false;
+    this.stopAutoCaptureLoop();
     this.actionMessage = 'Auto capture stopped.';
   }
 
@@ -263,6 +271,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
       next: (detail) => {
         this.detail = detail;
         this.autoCaptureActive = true;
+        this.startAutoCaptureLoop();
         this.breakUnlocked = false;
         this.breakUnlockPassword = '';
         this.breakUnlockError = '';
@@ -320,6 +329,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
       next: (detail) => {
         this.detail = detail;
         this.autoCaptureActive = true;
+        this.startAutoCaptureLoop();
         this.breakUnlocked = false;
         this.isBreakEnding = false;
         this.actionMessage = 'Session Break ended. Regular monitoring resumed.';
@@ -462,7 +472,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     this.api.endV2Session(this.sessionId).subscribe({
       next: () => {
         this.isEnding = false;
-        this.router.navigate(['/v2/sessions', this.sessionId, 'review']);
+        this.router.navigate(['/session-review', this.sessionId]);
       },
       error: () => {
         this.isEnding = false;
@@ -623,6 +633,134 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     });
   }
 
+  private processCapturedFrame(webcamImage: WebcamImage, mode: 'manual' | 'auto'): void {
+    if (!this.session?.class_id || this.recognitionInFlight) return;
+    if (mode === 'auto' && !this.autoCaptureActive) return;
+
+    const imageFile = this.webcamImageToFile(webcamImage);
+    if (!imageFile) {
+      this.actionMessage = 'Unable to read the camera frame.';
+      return;
+    }
+
+    this.recognitionInFlight = true;
+    this.unknownFaceLabel = '';
+    this.api.recognizeV2Face(this.session.class_id, imageFile).subscribe({
+      next: (result) => {
+        this.recognitionInFlight = false;
+        this.handleRecognitionResult(result, mode);
+      },
+      error: (error) => {
+        this.recognitionInFlight = false;
+        this.unknownFaceLabel = 'Recognition unavailable';
+        if (mode === 'manual') {
+          this.errorMessage = this.apiErrorMessage(error, 'Unable to run face recognition.');
+        }
+      }
+    });
+  }
+
+  private handleRecognitionResult(result: V2RecognitionMatchResponse, mode: 'manual' | 'auto'): void {
+    if (result.status !== 'success' || !result.student_id) {
+      this.unknownFaceLabel = result.message || 'Unknown face';
+      if (mode === 'manual') {
+        this.actionMessage = result.message || 'No student matched this capture.';
+      }
+      return;
+    }
+
+    const student = this.roster.find((item) => item.student_id === result.student_id);
+    if (!student) {
+      this.unknownFaceLabel = 'Student not in this session';
+      if (mode === 'manual') {
+        this.actionMessage = 'Recognized student is not enrolled in this session.';
+      }
+      return;
+    }
+
+    const eventType = this.recognitionEventTypeFor(student);
+    if (!eventType) {
+      this.actionMessage = `${student.student_name} recognized. No new attendance event was needed.`;
+      return;
+    }
+
+    if (mode === 'auto' && this.isRecentAutoEvent(student.student_id)) return;
+    this.createRecognitionEventForStudent(student, eventType, result.confidence ?? null, mode);
+  }
+
+  private recognitionEventTypeFor(student: V2StudentRecord): V2CreateEventRequest['event_type'] | null {
+    const lastEvent = this.lastStudentEvent(student.student_id);
+    if (this.isBreakMode) {
+      return lastEvent?.event_type === 'break_out' ? 'break_in' : null;
+    }
+    if (lastEvent?.event_type === 'break_out') return 'break_in';
+    if (!student.time_in) return 'time_in';
+    return null;
+  }
+
+  private createRecognitionEventForStudent(
+    student: V2StudentRecord,
+    eventType: V2CreateEventRequest['event_type'],
+    confidence: number | null,
+    mode: 'manual' | 'auto'
+  ): void {
+    this.api.createV2SessionEvent(this.sessionId, {
+      student_id: student.student_id,
+      event_type: eventType,
+      event_source: 'facial_recognition',
+      recognition_confidence: confidence,
+      notes: `${mode === 'auto' ? 'Auto Capture' : 'Manual Capture'} recognized ${student.student_name}.`
+    }).subscribe({
+      next: (detail) => {
+        this.detail = detail;
+        this.selectedStudent = this.selectedStudent
+          ? this.roster.find((item) => item.student_id === this.selectedStudent?.student_id) || null
+          : null;
+        this.lastAutoEventAt[student.student_id] = Date.now();
+        this.actionMessage = `${this.statusLabel(eventType)} recorded for ${student.student_name}.`;
+      },
+      error: (error) => {
+        this.errorMessage = this.apiErrorMessage(error, `Unable to record ${this.statusLabel(eventType)}.`);
+      }
+    });
+  }
+
+  private webcamImageToFile(webcamImage: WebcamImage): File | null {
+    const dataUrl = webcamImage.imageAsDataUrl;
+    const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+    if (!match) return null;
+    const mimeType = match[1];
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new File([bytes], `v2-session-${this.sessionId}-${Date.now()}.jpg`, { type: mimeType });
+  }
+
+  private startAutoCaptureLoop(): void {
+    this.stopAutoCaptureLoop();
+    this.pendingCaptureMode = 'auto';
+    this.trigger.next();
+    this.autoCaptureTimer = setInterval(() => {
+      if (!this.autoCaptureActive || this.recognitionInFlight) return;
+      this.pendingCaptureMode = 'auto';
+      this.trigger.next();
+    }, 5000);
+  }
+
+  private stopAutoCaptureLoop(): void {
+    if (this.autoCaptureTimer) {
+      clearInterval(this.autoCaptureTimer);
+      this.autoCaptureTimer = null;
+    }
+  }
+
+  private isRecentAutoEvent(studentId: number): boolean {
+    const previous = this.lastAutoEventAt[studentId] || 0;
+    return Date.now() - previous < 30000;
+  }
+
   private lastStudentEvent(studentId: number): V2AttendanceEvent | null {
     return this.events.find((event) => event.student_id === studentId && !event.is_voided) || null;
   }
@@ -668,6 +806,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     };
     this.breakPreviewMode = true;
     this.autoCaptureActive = true;
+    this.startAutoCaptureLoop();
     this.breakUnlocked = false;
     this.breakUnlockPassword = '';
     this.breakUnlockError = '';
@@ -688,6 +827,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     this.breakPreviewMode = false;
     this.breakUnlocked = false;
     this.autoCaptureActive = true;
+    this.startAutoCaptureLoop();
     this.actionMessage = 'Session Break preview ended. Regular monitoring resumed.';
   }
 

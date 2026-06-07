@@ -1,0 +1,154 @@
+<section class="v2-page-content history-page">
+  <div class="v2-page-topbar">
+    <div class="section-tabs">
+      <strong>Attendance Suite</strong>
+      <span>Term Overview</span>
+      <span class="active">Session History</span>
+      <span>Reports</span>
+    </div>
+  </div>
+
+  <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading session history...</div>
+  <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && history">
+    <header class="page-head">
+      <div>
+        <h1>Session History</h1>
+        <div class="context-line" *ngIf="context">
+          <span>{{ context.course_code }} - {{ context.course_name }}</span>
+          <span>Section {{ context.section }}</span>
+          <span>Room {{ context.room }}</span>
+          <span>{{ context.professor_name }}</span>
+        </div>
+      </div>
+      <button type="button" class="export-btn" [disabled]="!filteredSessions.length" (click)="exportFullHistory()">Export Full History</button>
+    </header>
+
+    <section class="summary-grid">
+      <article class="metric-card">
+        <span>Total Sessions</span>
+        <strong>{{ summary?.total_sessions || 0 }}</strong>
+        <em>Current class records</em>
+      </article>
+      <article class="metric-card">
+        <span>Average Attendance Rate</span>
+        <strong>{{ summary?.average_attendance_rate || 0 }}%</strong>
+        <em>Across recorded sessions</em>
+      </article>
+      <article class="metric-card">
+        <span>Average Presence Duration</span>
+        <strong>{{ minutesLabel(summary?.average_presence_minutes || 0) }}</strong>
+        <em>Inside classroom per session</em>
+      </article>
+      <article class="metric-card warning">
+        <span>Sessions Requiring Review</span>
+        <strong>{{ summary?.sessions_requiring_review || 0 }}</strong>
+        <em>Warnings or review-needed sessions</em>
+      </article>
+      <article class="metric-card">
+        <span>Excused Students</span>
+        <strong>{{ summary?.excused_students || 0 }}</strong>
+        <em>Across historical sessions</em>
+      </article>
+    </section>
+
+    <section class="filters-panel" aria-label="Session filters">
+      <label>
+        <span>Date From</span>
+        <input type="date" [(ngModel)]="filterStartDate" />
+      </label>
+      <label>
+        <span>Date To</span>
+        <input type="date" [(ngModel)]="filterEndDate" />
+      </label>
+      <label>
+        <span>Attendance Percentage</span>
+        <select [(ngModel)]="rateFilter">
+          <option value="all">All Rates</option>
+          <option value="below80">Below 80%</option>
+          <option value="80to90">80% to 90%</option>
+          <option value="above90">Above 90%</option>
+        </select>
+      </label>
+      <label>
+        <span>Session Status</span>
+        <select [(ngModel)]="statusFilter">
+          <option value="all">All Statuses</option>
+          <option value="completed">Completed</option>
+          <option value="needs_review">Needs Review</option>
+          <option value="in_progress">In Progress</option>
+        </select>
+      </label>
+      <label>
+        <span>Review Flag</span>
+        <select [(ngModel)]="reviewFilter">
+          <option value="all">All Sessions</option>
+          <option value="review">Warnings only</option>
+          <option value="clean">No warnings</option>
+        </select>
+      </label>
+      <button type="button" (click)="applyFilters()">Apply Filters</button>
+    </section>
+
+    <section class="table-shell" *ngIf="filteredSessions.length; else emptyHistory">
+      <div class="table-scroll">
+        <table aria-label="Historical attendance sessions">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time Range</th>
+              <th>Attendance Count</th>
+              <th>Attendance Rate</th>
+              <th>Average Presence</th>
+              <th>Warnings</th>
+              <th>Excused</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of filteredSessions" [class.review]="row.status === 'needs_review'">
+              <td class="date-cell">
+                <strong>{{ formatDate(row.date) }}</strong>
+                <span>{{ formatDay(row.date) }}</span>
+              </td>
+              <td class="time-cell">
+                <strong>{{ formatTime(row.scheduled_start) }}</strong>
+                <span>{{ formatTime(row.scheduled_end) }}</span>
+              </td>
+              <td>
+                <strong>{{ row.attendance_count }}/{{ row.total_students }}</strong>
+              </td>
+              <td>
+                <div class="rate-cell">
+                  <strong>{{ row.attendance_rate }}%</strong>
+                  <span><i [style.width.%]="row.attendance_rate"></i></span>
+                </div>
+              </td>
+              <td>{{ minutesLabel(row.average_presence_minutes) }}</td>
+              <td class="warning-count">{{ row.warning_count || '-' }}</td>
+              <td class="excused-count">{{ row.excused_count }}</td>
+              <td>
+                <app-v2-status-badge [label]="statusLabel(row.status)" [tone]="statusTone(row.status)"></app-v2-status-badge>
+              </td>
+              <td>
+                <button type="button" class="summary-btn" (click)="viewSessionSummary(row)">View Session Summary</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <footer class="table-foot">
+        Showing {{ filteredSessions.length }} of {{ history.sessions.length }} sessions
+      </footer>
+    </section>
+
+    <ng-template #emptyHistory>
+      <div class="empty-state fras-v2-panel">
+        <strong>No sessions match the current filters.</strong>
+        <span>Completed and review-needed sessions will appear here after monitoring sessions are ended.</span>
+      </div>
+    </ng-template>
+  </ng-container>
+</section>

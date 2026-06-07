@@ -1,0 +1,168 @@
+<section class="v2-page-content review-page">
+  <div class="v2-page-topbar">
+    <div class="review-title">
+      <h1>Post-Session Presence Review</h1>
+      <span>Validate attendance before finalizing and exporting Blackboard records.</span>
+    </div>
+    <button type="button" class="export-log-btn" [disabled]="!review" (click)="exportLogs()">Export Logs</button>
+  </div>
+
+  <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading post-session review...</div>
+  <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
+  <div class="message success" *ngIf="actionMessage">{{ actionMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && review">
+    <section class="session-strip fras-v2-panel">
+      <div>
+        <span>Course</span>
+        <strong>{{ classInfo?.course_code || 'Course' }} · {{ classInfo?.section || '-' }}</strong>
+      </div>
+      <div>
+        <span>Date</span>
+        <strong>{{ scheduledDateLabel }}</strong>
+      </div>
+      <div>
+        <span>Time Range</span>
+        <strong>{{ scheduledTimeRangeLabel }}</strong>
+      </div>
+      <div>
+        <span>Room</span>
+        <strong>{{ classInfo?.room || '-' }}</strong>
+      </div>
+      <div>
+        <span>Status</span>
+        <app-v2-status-badge [label]="statusLabel(session?.session_status || '')" [tone]="isFinalized ? 'success' : 'warning'"></app-v2-status-badge>
+      </div>
+    </section>
+
+    <section class="summary-grid" aria-label="Presence review summary">
+      <article class="metric-card rate">
+        <span>Presence Validation Rate</span>
+        <strong>{{ validationRateLabel }}</strong>
+        <em>Students with valid classroom presence</em>
+      </article>
+      <article class="metric-card">
+        <span>Present Count</span>
+        <strong>{{ summary?.present_count || 0 }}</strong>
+        <em>Validated as present</em>
+      </article>
+      <article class="metric-card">
+        <span>Late Count</span>
+        <strong>{{ summary?.late_count || 0 }}</strong>
+        <em>Arrived after grace period</em>
+      </article>
+      <article class="metric-card">
+        <span>Partial Count</span>
+        <strong>{{ summary?.partial_count || 0 }}</strong>
+        <em>Needs presence attention</em>
+      </article>
+      <article class="metric-card">
+        <span>Absent Count</span>
+        <strong>{{ summary?.absent_count || 0 }}</strong>
+        <em>No valid time in</em>
+      </article>
+      <article class="metric-card">
+        <span>Excused Count</span>
+        <strong>{{ summary?.excused_count || 0 }}</strong>
+        <em>Professor-approved exceptions</em>
+      </article>
+      <article class="metric-card review">
+        <span>Students Requiring Review</span>
+        <strong>{{ summary?.students_requiring_review || 0 }}</strong>
+        <em>Presence gaps or unusual breaks</em>
+      </article>
+    </section>
+
+    <section class="review-table-shell">
+      <div class="table-tools">
+        <label class="review-search">
+          <span aria-hidden="true">⌕</span>
+          <input type="search" [(ngModel)]="searchQuery" placeholder="Filter by student name, ID, status, or assessment..." />
+        </label>
+        <span>{{ filteredRoster.length }} students</span>
+      </div>
+
+      <div class="table-scroll">
+        <table aria-label="Student review table">
+          <thead>
+            <tr>
+              <th>Student Name</th>
+              <th>Status</th>
+              <th>Presence Duration</th>
+              <th>Outside Duration</th>
+              <th>Break Count</th>
+              <th>System Assessment</th>
+              <th>Professor Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let student of filteredRoster" [class.needs-review]="student.requires_review">
+              <td>
+                <div class="student-cell">
+                  <span class="student-avatar">{{ initialsForStudent(student) }}</span>
+                  <span>
+                    <strong>{{ student.student_name }}</strong>
+                    <small>{{ student.student_number }}</small>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <app-v2-status-badge [label]="statusLabel(student.final_status)" [tone]="statusTone(student.final_status)"></app-v2-status-badge>
+              </td>
+              <td class="duration">{{ minutesLabel(student.total_presence_minutes) }}</td>
+              <td class="duration" [class.warn]="student.total_outside_minutes > 20">{{ minutesLabel(student.total_outside_minutes) }}</td>
+              <td class="duration">{{ student.break_count }}</td>
+              <td>
+                <span class="assessment" [ngClass]="assessmentClass(student.system_assessment)">
+                  {{ assessmentLabel(student.system_assessment) }}
+                </span>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <button type="button" (click)="viewDetails(student)">View Details</button>
+                  <button type="button" [disabled]="isFinalized || isSaving" (click)="markExcused(student)">Mark Excused</button>
+                  <button type="button" class="primary" [disabled]="isFinalized || isSaving" (click)="openOverride(student)">Override</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer-actions">
+      <span>{{ isFinalized ? 'Attendance finalized. Blackboard CSV is ready.' : 'Review warnings and overrides before Blackboard export.' }}</span>
+      <button type="button" class="finalize-btn" [disabled]="isFinalized || isFinalizing" (click)="finalizeAttendance()">
+        {{ isFinalizing ? 'Finalizing...' : (isFinalized ? 'Attendance Finalized' : 'Finalize Attendance') }}
+      </button>
+      <button type="button" class="blackboard-btn" [disabled]="!isFinalized" (click)="exportBlackboardCsv()">Export Blackboard CSV</button>
+      <button type="button" class="history-btn" [disabled]="!isFinalized" (click)="goToHistory()">Session History</button>
+    </footer>
+  </ng-container>
+
+  <div class="override-backdrop" *ngIf="overrideStudent" (click)="closeOverride()">
+    <section class="override-modal" (click)="$event.stopPropagation()">
+      <header>
+        <div>
+          <span>Override Status</span>
+          <h2>{{ overrideStudent.student_name }}</h2>
+        </div>
+        <button type="button" (click)="closeOverride()">×</button>
+      </header>
+
+      <div class="override-options">
+        <button type="button" [class.selected]="overrideStatusValue === 'present'" (click)="overrideStatusValue = 'present'">Present</button>
+        <button type="button" [class.selected]="overrideStatusValue === 'absent'" (click)="overrideStatusValue = 'absent'">Absent</button>
+        <button type="button" [class.selected]="overrideStatusValue === 'late'" (click)="overrideStatusValue = 'late'">Late</button>
+        <button type="button" [class.selected]="overrideStatusValue === 'excused'" (click)="overrideStatusValue = 'excused'">Excused</button>
+      </div>
+
+      <footer>
+        <button type="button" class="cancel" [disabled]="isSaving" (click)="closeOverride()">Cancel</button>
+        <button type="button" class="save" [disabled]="isSaving" (click)="saveOverride()">
+          {{ isSaving ? 'Saving...' : 'Save Override' }}
+        </button>
+      </footer>
+    </section>
+  </div>
+</section>

@@ -1,0 +1,188 @@
+<section class="v2-page-content roster-page">
+  <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading class roster...</div>
+  <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && roster">
+    <header class="page-head">
+      <div>
+        <span class="eyebrow">Student List / Class Roster</span>
+        <h1>{{ roster.class_context.course_code }} - {{ roster.class_context.course_name }}</h1>
+        <div class="context-line">
+          <span>Section {{ roster.class_context.section }}</span>
+          <span>Room {{ roster.class_context.room }}</span>
+          <span>{{ roster.class_context.professor_name }}</span>
+          <span>{{ roster.class_context.student_count }} students</span>
+        </div>
+      </div>
+      <button type="button" class="back-btn" (click)="backToClasses()">Back to Classes</button>
+    </header>
+
+    <section class="summary-grid" aria-label="Class roster summary">
+      <article class="metric-card">
+        <span>Students</span>
+        <strong>{{ roster.class_context.student_count }}</strong>
+        <em>Enrolled in this class</em>
+      </article>
+      <article class="metric-card">
+        <span>Face Profiles</span>
+        <strong>{{ registeredFaceCount }}</strong>
+        <em>Registered or needing update</em>
+      </article>
+      <article class="metric-card">
+        <span>Average Attendance</span>
+        <strong>{{ averageAttendanceRate }}%</strong>
+        <em>Across completed records</em>
+      </article>
+    </section>
+
+    <section class="roster-layout">
+      <article class="table-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Student Roster</h2>
+            <span>{{ filteredStudents.length }} shown</span>
+          </div>
+          <label class="search-box">
+            <span>Search</span>
+            <input type="search" [(ngModel)]="searchTerm" placeholder="Student name or number..." />
+          </label>
+        </div>
+
+        <div class="table-scroll" *ngIf="filteredStudents.length; else emptyRoster">
+          <table aria-label="Class roster students">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Student No.</th>
+                <th>Face Profile</th>
+                <th>Recognition</th>
+                <th>Attendance</th>
+                <th>Last Face Update</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let student of filteredStudents"
+                [class.selected]="selectedStudent?.student_id === student.student_id"
+                (click)="selectStudent(student)">
+                <td>
+                  <div class="student-cell">
+                    <span class="avatar">{{ initials(student) }}</span>
+                    <div>
+                      <strong>{{ student.student_name }}</strong>
+                      <small>{{ student.email || 'No email listed' }}</small>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ student.student_number }}</td>
+                <td>
+                  <app-v2-status-badge [label]="faceStatusLabel(student.face_profile_status)" [tone]="faceTone(student.face_profile_status)"></app-v2-status-badge>
+                </td>
+                <td>
+                  <app-v2-status-badge [label]="recognitionStatusLabel(student.recognition_status)" [tone]="recognitionTone(student.recognition_status)"></app-v2-status-badge>
+                </td>
+                <td>
+                  <div class="rate-cell">
+                    <strong>{{ student.attendance_rate }}%</strong>
+                    <span><i [style.width.%]="student.attendance_rate"></i></span>
+                  </div>
+                </td>
+                <td>{{ formatDate(student.last_face_update) }}</td>
+                <td>
+                  <div class="row-actions" (click)="$event.stopPropagation()">
+                    <button
+                      type="button"
+                      [routerLink]="['/v2/classes', classId, 'students', student.student_id, 'history']">
+                      View Details
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <ng-template #emptyRoster>
+          <div class="empty-state">
+            <strong>No students found.</strong>
+            <span>Try another search term or check the class enrollment records.</span>
+          </div>
+        </ng-template>
+      </article>
+
+      <aside class="profile-panel" *ngIf="selectedStudent as student">
+        <div class="profile-top">
+          <span class="profile-avatar">{{ initials(student) }}</span>
+          <div>
+            <h2>{{ student.student_name }}</h2>
+            <span>{{ student.student_number }}</span>
+            <small>{{ roster.class_context.course_code }} - {{ roster.class_context.section }}</small>
+          </div>
+        </div>
+
+        <div class="status-stack">
+          <div>
+            <span>Face Profile Status</span>
+            <app-v2-status-badge [label]="faceStatusLabel(student.face_profile_status)" [tone]="faceTone(student.face_profile_status)"></app-v2-status-badge>
+          </div>
+          <div>
+            <span>Recognition Status</span>
+            <app-v2-status-badge [label]="recognitionStatusLabel(student.recognition_status)" [tone]="recognitionTone(student.recognition_status)"></app-v2-status-badge>
+          </div>
+          <div>
+            <span>Last Face Update</span>
+            <strong>{{ formatDate(student.last_face_update) }}</strong>
+          </div>
+          <div>
+            <span>Recognition Confidence</span>
+            <strong>{{ student.recognition_confidence || 0 }}%</strong>
+          </div>
+        </div>
+
+        <section class="profile-section">
+          <h3>Face Recognition Actions</h3>
+          <div class="face-actions">
+            <button type="button" (click)="manageFaceData()">Register / Update Face Data</button>
+            <button
+              type="button"
+              [routerLink]="['/v2/classes', classId, 'students', student.student_id, 'history']">
+              View Details
+            </button>
+          </div>
+        </section>
+
+        <section class="profile-section">
+          <h3>Attendance Summary</h3>
+          <div class="attendance-grid">
+            <div><span>Total</span><strong>{{ student.total_sessions }}</strong></div>
+            <div><span>Present</span><strong>{{ student.present_sessions }}</strong></div>
+            <div><span>Late</span><strong>{{ student.late_sessions }}</strong></div>
+            <div><span>Partial</span><strong>{{ student.partial_sessions }}</strong></div>
+            <div><span>Absent</span><strong>{{ student.absent_sessions }}</strong></div>
+            <div><span>Excused</span><strong>{{ student.excused_sessions }}</strong></div>
+          </div>
+          <div class="profile-rate">
+            <span>Attendance Rate</span>
+            <strong>{{ student.attendance_rate }}%</strong>
+            <i><b [style.width.%]="student.attendance_rate"></b></i>
+          </div>
+        </section>
+
+        <section class="profile-section">
+          <h3>Class Session Details</h3>
+          <div class="history-list" *ngIf="student.recent_history.length; else noHistory">
+            <div class="history-item" *ngFor="let item of student.recent_history">
+              <time>{{ formatHistoryDate(item.session_date) }}</time>
+              <app-v2-status-badge [label]="statusLabel(item.status)" [tone]="statusTone(item.status)"></app-v2-status-badge>
+              <span>{{ item.note }}</span>
+            </div>
+          </div>
+          <ng-template #noHistory>
+            <div class="empty-mini">No attendance history yet for this class.</div>
+          </ng-template>
+        </section>
+      </aside>
+    </section>
+  </ng-container>
+</section>

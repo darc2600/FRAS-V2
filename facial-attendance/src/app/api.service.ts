@@ -3,11 +3,17 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
   V2CreateEventRequest,
+  V2ClassRosterResponse,
+  V2FaceProfileContextResponse,
+  V2FaceProfileSaveResponse,
   V2ManualAttendanceRequest,
   V2ProfessorScheduleResponse,
   V2ProfessorSummary,
+  V2RecognitionMatchResponse,
+  V2SessionHistoryResponse,
   V2SessionReviewResponse,
   V2SessionDetailResponse,
+  V2StudentClassHistoryResponse,
   V2TodayClassesResponse
 } from './v2/models/v2-attendance.models';
 
@@ -56,6 +62,32 @@ export class ApiService {
     return this.http.get<V2ProfessorScheduleResponse>(`${this.backendUrl}/api/v2/professors/${professorId}/schedule`);
   }
 
+  getV2ClassSessionHistory(classId: number): Observable<V2SessionHistoryResponse> {
+    return this.http.get<V2SessionHistoryResponse>(`${this.backendUrl}/api/v2/classes/${classId}/session-history`);
+  }
+
+  getV2ClassRoster(classId: number): Observable<V2ClassRosterResponse> {
+    return this.http.get<V2ClassRosterResponse>(`${this.backendUrl}/api/v2/classes/${classId}/students`);
+  }
+
+  getV2StudentClassHistory(classId: number, studentId: number): Observable<V2StudentClassHistoryResponse> {
+    return this.http.get<V2StudentClassHistoryResponse>(`${this.backendUrl}/api/v2/classes/${classId}/students/${studentId}/history`);
+  }
+
+  getV2FaceProfileContext(classId: number, studentId: number): Observable<V2FaceProfileContextResponse> {
+    return this.http.get<V2FaceProfileContextResponse>(`${this.backendUrl}/api/v2/classes/${classId}/students/${studentId}/face-profile`);
+  }
+
+  saveV2FaceProfile(classId: number, studentId: number, formData: FormData): Observable<V2FaceProfileSaveResponse> {
+    return this.http.post<V2FaceProfileSaveResponse>(`${this.backendUrl}/api/v2/classes/${classId}/students/${studentId}/face-profile`, formData);
+  }
+
+  recognizeV2Face(classId: number, image: File): Observable<V2RecognitionMatchResponse> {
+    const formData = new FormData();
+    formData.append('image', image);
+    return this.http.post<V2RecognitionMatchResponse>(`${this.backendUrl}/api/v2/classes/${classId}/recognize`, formData);
+  }
+
   startV2Session(classId: number, professorId: number, sessionDate?: string): Observable<V2SessionDetailResponse> {
     return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/classes/${classId}/sessions/start`, {
       professor_id: professorId,
@@ -85,6 +117,18 @@ export class ApiService {
 
   endV2Session(sessionId: number): Observable<V2SessionReviewResponse> {
     return this.http.post<V2SessionReviewResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/end`, {});
+  }
+
+  getV2SessionReview(sessionId: number): Observable<V2SessionReviewResponse> {
+    return this.http.get<V2SessionReviewResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/review`);
+  }
+
+  finalizeV2Session(sessionId: number): Observable<V2SessionReviewResponse> {
+    return this.http.post<V2SessionReviewResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/finalize`, {});
+  }
+
+  confirmV2StudentRecord(sessionId: number, studentId: number): Observable<V2SessionReviewResponse> {
+    return this.http.post<V2SessionReviewResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/students/${studentId}/confirm`, {});
   }
 
   reauthenticate(email: string, password: string): Observable<any> {

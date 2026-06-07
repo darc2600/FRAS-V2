@@ -1,23 +1,55 @@
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import tempfile
 from datetime import date, datetime, time
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from fastapi import UploadFile
 from fastapi import HTTPException
 
+from services.face_embeddings import (
+    cosine_similarity,
+    ensure_embeddings_table,
+    extract_embedding_from_image,
+    load_enrolled_embeddings,
+    parse_embedding_json,
+    similarity_threshold_from_distance_threshold,
+    upsert_student_embedding,
+)
+from services.settings_service import get_settings_service
+from services.db import get_connection
 from v2.models import (
     V2AttendanceEvent,
     V2ClassCard,
+    V2ClassRosterContext,
+    V2ClassRosterHistoryItem,
+    V2ClassRosterResponse,
+    V2ClassRosterStudent,
     V2CreateEventRequest,
+    V2FaceProfileContextResponse,
+    V2FaceProfileSaveResponse,
     V2ManualAttendanceRequest,
     V2ProfessorScheduleClass,
     V2ProfessorScheduleResponse,
     V2ProfessorSummary,
+    V2RecognitionMatchResponse,
     V2ReviewSummary,
+    V2SessionHistoryClassContext,
+    V2SessionHistoryResponse,
+    V2SessionHistoryRow,
+    V2SessionHistorySummary,
     V2SessionDetailResponse,
     V2SessionResponse,
     V2SessionReviewResponse,
     V2StartSessionRequest,
+    V2StudentClassHistoryHeader,
+    V2StudentClassHistoryResponse,
+    V2StudentClassHistoryRow,
+    V2StudentClassHistorySummary,
     V2StudentRecord,
     V2TodayClassesResponse,
 )
@@ -105,6 +137,338 @@ class V2AttendanceService:
         ]
         return V2ProfessorScheduleResponse(professor_id=professor_id, classes=classes)
 
+    def get_class_session_history(self, class_id: int) -> V2SessionHistoryResponse:
+        context_row = self.repo.get_class_history_context(class_id)
+        if not context_row:
+            raise HTTPException(status_code=404, detail="Class not found.")
+
+        context = V2SessionHistoryClassContext(
+            class_id=context_row[0],
+            course_code=context_row[1],
+            course_name=context_row[2],
+            section=context_row[3],
+            room=context_row[4] or "TBA",
+            professor_name=f"{context_row[5]}, {context_row[6]}",
+        )
+
+        sessions: list[V2SessionHistoryRow] = []
+        for row in self.repo.list_class_session_history(class_id):
+            total_students = int(row[4] or 0)
+            attendance_count = int(row[5] or 0)
+            attendance_rate = round((attendance_count / total_students) * 100, 2) if total_students else 0.0
+            warning_count = int(row[7] or 0)
+            sessions.append(
+                V2SessionHistoryRow(
+                    session_id=row[0],
+                    date=self._coerce_datetime(row[1]).date(),
+                    scheduled_start=self._coerce_datetime(row[1]),
+                    scheduled_end=self._coerce_datetime(row[2]),
+                    attendance_count=attendance_count,
+                    total_students=total_students,
+                    attendance_rate=attendance_rate,
+                    average_presence_minutes=round(float(row[6] or 0)),
+                    warning_count=warning_count,
+                    excused_count=int(row[8] or 0),
+                    status=self._history_status(str(row[3]), warning_count),
+                )
+            )
+
+        total_sessions = len(sessions)
+        summary = V2SessionHistorySummary(
+            total_sessions=total_sessions,
+            average_attendance_rate=round(sum(item.attendance_rate for item in sessions) / total_sessions, 2) if total_sessions else 0.0,
+            average_presence_minutes=round(sum(item.average_presence_minutes for item in sessions) / total_sessions) if total_sessions else 0,
+            sessions_requiring_review=sum(1 for item in sessions if item.status == "needs_review"),
+            excused_students=sum(item.excused_count for item in sessions),
+        )
+
+        return V2SessionHistoryResponse(
+            class_context=context,
+            summary=summary,
+            sessions=sessions,
+        )
+
+    def get_class_roster(self, class_id: int) -> V2ClassRosterResponse:
+        context_row = self.repo.get_class_roster_context(class_id)
+        if not context_row:
+            raise HTTPException(status_code=404, detail="Class not found.")
+
+        context = V2ClassRosterContext(
+            class_id=context_row[0],
+            course_code=context_row[1],
+            course_name=context_row[2],
+            section=context_row[3],
+            room=context_row[4] or "TBA",
+            professor_name=f"{context_row[5]}, {context_row[6]}",
+            student_count=int(context_row[7] or 0),
+        )
+
+        students: list[V2ClassRosterStudent] = []
+        for row in self.repo.list_class_roster_students(class_id):
+            student_id = int(row[0])
+            total_sessions = int(row[7] or 0)
+            present_sessions = int(row[8] or 0)
+            late_sessions = int(row[9] or 0)
+            partial_sessions = int(row[10] or 0)
+            absent_sessions = int(row[11] or 0)
+            excused_sessions = int(row[12] or 0)
+            attended_sessions = present_sessions + late_sessions + partial_sessions + excused_sessions
+            last_face_update = self._coerce_datetime(row[5]) if row[5] else None
+            recognition_confidence = float(row[13]) if row[13] is not None else None
+            last_recognition_at = self._coerce_datetime(row[14]) if row[14] else None
+
+            students.append(
+                V2ClassRosterStudent(
+                    student_id=student_id,
+                    student_number=row[1],
+                    student_name=f"{row[3]}, {row[2]}",
+                    email=row[4],
+                    face_profile_status=self._face_profile_status(int(row[6] or 0), last_face_update),
+                    recognition_status=self._recognition_status(int(row[6] or 0), recognition_confidence, last_recognition_at),
+                    attendance_rate=round((attended_sessions / total_sessions) * 100, 2) if total_sessions else 0.0,
+                    last_face_update=last_face_update,
+                    recognition_confidence=recognition_confidence,
+                    total_sessions=total_sessions,
+                    present_sessions=present_sessions,
+                    late_sessions=late_sessions,
+                    partial_sessions=partial_sessions,
+                    absent_sessions=absent_sessions,
+                    excused_sessions=excused_sessions,
+                    recent_history=self._get_class_student_history(class_id, student_id),
+                )
+            )
+
+        return V2ClassRosterResponse(class_context=context, students=students)
+
+    def get_student_class_history(self, class_id: int, student_id: int) -> V2StudentClassHistoryResponse:
+        header_row = self.repo.get_student_class_history_header(class_id, student_id)
+        if not header_row:
+            raise HTTPException(status_code=404, detail="Student is not enrolled in this class.")
+
+        records: list[V2StudentClassHistoryRow] = []
+        present = late = partial = absent = excused = 0
+        for row in self.repo.list_student_class_history_records(class_id, student_id):
+            status = str(row[3])
+            if status == "present":
+                present += 1
+            elif status == "late":
+                late += 1
+            elif status == "partial":
+                partial += 1
+            elif status == "excused":
+                excused += 1
+            else:
+                absent += 1
+
+            scheduled_start = self._coerce_datetime(row[1])
+            records.append(
+                V2StudentClassHistoryRow(
+                    session_id=row[0],
+                    session_date=scheduled_start.date(),
+                    scheduled_start=scheduled_start,
+                    scheduled_end=self._coerce_datetime(row[2]),
+                    attendance_status=status,
+                    presence_duration_minutes=int(row[4] or 0),
+                    outside_duration_minutes=int(row[5] or 0),
+                    break_count=int(row[6] or 0),
+                    system_assessment=str(row[7] or "absent"),
+                )
+            )
+
+        total = len(records)
+        attended = present + late + partial + excused
+        attendance_rate = round((attended / total) * 100, 2) if total else 0.0
+        header = V2StudentClassHistoryHeader(
+            class_id=header_row[0],
+            student_id=header_row[1],
+            student_number=header_row[2],
+            student_name=f"{header_row[4]}, {header_row[3]}",
+            course_code=header_row[5],
+            course_name=header_row[6],
+            section=header_row[7],
+            room=header_row[8] or "TBA",
+            attendance_rate=attendance_rate,
+        )
+        summary = V2StudentClassHistorySummary(
+            total_sessions=total,
+            present_sessions=present,
+            late_sessions=late,
+            partial_sessions=partial,
+            absent_sessions=absent,
+            excused_sessions=excused,
+            attendance_rate=attendance_rate,
+        )
+        return V2StudentClassHistoryResponse(header=header, summary=summary, records=records)
+
+    def get_face_profile_context(self, class_id: int, student_id: int) -> V2FaceProfileContextResponse:
+        row = self.repo.get_face_profile_context(class_id, student_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Student is not enrolled in this class.")
+
+        last_face_update = self._coerce_datetime(row[9]) if row[9] else None
+        return V2FaceProfileContextResponse(
+            class_id=row[0],
+            student_id=row[1],
+            student_number=row[2],
+            student_name=f"{row[4]}, {row[3]}",
+            course_code=row[5],
+            course_name=row[6],
+            section=row[7],
+            room=row[8] or "TBA",
+            face_profile_status=self._face_profile_status(int(row[10] or 0), last_face_update),
+            last_face_update=last_face_update,
+        )
+
+    async def recognize_face_for_class(self, class_id: int, image: UploadFile) -> V2RecognitionMatchResponse:
+        if not self.repo.get_class_roster_context(class_id):
+            raise HTTPException(status_code=404, detail="Class not found.")
+
+        suffix = Path(image.filename or "frame.jpg").suffix.lower()
+        if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+            suffix = ".jpg"
+
+        temp_path = ""
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                shutil.copyfileobj(image.file, temp_file)
+                temp_path = temp_file.name
+
+            settings = get_settings_service()
+            model_name = settings.face_recognition_model
+            threshold = similarity_threshold_from_distance_threshold(settings.recognition_threshold)
+            query_embedding = extract_embedding_from_image(
+                temp_path,
+                model_name=model_name,
+                enforce_detection=False,
+            )
+            if not query_embedding:
+                return V2RecognitionMatchResponse(
+                    status="failed",
+                    message="No recognizable face embedding was found in the frame.",
+                )
+
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                ensure_embeddings_table(cursor)
+                enrolled_embeddings = load_enrolled_embeddings(cursor, class_id=class_id, model_name=model_name)
+
+            best_student_id: int | None = None
+            best_similarity = -1.0
+            for candidate_student_id, _last_name, embedding_json in enrolled_embeddings:
+                candidate_embedding = parse_embedding_json(embedding_json)
+                if not candidate_embedding:
+                    continue
+                similarity = cosine_similarity(query_embedding, candidate_embedding)
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_student_id = int(candidate_student_id)
+
+            if best_student_id is None:
+                return V2RecognitionMatchResponse(
+                    status="failed",
+                    message="No enrolled face profiles are available for this class.",
+                )
+            if best_similarity < threshold:
+                return V2RecognitionMatchResponse(
+                    status="failed",
+                    message="No confident student match found.",
+                    confidence=round(max(0.0, best_similarity) * 100, 2),
+                )
+
+            student = self.repo.get_student_name_for_class(class_id, best_student_id)
+            if not student:
+                return V2RecognitionMatchResponse(
+                    status="failed",
+                    message="Matched student is not enrolled in this class.",
+                    confidence=round(best_similarity * 100, 2),
+                )
+
+            return V2RecognitionMatchResponse(
+                status="success",
+                student_id=best_student_id,
+                student_name=f"{student[1]}, {student[0]}",
+                confidence=round(best_similarity * 100, 2),
+                message="Student recognized.",
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail="Unable to recognize the uploaded frame.") from exc
+        finally:
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+
+    async def save_face_profile(
+        self,
+        class_id: int,
+        student_id: int,
+        angles: list[str],
+        images: list[UploadFile],
+    ) -> V2FaceProfileSaveResponse:
+        context = self.get_face_profile_context(class_id, student_id)
+        if len(images) != len(angles):
+            raise HTTPException(status_code=400, detail="Angles and images must have the same count.")
+        if len(images) < 5:
+            raise HTTPException(status_code=400, detail="Capture all five required face angles before saving.")
+
+        required = ["front", "left", "right", "up", "down"]
+        normalized_angles = [angle.strip().lower() for angle in angles]
+        missing = [angle for angle in required if angle not in normalized_angles]
+        if missing:
+            raise HTTPException(status_code=400, detail=f"Missing required captures: {', '.join(missing)}")
+
+        dataset_base = Path(os.getenv("DATASET_PATH", "dataset"))
+        safe_student = "".join(ch for ch in context.student_number if ch.isalnum() or ch in ("-", "_"))
+        save_dir = dataset_base / "v2_face_profiles" / safe_student / f"class_{class_id}"
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        saved_paths: list[str] = []
+        for angle, upload in zip(normalized_angles, images):
+            extension = Path(upload.filename or "").suffix.lower() or ".jpg"
+            if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+                extension = ".jpg"
+            filename = f"{angle}{extension}"
+            path = save_dir / filename
+            content = await upload.read()
+            path.write_bytes(content)
+            saved_paths.append(str(path))
+
+        front_index = normalized_angles.index("front") if "front" in normalized_angles else 0
+        front_path = saved_paths[front_index]
+        settings = get_settings_service()
+        model_name = settings.face_recognition_model
+        embedding = extract_embedding_from_image(front_path, model_name=model_name, enforce_detection=False)
+        embedding_json = json.dumps(embedding) if embedding else None
+
+        self.repo.replace_student_face_profile(
+            student_id=student_id,
+            face_image_path=front_path,
+            embedding_json=embedding_json,
+            model_name=model_name,
+        )
+
+        if embedding:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                ensure_embeddings_table(cursor)
+                upsert_student_embedding(
+                    cursor=cursor,
+                    student_id=student_id,
+                    model_name=model_name,
+                    embedding=embedding,
+                    source_image_path=front_path,
+                )
+
+        return V2FaceProfileSaveResponse(
+            status="success",
+            message="Face profile saved successfully.",
+            student_id=student_id,
+            face_profile_status="registered",
+            saved_angles=normalized_angles,
+            image_paths=saved_paths,
+        )
+
     def start_session(self, class_id: int, payload: V2StartSessionRequest) -> V2SessionDetailResponse:
         session_date = payload.session_date or datetime.now(MANILA_TZ).date()
         class_row = self.repo.get_class_for_session_start(class_id, payload.professor_id)
@@ -170,6 +534,8 @@ class V2AttendanceService:
 
     def save_manual_attendance(self, session_id: int, payload: V2ManualAttendanceRequest) -> V2SessionDetailResponse:
         session = self._get_session_or_404(session_id)
+        if session.session_status == "finalized":
+            raise HTTPException(status_code=400, detail="Finalized sessions cannot be changed.")
         if session.session_status not in {"in_progress", "on_break", "under_review"}:
             raise HTTPException(status_code=400, detail="Session is not accepting manual attendance.")
 
@@ -254,6 +620,8 @@ class V2AttendanceService:
 
     def end_session(self, session_id: int) -> V2SessionReviewResponse:
         session = self._get_session_or_404(session_id)
+        if session.session_status == "finalized":
+            return self.get_session_review(session_id)
         if session.session_status not in {"in_progress", "on_break", "under_review"}:
             raise HTTPException(status_code=400, detail="Session cannot be ended from its current status.")
 
@@ -261,6 +629,32 @@ class V2AttendanceService:
         refreshed = self._get_session_or_404(session_id)
         for record in self._get_roster(session_id):
             self._recalculate_student_record(refreshed, record.record_id, record.student_id)
+        return self.get_session_review(session_id)
+
+    def finalize_session(self, session_id: int) -> V2SessionReviewResponse:
+        session = self._get_session_or_404(session_id)
+        if session.session_status == "finalized":
+            return self.get_session_review(session_id)
+        if session.session_status not in {"under_review", "in_progress", "on_break"}:
+            raise HTTPException(status_code=400, detail="Session cannot be finalized from its current status.")
+
+        for record in self._get_roster(session_id):
+            self._recalculate_student_record(session, record.record_id, record.student_id)
+        self.repo.finalize_session(session_id, datetime.now(MANILA_TZ).replace(tzinfo=None))
+        return self.get_session_review(session_id)
+
+    def confirm_student_record(self, session_id: int, student_id: int) -> V2SessionReviewResponse:
+        session = self._get_session_or_404(session_id)
+        if session.session_status == "finalized":
+            raise HTTPException(status_code=400, detail="Finalized sessions cannot be changed.")
+        if session.session_status not in {"under_review", "in_progress", "on_break"}:
+            raise HTTPException(status_code=400, detail="Session is not accepting confirmations.")
+
+        record_row = self.repo.get_record_for_student(session_id, student_id)
+        if not record_row:
+            raise HTTPException(status_code=404, detail="Student is not enrolled in this session.")
+
+        self.repo.confirm_student_record(session_id, student_id)
         return self.get_session_review(session_id)
 
     def _recalculate_student_record(self, session: V2SessionResponse, record_id: int, student_id: int) -> None:
@@ -440,6 +834,51 @@ class V2AttendanceService:
         if local_now < start_dt:
             return "upcoming"
         return "completed"
+
+    def _history_status(self, session_status: str, warning_count: int) -> str:
+        if session_status in {"in_progress", "on_break"}:
+            return "in_progress"
+        if session_status == "under_review" or warning_count > 0:
+            return "needs_review"
+        return "completed"
+
+    def _get_class_student_history(self, class_id: int, student_id: int) -> list[V2ClassRosterHistoryItem]:
+        history = []
+        for row in self.repo.list_class_roster_student_history(class_id, student_id):
+            status = str(row[2])
+            note = "Requires professor review" if row[4] else str(row[3]).replace("_", " ").title()
+            history.append(
+                V2ClassRosterHistoryItem(
+                    session_id=row[0],
+                    session_date=self._coerce_datetime(row[1]).date(),
+                    status=status,
+                    note=note,
+                )
+            )
+        return history
+
+    def _face_profile_status(self, profile_count: int, last_face_update: datetime | None) -> str:
+        if profile_count <= 0:
+            return "no_face_profile"
+        if last_face_update and (datetime.now(MANILA_TZ).replace(tzinfo=None) - last_face_update).days > 180:
+            return "needs_update"
+        return "registered"
+
+    def _recognition_status(
+        self,
+        profile_count: int,
+        recognition_confidence: float | None,
+        last_recognition_at: datetime | None,
+    ) -> str:
+        if profile_count <= 0:
+            return "not_available"
+        if recognition_confidence is not None and recognition_confidence < 80:
+            return "low_confidence"
+        if not last_recognition_at:
+            return "not_recognized_recently"
+        if (datetime.now(MANILA_TZ).replace(tzinfo=None) - last_recognition_at).days > 30:
+            return "not_recognized_recently"
+        return "active"
 
     def _assessment_from_ratio(self, ratio: float) -> str:
         if ratio >= 0.8:

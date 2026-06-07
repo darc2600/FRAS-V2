@@ -125,6 +125,315 @@ class V2AttendanceRepository:
             )
             return cursor.fetchall()
 
+    def get_class_history_context(self, class_id: int) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    c.class_id,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number,
+                    p.last_name,
+                    p.first_name
+                FROM classes c
+                JOIN courses co ON co.course_id = c.course_id
+                LEFT JOIN rooms r ON r.room_id = c.room_id
+                JOIN professors p ON p.professor_id = c.professor_id
+                WHERE c.class_id = ?
+                """,
+                (class_id,),
+            )
+            return cursor.fetchone()
+
+    def list_class_session_history(self, class_id: int) -> list[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    s.session_id,
+                    s.scheduled_start,
+                    s.scheduled_end,
+                    s.session_status,
+                    COUNT(r.record_id) AS total_students,
+                    COALESCE(SUM(CASE
+                        WHEN r.final_status IN ('present', 'late', 'partial', 'excused') THEN 1
+                        ELSE 0
+                    END), 0) AS attendance_count,
+                    COALESCE(AVG(r.total_presence_minutes), 0) AS average_presence_minutes,
+                    COALESCE(SUM(CASE
+                        WHEN r.requires_review = TRUE OR r.final_status = 'partial' THEN 1
+                        ELSE 0
+                    END), 0) AS warning_count,
+                    COALESCE(SUM(CASE
+                        WHEN r.final_status = 'excused' THEN 1
+                        ELSE 0
+                    END), 0) AS excused_count
+                FROM attendance_sessions s
+                LEFT JOIN student_session_records r ON r.session_id = s.session_id
+                WHERE s.class_id = ?
+                GROUP BY
+                    s.session_id,
+                    s.scheduled_start,
+                    s.scheduled_end,
+                    s.session_status
+                ORDER BY s.scheduled_start DESC, s.session_id DESC
+                """,
+                (class_id,),
+            )
+            return cursor.fetchall()
+
+    def get_class_roster_context(self, class_id: int) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    c.class_id,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number,
+                    p.last_name,
+                    p.first_name,
+                    COUNT(e.student_id) AS student_count
+                FROM classes c
+                JOIN courses co ON co.course_id = c.course_id
+                LEFT JOIN rooms r ON r.room_id = c.room_id
+                JOIN professors p ON p.professor_id = c.professor_id
+                LEFT JOIN enrollments e ON e.class_id = c.class_id
+                    AND e.enrollment_status = 'active'
+                WHERE c.class_id = ?
+                GROUP BY
+                    c.class_id,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number,
+                    p.last_name,
+                    p.first_name
+                """,
+                (class_id,),
+            )
+            return cursor.fetchone()
+
+    def list_class_roster_students(self, class_id: int) -> list[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    s.student_id,
+                    s.student_number,
+                    s.first_name,
+                    s.last_name,
+                    s.email,
+                    MAX(COALESCE(fp.updated_at, fp.registered_at)) AS last_face_update,
+                    COUNT(DISTINCT fp.face_profile_id) AS face_profile_count,
+                    COUNT(DISTINCT ss.record_id) AS total_sessions,
+                    COALESCE(SUM(CASE WHEN ss.final_status = 'present' THEN 1 ELSE 0 END), 0) AS present_sessions,
+                    COALESCE(SUM(CASE WHEN ss.final_status = 'late' THEN 1 ELSE 0 END), 0) AS late_sessions,
+                    COALESCE(SUM(CASE WHEN ss.final_status = 'partial' THEN 1 ELSE 0 END), 0) AS partial_sessions,
+                    COALESCE(SUM(CASE WHEN ss.final_status = 'absent' THEN 1 ELSE 0 END), 0) AS absent_sessions,
+                    COALESCE(SUM(CASE WHEN ss.final_status = 'excused' THEN 1 ELSE 0 END), 0) AS excused_sessions,
+                    MAX(ae.recognition_confidence) AS recognition_confidence,
+                    MAX(ae.event_time) AS last_recognition_at
+                FROM enrollments e
+                JOIN students s ON s.student_id = e.student_id
+                LEFT JOIN student_face_profiles fp ON fp.student_id = s.student_id
+                    AND fp.is_active = TRUE
+                LEFT JOIN attendance_sessions sess ON sess.class_id = e.class_id
+                LEFT JOIN student_session_records ss ON ss.session_id = sess.session_id
+                    AND ss.student_id = s.student_id
+                LEFT JOIN attendance_events ae ON ae.session_id = sess.session_id
+                    AND ae.student_id = s.student_id
+                    AND ae.recognition_confidence IS NOT NULL
+                    AND ae.is_voided = FALSE
+                WHERE e.class_id = ?
+                  AND e.enrollment_status = 'active'
+                GROUP BY
+                    s.student_id,
+                    s.student_number,
+                    s.first_name,
+                    s.last_name,
+                    s.email
+                ORDER BY s.last_name, s.first_name, s.student_number
+                """,
+                (class_id,),
+            )
+            return cursor.fetchall()
+
+    def list_class_roster_student_history(self, class_id: int, student_id: int) -> list[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    sess.session_id,
+                    sess.scheduled_start,
+                    ss.final_status,
+                    ss.system_assessment,
+                    ss.requires_review
+                FROM attendance_sessions sess
+                JOIN student_session_records ss ON ss.session_id = sess.session_id
+                WHERE sess.class_id = ?
+                  AND ss.student_id = ?
+                ORDER BY sess.scheduled_start DESC, sess.session_id DESC
+                """,
+                (class_id, student_id),
+            )
+            return cursor.fetchall()
+
+    def get_student_class_history_header(self, class_id: int, student_id: int) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    c.class_id,
+                    st.student_id,
+                    st.student_number,
+                    st.first_name,
+                    st.last_name,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number
+                FROM classes c
+                JOIN courses co ON co.course_id = c.course_id
+                LEFT JOIN rooms r ON r.room_id = c.room_id
+                JOIN enrollments e ON e.class_id = c.class_id
+                    AND e.enrollment_status = 'active'
+                JOIN students st ON st.student_id = e.student_id
+                WHERE c.class_id = ?
+                  AND st.student_id = ?
+                """,
+                (class_id, student_id),
+            )
+            return cursor.fetchone()
+
+    def list_student_class_history_records(self, class_id: int, student_id: int) -> list[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    sess.session_id,
+                    sess.scheduled_start,
+                    sess.scheduled_end,
+                    ss.final_status,
+                    ss.total_presence_minutes,
+                    ss.total_outside_minutes,
+                    ss.break_count,
+                    ss.system_assessment
+                FROM attendance_sessions sess
+                JOIN student_session_records ss ON ss.session_id = sess.session_id
+                WHERE sess.class_id = ?
+                  AND ss.student_id = ?
+                ORDER BY sess.scheduled_start DESC, sess.session_id DESC
+                """,
+                (class_id, student_id),
+            )
+            return cursor.fetchall()
+
+    def get_face_profile_context(self, class_id: int, student_id: int) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    c.class_id,
+                    st.student_id,
+                    st.student_number,
+                    st.first_name,
+                    st.last_name,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number,
+                    MAX(COALESCE(fp.updated_at, fp.registered_at)) AS last_face_update,
+                    COUNT(DISTINCT fp.face_profile_id) AS face_profile_count
+                FROM classes c
+                JOIN courses co ON co.course_id = c.course_id
+                LEFT JOIN rooms r ON r.room_id = c.room_id
+                JOIN enrollments e ON e.class_id = c.class_id
+                    AND e.enrollment_status = 'active'
+                JOIN students st ON st.student_id = e.student_id
+                LEFT JOIN student_face_profiles fp ON fp.student_id = st.student_id
+                    AND fp.is_active = TRUE
+                WHERE c.class_id = ?
+                  AND st.student_id = ?
+                GROUP BY
+                    c.class_id,
+                    st.student_id,
+                    st.student_number,
+                    st.first_name,
+                    st.last_name,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number
+                """,
+                (class_id, student_id),
+            )
+            return cursor.fetchone()
+
+    def get_student_name_for_class(self, class_id: int, student_id: int) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT st.first_name, st.last_name
+                FROM enrollments e
+                JOIN students st ON st.student_id = e.student_id
+                WHERE e.class_id = ?
+                  AND e.student_id = ?
+                  AND e.enrollment_status = 'active'
+                """,
+                (class_id, student_id),
+            )
+            return cursor.fetchone()
+
+    def replace_student_face_profile(
+        self,
+        student_id: int,
+        face_image_path: str | None,
+        embedding_json: str | None,
+        model_name: str | None,
+    ) -> int:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE student_face_profiles
+                SET is_active = FALSE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE student_id = ?
+                  AND is_active = TRUE
+                """,
+                (student_id,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO student_face_profiles (
+                    student_id,
+                    face_image_path,
+                    embedding_json,
+                    model_name,
+                    is_active,
+                    registered_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING face_profile_id
+                """,
+                (student_id, face_image_path, embedding_json, model_name),
+            )
+            return int(cursor.fetchone()[0])
+
     def get_class_for_session_start(self, class_id: int, professor_id: int) -> Optional[tuple[Any, ...]]:
         with get_connection() as conn:
             cursor = conn.cursor()
@@ -469,6 +778,23 @@ class V2AttendanceRepository:
                 (record_id, professor_id, previous_status, new_status, notes),
             )
 
+    def confirm_student_record(self, session_id: int, student_id: int) -> None:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE student_session_records
+                SET confirmed_by_professor = TRUE,
+                    confirmed_at = CURRENT_TIMESTAMP,
+                    requires_review = FALSE,
+                    review_reason = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE session_id = ?
+                  AND student_id = ?
+                """,
+                (session_id, student_id),
+            )
+
     def set_session_status(self, session_id: int, status: str) -> None:
         with get_connection() as conn:
             cursor = conn.cursor()
@@ -495,4 +821,19 @@ class V2AttendanceRepository:
                   AND session_status IN ('in_progress', 'on_break')
                 """,
                 (actual_end, session_id),
+            )
+
+    def finalize_session(self, session_id: int, finalized_at: datetime) -> None:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE attendance_sessions
+                SET finalized_at = ?,
+                    session_status = 'finalized',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE session_id = ?
+                  AND session_status IN ('under_review', 'in_progress', 'on_break')
+                """,
+                (finalized_at, session_id),
             )

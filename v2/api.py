@@ -1,15 +1,21 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from v2.models import (
+    V2ClassRosterResponse,
     V2CreateEventRequest,
+    V2FaceProfileContextResponse,
+    V2FaceProfileSaveResponse,
     V2ManualAttendanceRequest,
     V2ProfessorScheduleResponse,
     V2ProfessorSummary,
+    V2RecognitionMatchResponse,
     V2SessionDetailResponse,
+    V2SessionHistoryResponse,
     V2SessionReviewResponse,
     V2StartSessionRequest,
+    V2StudentClassHistoryResponse,
     V2TodayClassesResponse,
 )
 from v2.service import V2AttendanceService, get_v2_attendance_service
@@ -40,6 +46,65 @@ def get_professor_schedule(
     service: V2AttendanceService = Depends(get_v2_attendance_service),
 ):
     return service.get_professor_schedule(professor_id=professor_id)
+
+
+@router.get("/classes/{class_id}/session-history", response_model=V2SessionHistoryResponse)
+def get_class_session_history(
+    class_id: int,
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.get_class_session_history(class_id=class_id)
+
+
+@router.get("/classes/{class_id}/students", response_model=V2ClassRosterResponse)
+def get_class_roster(
+    class_id: int,
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.get_class_roster(class_id=class_id)
+
+
+@router.get("/classes/{class_id}/students/{student_id}/history", response_model=V2StudentClassHistoryResponse)
+def get_student_class_history(
+    class_id: int,
+    student_id: int,
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.get_student_class_history(class_id=class_id, student_id=student_id)
+
+
+@router.get("/classes/{class_id}/students/{student_id}/face-profile", response_model=V2FaceProfileContextResponse)
+def get_face_profile_context(
+    class_id: int,
+    student_id: int,
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.get_face_profile_context(class_id=class_id, student_id=student_id)
+
+
+@router.post("/classes/{class_id}/students/{student_id}/face-profile", response_model=V2FaceProfileSaveResponse)
+async def save_face_profile(
+    class_id: int,
+    student_id: int,
+    angles: list[str] = Form(...),
+    images: list[UploadFile] = File(...),
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return await service.save_face_profile(
+        class_id=class_id,
+        student_id=student_id,
+        angles=angles,
+        images=images,
+    )
+
+
+@router.post("/classes/{class_id}/recognize", response_model=V2RecognitionMatchResponse)
+async def recognize_face_for_class(
+    class_id: int,
+    image: UploadFile = File(...),
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return await service.recognize_face_for_class(class_id=class_id, image=image)
 
 
 @router.post("/classes/{class_id}/sessions/start", response_model=V2SessionDetailResponse)
@@ -107,3 +172,20 @@ def get_session_review(
     service: V2AttendanceService = Depends(get_v2_attendance_service),
 ):
     return service.get_session_review(session_id=session_id)
+
+
+@router.post("/sessions/{session_id}/finalize", response_model=V2SessionReviewResponse)
+def finalize_session(
+    session_id: int,
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.finalize_session(session_id=session_id)
+
+
+@router.post("/sessions/{session_id}/students/{student_id}/confirm", response_model=V2SessionReviewResponse)
+def confirm_student_record(
+    session_id: int,
+    student_id: int,
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.confirm_student_record(session_id=session_id, student_id=student_id)
