@@ -43,8 +43,8 @@ export class LoginComponent {
 
           this.email = '';
           this.password = '';
-          // navigate to monitor page
-          this.router.navigate(['/monitor']);
+          const targetRoute = this.authService.isAdmin() ? '/admin/analytics' : '/v2/classes';
+          this.router.navigate([targetRoute]);
         },
         error: err => {
           this.error = err?.error?.detail || err?.error?.message || 'Invalid credentials';

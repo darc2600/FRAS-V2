@@ -7,6 +7,27 @@ from services.db import get_connection
 
 
 class V2AttendanceRepository:
+    def list_professors(self) -> list[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    professor_id,
+                    user_id,
+                    faculty_number,
+                    first_name,
+                    last_name,
+                    email,
+                    COALESCE(total_units, 0),
+                    COALESCE(lecture_units, 0),
+                    COALESCE(lab_units, 0)
+                FROM professors
+                ORDER BY last_name, first_name, professor_id
+                """
+            )
+            return cursor.fetchall()
+
     def list_professor_classes_for_day(self, professor_id: int, day_of_week: str) -> list[tuple[Any, ...]]:
         with get_connection() as conn:
             cursor = conn.cursor()

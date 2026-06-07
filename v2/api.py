@@ -6,6 +6,7 @@ from v2.models import (
     V2CreateEventRequest,
     V2ManualAttendanceRequest,
     V2ProfessorScheduleResponse,
+    V2ProfessorSummary,
     V2SessionDetailResponse,
     V2SessionReviewResponse,
     V2StartSessionRequest,
@@ -15,6 +16,13 @@ from v2.service import V2AttendanceService, get_v2_attendance_service
 
 
 router = APIRouter(prefix="/api/v2", tags=["V2 Attendance"])
+
+
+@router.get("/professors", response_model=list[V2ProfessorSummary])
+def list_professors(
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.list_professors()
 
 
 @router.get("/professors/{professor_id}/today/classes", response_model=V2TodayClassesResponse)

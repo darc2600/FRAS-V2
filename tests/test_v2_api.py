@@ -14,6 +14,7 @@ def setup_module():
 
 def test_v2_routes_are_registered():
     paths = {route.path for route in app.routes}
+    assert "/api/v2/professors" in paths
     assert "/api/v2/professors/{professor_id}/today/classes" in paths
     assert "/api/v2/professors/{professor_id}/schedule" in paths
     assert "/api/v2/classes/{class_id}/sessions/start" in paths

@@ -193,7 +193,35 @@ def _get_user_auth(email: str):
         with get_connection() as conn:
             cur = conn.cursor()
 
-            # 1) users table (newer consolidated schema)
+            # 1) V2 users table. V2 stores passwords in password_hash and
+            # links professor rows through professors.user_id.
+            try:
+                cur.execute("""
+                    SELECT u.password_hash, u.role, u.user_id,
+                           COALESCE(p.professor_id, u.user_id) AS reference_id,
+                           COALESCE(u.is_active, TRUE)
+                    FROM users u
+                    LEFT JOIN professors p ON p.user_id = u.user_id
+                    WHERE u.email = ?
+                """, (email,))
+                result = cur.fetchone()
+                if result:
+                    password, role, user_id, reference_id, is_active = result
+                    user_type_map = {
+                        'student': 'regular',
+                        'regular': 'regular',
+                        'professor': 'instructor',
+                        'instructor': 'instructor',
+                        'admin': 'it_admin',
+                        'it_admin': 'it_admin',
+                        'super_admin': 'super_admin'
+                    }
+                    user_type = user_type_map.get(role, 'regular')
+                    return (password, user_type, user_id, reference_id, bool(is_active))
+            except Exception:
+                pass
+
+            # 2) Legacy consolidated users table.
             try:
                 cur.execute("""
                     SELECT u.password, u.role, u.user_id, u.reference_id,
@@ -206,6 +234,8 @@ def _get_user_auth(email: str):
                     password, role, user_id, reference_id, is_active = result
                     user_type_map = {
                         'student': 'regular',
+                        'regular': 'regular',
+                        'professor': 'instructor',
                         'instructor': 'instructor',
                         'admin': 'it_admin',
                         'it_admin': 'it_admin',
@@ -217,7 +247,7 @@ def _get_user_auth(email: str):
                 # users table may not exist in migrated schema
                 pass
 
-            # 2) students table
+            # 3) students table
             try:
                 cur.execute("SELECT password, student_id FROM students WHERE email = ?", (email,))
                 row = cur.fetchone()
@@ -227,7 +257,7 @@ def _get_user_auth(email: str):
             except Exception:
                 pass
 
-            # 3) instructors table
+            # 4) instructors table
             try:
                 cur.execute("SELECT password, instructor_id FROM instructors WHERE email = ?", (email,))
                 row = cur.fetchone()
@@ -237,7 +267,7 @@ def _get_user_auth(email: str):
             except Exception:
                 pass
 
-            # 4) admins table
+            # 5) admins table
             try:
                 cur.execute("SELECT password, admin_id FROM admins WHERE email = ?", (email,))
                 row = cur.fetchone()
@@ -247,7 +277,7 @@ def _get_user_auth(email: str):
             except Exception:
                 pass
 
-            # 5) super_admins table
+            # 6) super_admins table
             try:
                 cur.execute("SELECT password, super_admin_id FROM super_admins WHERE email = ?", (email,))
                 row = cur.fetchone()

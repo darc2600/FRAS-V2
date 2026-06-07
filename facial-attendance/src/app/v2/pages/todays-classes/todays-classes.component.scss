@@ -55,12 +55,14 @@
   gap: var(--space-4);
 }
 
-.date-control {
+.date-control,
+.professor-control {
   display: grid;
   gap: var(--space-2);
 }
 
-.date-control span {
+.date-control span,
+.professor-control span {
   color: var(--color-text-subtle);
   font-size: var(--font-size-label);
   font-weight: var(--font-weight-heavy);
@@ -68,7 +70,8 @@
   text-transform: uppercase;
 }
 
-.date-control input {
+.date-control input,
+.professor-control select {
   height: 38px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -76,6 +79,10 @@
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
+}
+
+.professor-control select {
+  min-width: 240px;
 }
 
 .view-toggle {

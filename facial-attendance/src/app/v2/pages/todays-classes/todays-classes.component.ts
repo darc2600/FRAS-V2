@@ -1,8 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../../api.service';
+import { AuthService } from '../../../auth.service';
 import {
   V2ClassCard,
+  V2ProfessorSummary,
   V2ProfessorScheduleClass,
   V2ProfessorScheduleResponse,
   V2TodayClassesResponse
@@ -12,6 +14,7 @@ import { V2StatusTone } from '../../components';
 type V2TodayView = 'cards' | 'schedule';
 
 const PROFESSOR_ID = 1;
+const TEST_PROFESSOR_EMAIL = 'test.professor@mapua.test';
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const STANDARD_TIME_SLOTS = [
   '07:00 AM - 08:10 AM',
@@ -39,6 +42,7 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
   view: V2TodayView = 'cards';
   todayData: V2TodayClassesResponse | null = null;
   scheduleData: V2ProfessorScheduleResponse | null = null;
+  professors: V2ProfessorSummary[] = [];
   isLoading = false;
   isStartingSession = false;
   errorMessage = '';
@@ -58,6 +62,7 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
 
   constructor(
     private api: ApiService,
+    private authService: AuthService,
     private route: ActivatedRoute,
     private router: Router
   ) {}
@@ -66,7 +71,7 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
     this.routeSubscription = this.route.url.subscribe(() => {
       this.view = this.router.url.startsWith('/v2/schedule') ? 'schedule' : 'cards';
     });
-    this.loadPageData();
+    this.loadProfessors();
     this.clockInterval = setInterval(() => this.now = new Date(), 60000);
   }
 
@@ -98,6 +103,39 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
       next: (data) => this.scheduleData = data,
       error: () => this.errorMessage = 'Unable to load V2 schedule.'
     });
+  }
+
+  loadProfessors(): void {
+    this.api.getV2Professors().subscribe({
+      next: (data) => {
+        this.professors = data;
+        const currentUser = this.authService.getCurrentUser();
+        const matchedProfessor = data.find((professor) => professor.user_id === currentUser?.userId);
+        if (matchedProfessor) {
+          this.professorId = matchedProfessor.professor_id;
+        }
+        this.loadPageData();
+      },
+      error: () => {
+        this.errorMessage = 'Unable to load V2 professors.';
+        this.loadPageData();
+      }
+    });
+  }
+
+  onProfessorChange(value: number | string): void {
+    if (!this.canBrowseProfessors) return;
+    this.professorId = Number(value) || PROFESSOR_ID;
+    this.loadPageData();
+  }
+
+  get selectedProfessor(): V2ProfessorSummary | null {
+    return this.professors.find((professor) => professor.professor_id === this.professorId) || null;
+  }
+
+  get canBrowseProfessors(): boolean {
+    const currentUser = this.authService.getCurrentUser();
+    return this.authService.isAdmin() || currentUser?.email === TEST_PROFESSOR_EMAIL;
   }
 
   setView(view: V2TodayView): void {
@@ -294,6 +332,10 @@ export class V2TodaysClassesComponent implements OnInit, OnDestroy {
 
   formatScheduleLike(classItem: V2ClassCard | V2ProfessorScheduleClass): string {
     return `${this.formatTime(classItem.start_time)} - ${this.formatTime(classItem.end_time)}`;
+  }
+
+  courseSectionLabel(classItem: V2ClassCard | V2ProfessorScheduleClass): string {
+    return `${classItem.course_code} · ${classItem.section}`;
   }
 
   statusForAssignedClass(classItem: V2ProfessorScheduleClass): 'upcoming' | 'ongoing' | 'completed' | 'needs_review' {

@@ -12,6 +12,7 @@ from v2.models import (
     V2ManualAttendanceRequest,
     V2ProfessorScheduleClass,
     V2ProfessorScheduleResponse,
+    V2ProfessorSummary,
     V2ReviewSummary,
     V2SessionDetailResponse,
     V2SessionResponse,
@@ -29,6 +30,21 @@ MANILA_TZ = ZoneInfo("Asia/Manila")
 class V2AttendanceService:
     def __init__(self, repo: V2AttendanceRepository | None = None):
         self.repo = repo or V2AttendanceRepository()
+
+    def list_professors(self) -> list[V2ProfessorSummary]:
+        return [
+            V2ProfessorSummary(
+                professor_id=row[0],
+                user_id=row[1],
+                faculty_number=row[2],
+                professor_name=f"{row[4]}, {row[3]}",
+                email=row[5],
+                total_units=row[6],
+                lecture_units=row[7],
+                lab_units=row[8],
+            )
+            for row in self.repo.list_professors()
+        ]
 
     def get_today_classes(self, professor_id: int = 1, target_date: date | None = None) -> V2TodayClassesResponse:
         target_date = target_date or datetime.now(MANILA_TZ).date()

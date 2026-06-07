@@ -43,6 +43,17 @@ class V2ProfessorScheduleResponse(BaseModel):
     classes: list[V2ProfessorScheduleClass]
 
 
+class V2ProfessorSummary(BaseModel):
+    professor_id: int
+    user_id: Optional[int] = None
+    faculty_number: Optional[str] = None
+    professor_name: str
+    email: str
+    total_units: int = 0
+    lecture_units: int = 0
+    lab_units: int = 0
+
+
 class V2StartSessionRequest(BaseModel):
     professor_id: int = 1
     session_date: Optional[date] = None

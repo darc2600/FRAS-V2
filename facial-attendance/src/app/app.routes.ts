@@ -22,18 +22,18 @@ import { SuperAdminGuard } from './super-admin.guard';
 
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'monitor', pathMatch: 'full' },
+  { path: '', redirectTo: 'v2/classes', pathMatch: 'full' },
   { path: 'monitor', component: AttendanceMonitorComponent, canActivate: [AuthGuard] },
   { path: 'logs', component: AttendanceLogsComponent, canActivate: [AuthGuard] },
   { path: 'room-schedule', component: RoomScheduleComponent, canActivate: [AuthGuard] },
   { path: 'register-student', component: RegisterStudentsComponent, canActivate: [AuthGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'registration', component: RegistrationComponent },
-  { path: 'v2/classes', component: V2TodaysClassesComponent },
+  { path: 'v2/classes', component: V2TodaysClassesComponent, canActivate: [AuthGuard] },
   { path: 'v2/today', redirectTo: 'v2/classes', pathMatch: 'full' },
-  { path: 'v2/schedule', component: V2TodaysClassesComponent },
-  { path: 'live-session/:sessionId', component: V2LiveSessionComponent },
-  { path: 'v2/sessions/:sessionId/review', component: V2PostSessionReviewPlaceholderComponent },
+  { path: 'v2/schedule', component: V2TodaysClassesComponent, canActivate: [AuthGuard] },
+  { path: 'live-session/:sessionId', component: V2LiveSessionComponent, canActivate: [AuthGuard] },
+  { path: 'v2/sessions/:sessionId/review', component: V2PostSessionReviewPlaceholderComponent, canActivate: [AuthGuard] },
 
   // Admin routes (no longer using AdminLayoutComponent)
   { path: 'admin/users', component: UserManagementComponent, canActivate: [AdminGuard] },

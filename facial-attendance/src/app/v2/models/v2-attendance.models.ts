@@ -39,6 +39,17 @@ export interface V2ProfessorScheduleResponse {
   classes: V2ProfessorScheduleClass[];
 }
 
+export interface V2ProfessorSummary {
+  professor_id: number;
+  user_id?: number | null;
+  faculty_number?: string | null;
+  professor_name: string;
+  email: string;
+  total_units: number;
+  lecture_units: number;
+  lab_units: number;
+}
+
 export interface V2SessionDetailResponse {
   session: {
     session_id: number;

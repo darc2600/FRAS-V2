@@ -5,6 +5,7 @@ import {
   V2CreateEventRequest,
   V2ManualAttendanceRequest,
   V2ProfessorScheduleResponse,
+  V2ProfessorSummary,
   V2SessionReviewResponse,
   V2SessionDetailResponse,
   V2TodayClassesResponse
@@ -45,6 +46,10 @@ export class ApiService {
       url += `?target_date=${encodeURIComponent(targetDate)}`;
     }
     return this.http.get<V2TodayClassesResponse>(url);
+  }
+
+  getV2Professors(): Observable<V2ProfessorSummary[]> {
+    return this.http.get<V2ProfessorSummary[]>(`${this.backendUrl}/api/v2/professors`);
   }
 
   getV2ProfessorSchedule(professorId: number): Observable<V2ProfessorScheduleResponse> {

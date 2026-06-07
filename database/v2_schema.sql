@@ -33,6 +33,10 @@ CREATE TABLE professors (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
+    employment_status VARCHAR(100),
+    total_units INT DEFAULT 0,
+    lecture_units INT DEFAULT 0,
+    lab_units INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

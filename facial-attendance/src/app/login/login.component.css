@@ -65,8 +65,19 @@
 }
 
 h2 {
-  margin: 6px 0 16px 0;
+  margin: 6px 0 8px 0;
   font-size: 1.1rem;
+}
+
+.login-hint {
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.login-hint strong {
+  color: #ffd15c;
 }
 
 label {
