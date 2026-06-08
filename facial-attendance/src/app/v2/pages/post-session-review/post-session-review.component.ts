@@ -25,8 +25,8 @@ export class V2PostSessionReviewComponent implements OnInit {
   isFinalizing = false;
   errorMessage = '';
   actionMessage = '';
-  overrideStudent: V2StudentRecord | null = null;
-  overrideStatusValue: V2ManualAttendanceStatus = 'present';
+  overrideMode = false;
+  overrideSelections: Record<number, V2ManualAttendanceStatus> = {};
 
   constructor(
     private route: ActivatedRoute,
@@ -109,27 +109,72 @@ export class V2PostSessionReviewComponent implements OnInit {
     this.router.navigate(['/student-evidence', this.sessionId, student.student_id]);
   }
 
-  markExcused(student: V2StudentRecord): void {
-    this.saveSingleStatus(student, 'excused', 'Marked excused from post-session review.');
+  beginOverrideMode(): void {
+    if (this.isFinalized) return;
+    this.overrideSelections = {};
+    for (const student of this.roster) {
+      this.overrideSelections[student.record_id] = this.normalizeManualStatus(student.final_status);
+    }
+    this.overrideMode = true;
   }
 
-  openOverride(student: V2StudentRecord): void {
-    this.overrideStudent = student;
-    this.overrideStatusValue = this.normalizeManualStatus(student.final_status);
-  }
-
-  closeOverride(): void {
+  cancelOverrideMode(): void {
     if (this.isSaving) return;
-    this.overrideStudent = null;
+    this.overrideMode = false;
+    this.overrideSelections = {};
   }
 
-  saveOverride(): void {
-    if (!this.overrideStudent) return;
-    this.saveSingleStatus(
-      this.overrideStudent,
-      this.overrideStatusValue,
-      `Override from post-session review: ${this.statusLabel(this.overrideStatusValue)}.`
-    );
+  setOverrideStatus(student: V2StudentRecord, status: V2ManualAttendanceStatus): void {
+    this.overrideSelections[student.record_id] = status;
+  }
+
+  overrideStatusFor(student: V2StudentRecord): V2ManualAttendanceStatus {
+    return this.overrideSelections[student.record_id] || this.normalizeManualStatus(student.final_status);
+  }
+
+  setVisibleOverrideStatus(status: V2ManualAttendanceStatus): void {
+    for (const student of this.filteredRoster) {
+      this.overrideSelections[student.record_id] = status;
+    }
+  }
+
+  get overrideChangeCount(): number {
+    return this.changedOverrideRecords.length;
+  }
+
+  saveOverrideChanges(): void {
+    if (!this.session || this.isSaving || this.isFinalized) return;
+    const records = this.changedOverrideRecords.map((student) => ({
+      record_id: student.record_id,
+      student_id: student.student_id,
+      status: this.overrideStatusFor(student)
+    }));
+
+    if (!records.length) {
+      this.actionMessage = 'No override changes to save.';
+      this.cancelOverrideMode();
+      return;
+    }
+
+    this.isSaving = true;
+    this.errorMessage = '';
+    this.api.saveV2ManualAttendance(this.sessionId, {
+      professor_id: this.session.professor_id,
+      records,
+      notes: 'Saved from post-session override mode.'
+    }).subscribe({
+      next: () => {
+        this.isSaving = false;
+        this.overrideMode = false;
+        this.overrideSelections = {};
+        this.actionMessage = `${records.length} attendance override${records.length === 1 ? '' : 's'} saved.`;
+        this.loadReview();
+      },
+      error: () => {
+        this.isSaving = false;
+        this.errorMessage = 'Unable to save attendance overrides.';
+      }
+    });
   }
 
   finalizeAttendance(): void {
@@ -230,30 +275,10 @@ export class V2PostSessionReviewComponent implements OnInit {
     });
   }
 
-  private saveSingleStatus(student: V2StudentRecord, status: V2ManualAttendanceStatus, notes: string): void {
-    if (!this.session || this.isSaving || this.isFinalized) return;
-    this.isSaving = true;
-    this.errorMessage = '';
-    this.api.saveV2ManualAttendance(this.sessionId, {
-      professor_id: this.session.professor_id,
-      records: [{
-        record_id: student.record_id,
-        student_id: student.student_id,
-        status
-      }],
-      notes
-    }).subscribe({
-      next: () => {
-        this.isSaving = false;
-        this.overrideStudent = null;
-        this.actionMessage = `${student.student_name} updated to ${this.statusLabel(status)}.`;
-        this.loadReview();
-      },
-      error: () => {
-        this.isSaving = false;
-        this.errorMessage = 'Unable to update student status.';
-      }
-    });
+  private get changedOverrideRecords(): V2StudentRecord[] {
+    return this.roster.filter((student) =>
+      this.overrideStatusFor(student) !== this.normalizeManualStatus(student.final_status)
+    );
   }
 
   private normalizeManualStatus(status: string): V2ManualAttendanceStatus {

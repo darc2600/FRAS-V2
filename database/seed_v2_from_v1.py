@@ -1,4 +1,5 @@
 from pathlib import Path
+import argparse
 import json
 import os
 import sqlite3
@@ -35,7 +36,19 @@ def split_day_of_week(value: str) -> str:
     return "Monday"
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Reset V2 from one V1 class snapshot.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Truncate V2 tables before seeding from V1. This deletes existing V2 seed data.",
+    )
+    args = parser.parse_args(argv)
+    if not args.force:
+        print("Refusing to seed from V1 because this script truncates V2 tables.")
+        print("Run with --force only when you intentionally want to replace current V2 data.")
+        return 2
+
     load_local_env()
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:

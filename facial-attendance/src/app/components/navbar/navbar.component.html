@@ -11,16 +11,9 @@
   </div>
   <ul class="sidebar-links">
     <li><a routerLink="/v2/classes" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Classes</a></li>
-    <li><a routerLink="/v2/history" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Session History</a></li>
+    <li><a routerLink="/session-history" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Session History</a></li>
     <li><a routerLink="/v2/schedule" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Schedule</a></li>
     <li><a routerLink="/v2/settings" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Settings</a></li>
-
-    <!-- Core Features for all authenticated users -->
-    <li *ngIf="canMonitor"><a routerLink="/monitor" routerLinkActive="active">Monitor</a></li>
-    <li *ngIf="canViewLogs"><a routerLink="/logs" routerLinkActive="active">Attendance Logs</a></li>
-    <li *ngIf="canRegister"><a routerLink="/register-student" routerLinkActive="active">Register</a></li>
-    <li *ngIf="canViewSchedule"><a routerLink="/room-schedule" routerLinkActive="active">View Schedule</a></li>
-    <li *ngIf="canSubmitSupport"><a routerLink="/submit-support" routerLinkActive="active">Submit Support</a></li>
 
     <!-- Admin Section -->
     <li *ngIf="canManageUsers || canResetPasswords || canEditSchedule || canConfigureSystem || canViewAnalytics || canManageSupport" class="nav-section">Admin</li>

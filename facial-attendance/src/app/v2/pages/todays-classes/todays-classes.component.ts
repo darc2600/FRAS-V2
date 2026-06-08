@@ -14,7 +14,7 @@ import { V2StatusTone } from '../../components';
 type V2TodayView = 'cards' | 'schedule';
 
 const PROFESSOR_ID = 1;
-const TEST_PROFESSOR_EMAIL = 'test.professor@mapua.test';
+const TEST_PROFESSOR_EMAIL = 'test.professor@fras.local';
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const STANDARD_TIME_SLOTS = [
   '07:00 AM - 08:10 AM',

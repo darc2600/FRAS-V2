@@ -79,7 +79,23 @@
           <span aria-hidden="true">⌕</span>
           <input type="search" [(ngModel)]="searchQuery" placeholder="Filter by student name, ID, status, or assessment..." />
         </label>
-        <span>{{ filteredRoster.length }} students</span>
+        <div class="review-table-actions" *ngIf="!overrideMode; else overrideTools">
+          <span>{{ filteredRoster.length }} students</span>
+          <button type="button" class="override-toggle" [disabled]="isFinalized" (click)="beginOverrideMode()">Override Attendance</button>
+        </div>
+        <ng-template #overrideTools>
+          <div class="bulk-override-tools">
+            <span>{{ overrideChangeCount }} changed</span>
+            <button type="button" (click)="setVisibleOverrideStatus('present')">Set Visible Present</button>
+            <button type="button" (click)="setVisibleOverrideStatus('late')">Late</button>
+            <button type="button" (click)="setVisibleOverrideStatus('absent')">Absent</button>
+            <button type="button" (click)="setVisibleOverrideStatus('excused')">Excused</button>
+            <button type="button" class="save-overrides" [disabled]="isSaving || !overrideChangeCount" (click)="saveOverrideChanges()">
+              {{ isSaving ? 'Saving...' : 'Save Overrides' }}
+            </button>
+            <button type="button" class="cancel-overrides" [disabled]="isSaving" (click)="cancelOverrideMode()">Cancel</button>
+          </div>
+        </ng-template>
       </div>
 
       <div class="table-scroll">
@@ -92,7 +108,7 @@
               <th>Outside Duration</th>
               <th>Break Count</th>
               <th>System Assessment</th>
-              <th>Professor Actions</th>
+              <th>{{ overrideMode ? 'Override Status' : 'Professor Actions' }}</th>
             </tr>
           </thead>
           <tbody>
@@ -120,8 +136,12 @@
               <td>
                 <div class="row-actions">
                   <button type="button" (click)="viewDetails(student)">View Details</button>
-                  <button type="button" [disabled]="isFinalized || isSaving" (click)="markExcused(student)">Mark Excused</button>
-                  <button type="button" class="primary" [disabled]="isFinalized || isSaving" (click)="openOverride(student)">Override</button>
+                  <div class="inline-override-group" *ngIf="overrideMode" role="group" [attr.aria-label]="'Override status for ' + student.student_name">
+                    <button type="button" [class.selected]="overrideStatusFor(student) === 'present'" (click)="setOverrideStatus(student, 'present')">Present</button>
+                    <button type="button" [class.selected]="overrideStatusFor(student) === 'late'" (click)="setOverrideStatus(student, 'late')">Late</button>
+                    <button type="button" [class.selected]="overrideStatusFor(student) === 'absent'" (click)="setOverrideStatus(student, 'absent')">Absent</button>
+                    <button type="button" [class.selected]="overrideStatusFor(student) === 'excused'" (click)="setOverrideStatus(student, 'excused')">Excused</button>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -139,30 +159,4 @@
       <button type="button" class="history-btn" [disabled]="!isFinalized" (click)="goToHistory()">Session History</button>
     </footer>
   </ng-container>
-
-  <div class="override-backdrop" *ngIf="overrideStudent" (click)="closeOverride()">
-    <section class="override-modal" (click)="$event.stopPropagation()">
-      <header>
-        <div>
-          <span>Override Status</span>
-          <h2>{{ overrideStudent.student_name }}</h2>
-        </div>
-        <button type="button" (click)="closeOverride()">×</button>
-      </header>
-
-      <div class="override-options">
-        <button type="button" [class.selected]="overrideStatusValue === 'present'" (click)="overrideStatusValue = 'present'">Present</button>
-        <button type="button" [class.selected]="overrideStatusValue === 'absent'" (click)="overrideStatusValue = 'absent'">Absent</button>
-        <button type="button" [class.selected]="overrideStatusValue === 'late'" (click)="overrideStatusValue = 'late'">Late</button>
-        <button type="button" [class.selected]="overrideStatusValue === 'excused'" (click)="overrideStatusValue = 'excused'">Excused</button>
-      </div>
-
-      <footer>
-        <button type="button" class="cancel" [disabled]="isSaving" (click)="closeOverride()">Cancel</button>
-        <button type="button" class="save" [disabled]="isSaving" (click)="saveOverride()">
-          {{ isSaving ? 'Saving...' : 'Save Override' }}
-        </button>
-      </footer>
-    </section>
-  </div>
 </section>

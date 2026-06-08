@@ -28,6 +28,7 @@
           <div class="camera-placeholder" *ngIf="!cameraReady">
             <strong>Camera Preview</strong>
             <span>Allow camera permission to begin capture.</span>
+            <button type="button" class="camera-retry" (click)="startCamera()">Retry Camera</button>
           </div>
           <div class="face-guide">
             <span></span>
@@ -46,7 +47,7 @@
 
         <div class="controls-grid">
           <button type="button" class="primary" [disabled]="!cameraReady" (click)="captureCurrentFrame()">Capture Frame</button>
-          <button type="button" (click)="retakeCurrentAngle()" [disabled]="currentAngle.status !== 'captured'">Retake Current Angle</button>
+          <button type="button" (click)="retakeCurrentAngle()" [disabled]="currentAngle.status !== 'captured'">Retake Capture</button>
           <button type="button" (click)="resetCaptures()" [disabled]="capturedCount === 0">Reset Captures</button>
           <button type="button" class="save" [disabled]="!allCaptured || isSaving" (click)="saveFaceProfile()">
             {{ isSaving ? 'Saving...' : 'Save Face Profile' }}
@@ -58,7 +59,7 @@
       <aside class="side-panels">
         <section class="panel">
           <div class="panel-head">
-            <h2>Five-Angle Capture</h2>
+            <h2>Front Face Capture</h2>
             <span>{{ capturedCount }}/{{ angles.length }}</span>
           </div>
           <div class="angle-list">
@@ -103,8 +104,8 @@
               <strong>{{ cameraReady ? 'Use guide frame' : 'Camera inactive' }}</strong>
             </div>
             <div>
-              <span>Angle Variation</span>
-              <strong>{{ allCaptured ? 'Complete' : capturedCount + ' captured' }}</strong>
+              <span>Capture Status</span>
+              <strong>{{ allCaptured ? 'Complete' : 'Waiting for front face' }}</strong>
             </div>
             <div>
               <span>Occlusion Warning</span>

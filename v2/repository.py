@@ -693,6 +693,22 @@ class V2AttendanceRepository:
             )
             return cursor.fetchall()
 
+    def get_record_recalculation_state(self, record_id: int) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    final_status,
+                    system_assessment,
+                    confirmed_by_professor
+                FROM student_session_records
+                WHERE record_id = ?
+                """,
+                (record_id,),
+            )
+            return cursor.fetchone()
+
     def update_student_record(
         self,
         record_id: int,

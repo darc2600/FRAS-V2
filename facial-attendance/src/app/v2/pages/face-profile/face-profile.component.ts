@@ -8,7 +8,7 @@ import { V2StatusTone } from '../../components';
 type CaptureStatus = 'pending' | 'captured';
 
 interface FaceAngle {
-  key: 'front' | 'left' | 'right' | 'up' | 'down';
+  key: 'front';
   label: string;
   instruction: string;
   status: CaptureStatus;
@@ -37,11 +37,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   lightingScore = 0;
 
   angles: FaceAngle[] = [
-    { key: 'front', label: 'Front', instruction: 'Face the camera directly.', status: 'pending' },
-    { key: 'left', label: 'Left', instruction: 'Turn slightly to your left.', status: 'pending' },
-    { key: 'right', label: 'Right', instruction: 'Turn slightly to your right.', status: 'pending' },
-    { key: 'up', label: 'Up', instruction: 'Tilt your chin slightly up.', status: 'pending' },
-    { key: 'down', label: 'Down', instruction: 'Tilt your chin slightly down.', status: 'pending' }
+    { key: 'front', label: 'Front', instruction: 'Face the camera directly inside the guide frame.', status: 'pending' }
   ];
   currentAngleIndex = 0;
 
@@ -55,7 +51,6 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     this.classId = Number(this.route.snapshot.paramMap.get('classId')) || 0;
     this.studentId = Number(this.route.snapshot.paramMap.get('studentId')) || 0;
     this.loadContext();
-    setTimeout(() => this.startCamera(), 0);
   }
 
   ngOnDestroy(): void {
@@ -77,6 +72,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       next: (context) => {
         this.context = context;
         this.isLoading = false;
+        setTimeout(() => this.startCamera(), 0);
       },
       error: () => {
         this.errorMessage = 'Unable to load face profile context.';
@@ -87,19 +83,31 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
 
   async startCamera(): Promise<void> {
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        this.cameraReady = false;
+        this.errorMessage = 'Camera access is not available in this browser or connection.';
+        return;
+      }
+
+      this.stopCamera();
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false
       });
-      if (this.videoEl?.nativeElement) {
-        this.videoEl.nativeElement.srcObject = this.stream;
-        await this.videoEl.nativeElement.play();
+
+      if (!this.videoEl?.nativeElement) {
+        this.cameraReady = false;
+        this.errorMessage = 'Camera preview is still loading. Please retry camera access.';
+        return;
       }
+
+      this.videoEl.nativeElement.srcObject = this.stream;
+      await this.videoEl.nativeElement.play();
       this.cameraReady = true;
       this.errorMessage = '';
     } catch (error) {
       this.cameraReady = false;
-      this.errorMessage = 'Camera permission is needed to capture face profile images.';
+      this.errorMessage = this.cameraErrorMessage(error);
     }
   }
 
@@ -122,7 +130,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   }
 
   get recognitionQuality(): number {
-    const completion = (this.capturedCount / this.angles.length) * 70;
+    const completion = this.allCaptured ? 70 : 0;
     const lighting = Math.min(30, Math.round((this.lightingScore / 100) * 30));
     return Math.min(100, Math.round(completion + lighting));
   }
@@ -160,10 +168,9 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     angle.blob = blob;
     angle.previewUrl = URL.createObjectURL(blob);
     angle.status = 'captured';
-    this.successMessage = `${angle.label} angle captured.`;
+    this.successMessage = 'Front face captured.';
 
-    const nextIndex = this.angles.findIndex((item) => item.status === 'pending');
-    if (nextIndex >= 0) this.currentAngleIndex = nextIndex;
+    this.currentAngleIndex = 0;
   }
 
   selectAngle(index: number): void {
@@ -263,5 +270,19 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     }
     const average = total / (imageData.data.length / 4);
     return Math.max(0, Math.min(100, Math.round((average / 255) * 100)));
+  }
+
+  private cameraErrorMessage(error: unknown): string {
+    const name = error instanceof DOMException ? error.name : '';
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return 'Camera permission is blocked. Allow camera access in the browser, then retry.';
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      return 'No camera was found on this device.';
+    }
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      return 'The camera is already in use by another app or browser tab.';
+    }
+    return 'Camera permission is needed to capture face profile images.';
   }
 }

@@ -12,8 +12,8 @@ except ImportError:
     from init_v2_database import load_local_env
 
 
-TEST_EMAIL = "test.professor@mapua.test"
-TEST_PASSWORD = "password"
+TEST_EMAIL = "test.professor@fras.local"
+TEST_PASSWORD = "password123"
 TEST_FACULTY_NUMBER = "TEST-001"
 TEST_FIRST_NAME = "Testing"
 TEST_LAST_NAME = "Professor"
@@ -192,17 +192,6 @@ def main() -> int:
             professor_id = upsert_test_professor(cursor)
             room_id = upsert_room(cursor)
             course_ids = fetch_course_ids(cursor)
-
-            cursor.execute(
-                """
-                UPDATE classes
-                SET is_active = FALSE,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE professor_id = %s
-                  AND term = 'TEST'
-                """,
-                (professor_id,),
-            )
 
             class_ids: list[int] = []
             for day_index, day in enumerate(DAYS):

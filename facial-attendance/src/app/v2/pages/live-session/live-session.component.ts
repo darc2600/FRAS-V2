@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin, Observable, Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { WebcamImage } from 'ngx-webcam';
 import { ApiService } from '../../../api.service';
 import { AuthService } from '../../../auth.service';
@@ -15,8 +15,6 @@ import {
   V2StudentRecord
 } from '../../models/v2-attendance.models';
 import { V2StatusTone } from '../../components';
-
-const PROFESSOR_ID = 1;
 
 @Component({
   selector: 'app-v2-live-session',
@@ -86,13 +84,9 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
 
     this.isLoading = true;
     this.errorMessage = '';
-    forkJoin({
-      detail: this.api.getV2Session(this.sessionId),
-      schedule: this.api.getV2ProfessorSchedule(PROFESSOR_ID)
-    }).subscribe({
-      next: ({ detail, schedule }) => {
+    this.api.getV2Session(this.sessionId).subscribe({
+      next: (detail) => {
         this.detail = detail;
-        this.classInfo = this.findClassInfo(schedule, detail.session.class_id);
         this.selectedStudent = null;
         if (this.isBreakMode) {
           this.autoCaptureActive = true;
@@ -102,6 +96,10 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
           this.stopAutoCaptureLoop();
         }
         this.isLoading = false;
+        this.api.getV2ProfessorSchedule(detail.session.professor_id).subscribe({
+          next: (schedule) => this.classInfo = this.findClassInfo(schedule, detail.session.class_id),
+          error: () => this.classInfo = null
+        });
       },
       error: () => {
         this.errorMessage = 'Unable to load this live session.';
@@ -184,6 +182,10 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
 
   get isBreakMode(): boolean {
     return this.session?.session_status === 'on_break';
+  }
+
+  get activeProfessorId(): number {
+    return this.session?.professor_id || 1;
   }
 
   get cameraModeLabel(): string {
@@ -384,7 +386,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
 
     const selectedId = this.selectedStudent.student_id;
     this.api.saveV2ManualAttendance(this.sessionId, {
-      professor_id: PROFESSOR_ID,
+      professor_id: this.activeProfessorId,
       records: [{
         record_id: this.selectedStudent.record_id,
         student_id: this.selectedStudent.student_id,
@@ -406,7 +408,12 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
   openManualAttendanceModal(): void {
     this.manualAttendanceSelections = {};
     for (const student of this.roster) {
-      if (student.final_status === 'present' || student.final_status === 'excused') {
+      if (
+        student.final_status === 'present' ||
+        student.final_status === 'late' ||
+        student.final_status === 'excused' ||
+        student.final_status === 'absent'
+      ) {
         this.manualAttendanceSelections[student.record_id] = student.final_status;
       } else {
         this.manualAttendanceSelections[student.record_id] = 'absent';
@@ -443,7 +450,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     this.manualAttendanceSaving = true;
     this.errorMessage = '';
     this.api.saveV2ManualAttendance(this.sessionId, {
-      professor_id: PROFESSOR_ID,
+      professor_id: this.activeProfessorId,
       records: this.roster.map((student) => ({
         record_id: student.record_id,
         student_id: student.student_id,

@@ -1,4 +1,5 @@
 from pathlib import Path
+import argparse
 import os
 import sys
 
@@ -22,7 +23,19 @@ def load_local_env() -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Initialize the FRAS V2 database schema.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Drop and recreate V2 tables. This deletes existing V2 data.",
+    )
+    args = parser.parse_args(argv)
+    if not args.force:
+        print("Refusing to initialize V2 schema because this drops existing V2 tables.")
+        print("Run with --force only when you intentionally want to reset the V2 database.")
+        return 2
+
     load_local_env()
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:

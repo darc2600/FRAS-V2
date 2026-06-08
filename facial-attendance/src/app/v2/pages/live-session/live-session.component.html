@@ -313,6 +313,14 @@
               </button>
               <button
                 type="button"
+                class="manual-status-btn late"
+                [class.selected]="manualAttendanceStatusFor(student) === 'late'"
+                (click)="setManualAttendanceStatus(student, 'late')">
+                <span aria-hidden="true">!</span>
+                Late
+              </button>
+              <button
+                type="button"
                 class="manual-status-btn present"
                 [class.selected]="manualAttendanceStatusFor(student) === 'present'"
                 (click)="setManualAttendanceStatus(student, 'present')">

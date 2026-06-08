@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import tempfile
@@ -409,14 +408,12 @@ class V2AttendanceService:
         context = self.get_face_profile_context(class_id, student_id)
         if len(images) != len(angles):
             raise HTTPException(status_code=400, detail="Angles and images must have the same count.")
-        if len(images) < 5:
-            raise HTTPException(status_code=400, detail="Capture all five required face angles before saving.")
+        if not images:
+            raise HTTPException(status_code=400, detail="Capture the front face image before saving.")
 
-        required = ["front", "left", "right", "up", "down"]
         normalized_angles = [angle.strip().lower() for angle in angles]
-        missing = [angle for angle in required if angle not in normalized_angles]
-        if missing:
-            raise HTTPException(status_code=400, detail=f"Missing required captures: {', '.join(missing)}")
+        if "front" not in normalized_angles:
+            raise HTTPException(status_code=400, detail="Front face capture is required.")
 
         dataset_base = Path(os.getenv("DATASET_PATH", "dataset"))
         safe_student = "".join(ch for ch in context.student_number if ch.isalnum() or ch in ("-", "_"))
@@ -434,18 +431,17 @@ class V2AttendanceService:
             path.write_bytes(content)
             saved_paths.append(str(path))
 
-        front_index = normalized_angles.index("front") if "front" in normalized_angles else 0
+        front_index = normalized_angles.index("front")
         front_path = saved_paths[front_index]
         settings = get_settings_service()
         model_name = settings.face_recognition_model
         embedding = extract_embedding_from_image(front_path, model_name=model_name, enforce_detection=False)
-        embedding_json = json.dumps(embedding) if embedding else None
 
         self.repo.replace_student_face_profile(
             student_id=student_id,
             face_image_path=front_path,
-            embedding_json=embedding_json,
-            model_name=model_name,
+            embedding_json=None,
+            model_name=None,
         )
 
         if embedding:
@@ -658,6 +654,9 @@ class V2AttendanceService:
         return self.get_session_review(session_id)
 
     def _recalculate_student_record(self, session: V2SessionResponse, record_id: int, student_id: int) -> None:
+        record_state = self.repo.get_record_recalculation_state(record_id)
+        professor_confirmed = bool(record_state[2]) if record_state else False
+        professor_status = str(record_state[0]) if record_state else ""
         events = self.repo.get_student_events(session.session_id, student_id)
         normalized = [(row[0], self._coerce_datetime(row[1])) for row in events]
         time_in = next((event_time for event_type, event_time in normalized if event_type in {"time_in", "manual_attendance"}), None)
@@ -725,6 +724,15 @@ class V2AttendanceService:
             system_assessment = "requires_review"
             requires_review = True
             review_reason = "Presence is below 60% of the scheduled session."
+
+        if professor_confirmed and professor_status in {"present", "late", "absent", "excused"}:
+            final_status = professor_status
+            if final_status in {"present", "late", "excused"}:
+                system_assessment = "valid_presence"
+            else:
+                system_assessment = "absent"
+            requires_review = False
+            review_reason = None
 
         self.repo.update_student_record(
             record_id=record_id,

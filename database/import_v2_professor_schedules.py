@@ -290,7 +290,7 @@ def upsert_room(cursor, room: str) -> int:
     return cursor.fetchone()[0]
 
 
-def upsert_class(cursor, professor_id: int, entry: ScheduleEntry) -> None:
+def upsert_class(cursor, professor_id: int, entry: ScheduleEntry) -> int:
     course_id = upsert_course(cursor, entry.course_code)
     room_id = upsert_room(cursor, entry.room)
     cursor.execute(
@@ -319,15 +319,16 @@ def upsert_class(cursor, professor_id: int, entry: ScheduleEntry) -> None:
             """
             UPDATE classes
             SET room_id = %s,
-                term = '2025-3RD',
+                term = 'SY 2025-3RD',
                 academic_year = '2025-2026',
                 is_active = TRUE,
                 updated_at = CURRENT_TIMESTAMP
             WHERE class_id = %s
+            RETURNING class_id
             """,
             (room_id, existing[0]),
         )
-        return
+        return cursor.fetchone()[0]
 
     cursor.execute(
         """
@@ -335,7 +336,8 @@ def upsert_class(cursor, professor_id: int, entry: ScheduleEntry) -> None:
             course_id, professor_id, room_id, section, day_of_week,
             start_time, end_time, term, academic_year
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, '2025-3RD', '2025-2026')
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 'SY 2025-3RD', '2025-2026')
+        RETURNING class_id
         """,
         (
             course_id,
@@ -347,6 +349,7 @@ def upsert_class(cursor, professor_id: int, entry: ScheduleEntry) -> None:
             entry.end_time,
         ),
     )
+    return cursor.fetchone()[0]
 
 
 def main(argv: list[str] | None = None) -> int:
