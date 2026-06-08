@@ -5,7 +5,7 @@ import { ApiService } from '../../../api.service';
 import { V2StatusTone } from '../../components';
 import { V2StudentClassHistoryRecord, V2StudentClassHistoryResponse } from '../../models/v2-attendance.models';
 
-type StatusFilter = 'all' | 'present' | 'late' | 'partial' | 'absent' | 'excused';
+type StatusFilter = 'all' | 'present' | 'late' | 'absent' | 'excused';
 type AssessmentFilter = 'all' | 'valid_presence' | 'attendance_warning' | 'requires_review' | 'absent';
 
 @Component({
@@ -121,7 +121,7 @@ export class V2StudentClassHistoryComponent implements OnInit {
 
   statusTone(status: string): V2StatusTone {
     if (status === 'present') return 'success';
-    if (status === 'late' || status === 'partial') return 'warning';
+    if (status === 'late') return 'warning';
     if (status === 'excused') return 'excused';
     return 'danger';
   }

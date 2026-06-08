@@ -91,6 +91,13 @@ export class V2PostSessionReviewComponent implements OnInit {
     return `${this.summary?.presence_validation_rate ?? 0}%`;
   }
 
+  get warningCount(): number {
+    return this.roster.filter((student) =>
+      student.system_assessment === 'attendance_warning' ||
+      student.system_assessment === 'requires_review'
+    ).length;
+  }
+
   get scheduledDateLabel(): string {
     if (!this.session) return '-';
     return new Intl.DateTimeFormat('en-US', {
@@ -195,12 +202,12 @@ export class V2PostSessionReviewComponent implements OnInit {
   }
 
   exportLogs(): void {
-    this.downloadCsv('fras-session-review-log.csv', this.buildCsvRows(false));
+    this.downloadCsv(this.sessionLogFilename(), this.buildCsvRows(false));
   }
 
   exportBlackboardCsv(): void {
     if (!this.isFinalized) return;
-    this.downloadCsv('fras-blackboard-attendance.csv', this.buildCsvRows(true));
+    this.downloadCsv(this.blackboardFilename(), this.buildCsvRows(true));
   }
 
   goToHistory(): void {
@@ -291,10 +298,19 @@ export class V2PostSessionReviewComponent implements OnInit {
   private buildCsvRows(blackboardOnly: boolean): string[][] {
     const header = blackboardOnly
       ? ['Student Number', 'Student Name', 'Attendance Status']
-      : ['Student Number', 'Student Name', 'Status', 'Presence Minutes', 'Outside Minutes', 'Break Count', 'System Assessment'];
+      : [
+          'Student Number',
+          'Student Name',
+          'Status',
+          'Presence Minutes',
+          'Outside Minutes',
+          'Break Count',
+          'System Assessment',
+          'Review Reason'
+        ];
 
     const rows = this.roster.map((student) => blackboardOnly
-      ? [student.student_number, student.student_name, this.statusLabel(student.final_status)]
+      ? [student.student_number, student.student_name, this.blackboardStatusLabel(student.final_status)]
       : [
           student.student_number,
           student.student_name,
@@ -302,9 +318,41 @@ export class V2PostSessionReviewComponent implements OnInit {
           String(student.total_presence_minutes),
           String(student.total_outside_minutes),
           String(student.break_count),
-          this.statusLabel(student.system_assessment)
+          this.statusLabel(student.system_assessment),
+          student.review_reason || ''
         ]);
     return [header, ...rows];
+  }
+
+  private blackboardStatusLabel(status: string): string {
+    const normalized = (status || '').toLowerCase();
+    if (normalized === 'present') return 'Present';
+    if (normalized === 'late') return 'Late';
+    if (normalized === 'excused') return 'Excused';
+    return 'Absent';
+  }
+
+  private blackboardFilename(): string {
+    return `fras_blackboard_${this.classFilenamePart()}_${this.sessionDatePart()}_session-${this.sessionId}.csv`;
+  }
+
+  private sessionLogFilename(): string {
+    return `fras_session_review_${this.classFilenamePart()}_${this.sessionDatePart()}_session-${this.sessionId}.csv`;
+  }
+
+  private classFilenamePart(): string {
+    const course = this.safeFilenamePart(this.classInfo?.course_code || 'course');
+    const section = this.safeFilenamePart(this.classInfo?.section || 'section');
+    return `${course}_${section}`;
+  }
+
+  private sessionDatePart(): string {
+    if (!this.session) return 'date';
+    return new Date(this.session.scheduled_start).toISOString().slice(0, 10);
+  }
+
+  private safeFilenamePart(value: string): string {
+    return value.trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'value';
   }
 
   private downloadCsv(filename: string, rows: string[][]): void {

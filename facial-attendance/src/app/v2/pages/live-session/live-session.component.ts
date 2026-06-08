@@ -15,6 +15,7 @@ import {
   V2StudentRecord
 } from '../../models/v2-attendance.models';
 import { V2StatusTone } from '../../components';
+import { SESSION_BREAK_LOCK_KEY } from '../../../auth.guard';
 
 @Component({
   selector: 'app-v2-live-session',
@@ -44,7 +45,6 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
   isBreakStarting = false;
   isBreakEnding = false;
   isUnlockingBreak = false;
-  breakPreviewMode = false;
   cameraReady = false;
   webcamImage: WebcamImage | null = null;
   now = new Date();
@@ -54,6 +54,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
   private pendingCaptureMode: 'manual' | 'auto' = 'manual';
   private recognitionInFlight = false;
   private lastAutoEventAt: Record<number, number> = {};
+  private lastBreakUnlockPassword = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -89,10 +90,12 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
         this.detail = detail;
         this.selectedStudent = null;
         if (this.isBreakMode) {
+          this.lockBreakRoute();
           this.autoCaptureActive = true;
           this.startAutoCaptureLoop();
           this.breakUnlocked = false;
         } else {
+          this.clearBreakRouteLock();
           this.stopAutoCaptureLoop();
         }
         this.isLoading = false;
@@ -272,6 +275,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     this.api.startV2SessionBreak(this.sessionId).subscribe({
       next: (detail) => {
         this.detail = detail;
+        this.lockBreakRoute();
         this.autoCaptureActive = true;
         this.startAutoCaptureLoop();
         this.breakUnlocked = false;
@@ -282,10 +286,6 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.isBreakStarting = false;
-        if (error?.status === 404) {
-          this.enterBreakPreviewMode();
-          return;
-        }
         this.errorMessage = this.apiErrorMessage(error, 'Unable to start Session Break.');
       }
     });
@@ -309,6 +309,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
       next: () => {
         this.isUnlockingBreak = false;
         this.breakUnlocked = true;
+        this.lastBreakUnlockPassword = this.breakUnlockPassword;
         this.breakUnlockPassword = '';
         this.actionMessage = 'Professor controls unlocked.';
       },
@@ -321,18 +322,23 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
 
   endBreak(): void {
     if (!this.breakUnlocked || this.isBreakEnding) return;
-    if (this.breakPreviewMode) {
-      this.exitBreakPreviewMode();
-      return;
-    }
     this.isBreakEnding = true;
     this.errorMessage = '';
-    this.api.endV2SessionBreak(this.sessionId).subscribe({
+    const email = this.auth.getCurrentUser()?.email;
+    const password = this.lastBreakUnlockPassword || this.breakUnlockPassword;
+    if (!email || !password) {
+      this.isBreakEnding = false;
+      this.breakUnlockError = 'Professor password verification is required before ending break.';
+      return;
+    }
+    this.api.endV2SessionBreak(this.sessionId, email, password).subscribe({
       next: (detail) => {
         this.detail = detail;
+        this.clearBreakRouteLock();
         this.autoCaptureActive = true;
         this.startAutoCaptureLoop();
         this.breakUnlocked = false;
+        this.lastBreakUnlockPassword = '';
         this.isBreakEnding = false;
         this.actionMessage = 'Session Break ended. Regular monitoring resumed.';
       },
@@ -478,6 +484,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.api.endV2Session(this.sessionId).subscribe({
       next: () => {
+        this.clearBreakRouteLock();
         this.isEnding = false;
         this.router.navigate(['/session-review', this.sessionId]);
       },
@@ -782,62 +789,6 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  private enterBreakPreviewMode(): void {
-    if (!this.detail) return;
-
-    const nowIso = new Date().toISOString();
-    const activeStudents = this.roster.filter((student) =>
-      ['present', 'late', 'partial'].includes(student.final_status) || !!student.time_in
-    );
-    const previewStudents = activeStudents.length ? activeStudents : this.roster;
-    const breakEvents: V2AttendanceEvent[] = previewStudents.map((student, index) => ({
-      event_id: -1 - index,
-      session_id: this.sessionId,
-      record_id: student.record_id,
-      student_id: student.student_id,
-      event_type: 'break_out',
-      event_time: nowIso,
-      event_source: 'system',
-      recognition_confidence: null,
-      notes: 'Preview Session Break. Backend endpoint was not available.',
-      is_voided: false
-    }));
-
-    this.detail = {
-      ...this.detail,
-      session: {
-        ...this.detail.session,
-        session_status: 'on_break'
-      },
-      events: [...this.detail.events, ...breakEvents]
-    };
-    this.breakPreviewMode = true;
-    this.autoCaptureActive = true;
-    this.startAutoCaptureLoop();
-    this.breakUnlocked = false;
-    this.breakUnlockPassword = '';
-    this.breakUnlockError = '';
-    this.errorMessage = '';
-    this.actionMessage = 'Session Break preview mode is active because the backend break endpoint returned Not Found.';
-  }
-
-  private exitBreakPreviewMode(): void {
-    if (!this.detail) return;
-    this.detail = {
-      ...this.detail,
-      session: {
-        ...this.detail.session,
-        session_status: 'in_progress'
-      },
-      events: this.detail.events.filter((event) => event.event_id >= 0)
-    };
-    this.breakPreviewMode = false;
-    this.breakUnlocked = false;
-    this.autoCaptureActive = true;
-    this.startAutoCaptureLoop();
-    this.actionMessage = 'Session Break preview ended. Regular monitoring resumed.';
-  }
-
   private apiErrorMessage(error: any, fallback: string): string {
     const detail = error?.error?.detail || error?.error?.message || error?.message;
     return detail ? `${fallback} ${detail}` : fallback;
@@ -872,6 +823,16 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
 
   private findClassInfo(schedule: V2ProfessorScheduleResponse, classId: number): V2ProfessorScheduleClass | null {
     return schedule.classes.find((classItem) => classItem.class_id === classId) || null;
+  }
+
+  private lockBreakRoute(): void {
+    localStorage.setItem(SESSION_BREAK_LOCK_KEY, String(this.sessionId));
+  }
+
+  private clearBreakRouteLock(): void {
+    if (localStorage.getItem(SESSION_BREAK_LOCK_KEY) === String(this.sessionId)) {
+      localStorage.removeItem(SESSION_BREAK_LOCK_KEY);
+    }
   }
 
   private handleKeyDown = (event: KeyboardEvent): void => {

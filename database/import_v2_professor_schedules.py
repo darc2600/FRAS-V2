@@ -229,7 +229,8 @@ def upsert_professor(cursor, load: ProfessorLoad) -> int:
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (faculty_number) DO UPDATE
-        SET first_name = EXCLUDED.first_name,
+        SET user_id = EXCLUDED.user_id,
+            first_name = EXCLUDED.first_name,
             last_name = EXCLUDED.last_name,
             email = EXCLUDED.email,
             employment_status = EXCLUDED.employment_status,

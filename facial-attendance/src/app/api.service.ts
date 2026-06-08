@@ -111,8 +111,11 @@ export class ApiService {
     return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/break/start`, {});
   }
 
-  endV2SessionBreak(sessionId: number): Observable<V2SessionDetailResponse> {
-    return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/break/end`, {});
+  endV2SessionBreak(sessionId: number, professorEmail: string, password: string): Observable<V2SessionDetailResponse> {
+    return this.http.post<V2SessionDetailResponse>(`${this.backendUrl}/api/v2/sessions/${sessionId}/break/end`, {
+      professor_email: professorEmail,
+      password
+    });
   }
 
   endV2Session(sessionId: number): Observable<V2SessionReviewResponse> {

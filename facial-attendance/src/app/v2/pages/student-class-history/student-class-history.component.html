@@ -30,7 +30,7 @@
       <article class="metric-card rate">
         <span>Attendance Rate</span>
         <strong>{{ summary.attendance_rate }}%</strong>
-        <em>Present, late, partial, and excused sessions</em>
+        <em>Present, late, and excused sessions</em>
       </article>
       <article class="metric-card">
         <span>Total Sessions</span>
@@ -46,11 +46,6 @@
         <span>Late</span>
         <strong>{{ summary.late_sessions }}</strong>
         <em>Late arrival records</em>
-      </article>
-      <article class="metric-card warning">
-        <span>Partial</span>
-        <strong>{{ summary.partial_sessions }}</strong>
-        <em>Presence warning records</em>
       </article>
       <article class="metric-card danger">
         <span>Absent</span>
@@ -79,7 +74,6 @@
           <option value="all">All Statuses</option>
           <option value="present">Present</option>
           <option value="late">Late</option>
-          <option value="partial">Partial</option>
           <option value="absent">Absent</option>
           <option value="excused">Excused</option>
         </select>
@@ -99,6 +93,7 @@
     </section>
 
     <section class="table-shell" *ngIf="filteredRecords.length; else emptyHistory">
+      <div class="table-scroll-hint">Scroll sideways to view all columns on smaller screens.</div>
       <div class="table-scroll">
         <table aria-label="Student attendance history">
           <thead>

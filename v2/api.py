@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from v2.models import (
     V2ClassRosterResponse,
+    V2BreakUnlockRequest,
     V2CreateEventRequest,
     V2FaceProfileContextResponse,
     V2FaceProfileSaveResponse,
@@ -153,9 +154,10 @@ def start_break(
 @router.post("/sessions/{session_id}/break/end", response_model=V2SessionDetailResponse)
 def end_break(
     session_id: int,
+    payload: V2BreakUnlockRequest,
     service: V2AttendanceService = Depends(get_v2_attendance_service),
 ):
-    return service.end_break(session_id=session_id)
+    return service.end_break(session_id=session_id, payload=payload)
 
 
 @router.post("/sessions/{session_id}/end", response_model=V2SessionReviewResponse)

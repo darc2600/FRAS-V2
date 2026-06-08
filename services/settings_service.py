@@ -11,6 +11,15 @@ from typing import Dict, Any, Optional
 from services.db import get_connection
 
 
+def _is_missing_legacy_table_error(error: Exception) -> bool:
+    message = str(error).lower()
+    return (
+        "does not exist" in message
+        or "no such table" in message
+        or "undefinedtable" in message
+    )
+
+
 class SettingsService:
     """Service for managing system settings with database persistence and caching"""
 
@@ -78,7 +87,8 @@ class SettingsService:
                 return settings
 
         except Exception as e:
-            print(f"Error loading settings from database: {e}")
+            if not _is_missing_legacy_table_error(e):
+                print(f"Error loading settings from database: {e}")
             return {}
 
     def _should_refresh_cache(self) -> bool:

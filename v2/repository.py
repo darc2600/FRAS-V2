@@ -160,12 +160,12 @@ class V2AttendanceRepository:
                     s.session_status,
                     COUNT(r.record_id) AS total_students,
                     COALESCE(SUM(CASE
-                        WHEN r.final_status IN ('present', 'late', 'partial', 'excused') THEN 1
+                        WHEN r.final_status IN ('present', 'late', 'excused') THEN 1
                         ELSE 0
                     END), 0) AS attendance_count,
                     COALESCE(AVG(r.total_presence_minutes), 0) AS average_presence_minutes,
                     COALESCE(SUM(CASE
-                        WHEN r.requires_review = TRUE OR r.final_status = 'partial' THEN 1
+                        WHEN r.requires_review = TRUE THEN 1
                         ELSE 0
                     END), 0) AS warning_count,
                     COALESCE(SUM(CASE
@@ -634,7 +634,7 @@ class V2AttendanceRepository:
                     time_in
                 FROM student_session_records
                 WHERE session_id = ?
-                  AND final_status IN ('present', 'late', 'partial')
+                  AND final_status IN ('present', 'late')
                   AND time_in IS NOT NULL
                 ORDER BY record_id
                 """,
@@ -811,6 +811,21 @@ class V2AttendanceRepository:
                 (session_id, student_id),
             )
 
+    def confirm_session_records(self, session_id: int) -> None:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE student_session_records
+                SET confirmed_by_professor = TRUE,
+                    confirmed_at = CURRENT_TIMESTAMP,
+                    requires_review = FALSE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE session_id = ?
+                """,
+                (session_id,),
+            )
+
     def set_session_status(self, session_id: int, status: str) -> None:
         with get_connection() as conn:
             cursor = conn.cursor()
@@ -834,7 +849,7 @@ class V2AttendanceRepository:
                     session_status = 'under_review',
                     updated_at = CURRENT_TIMESTAMP
                 WHERE session_id = ?
-                  AND session_status IN ('in_progress', 'on_break')
+                  AND session_status IN ('in_progress')
                 """,
                 (actual_end, session_id),
             )
@@ -849,7 +864,7 @@ class V2AttendanceRepository:
                     session_status = 'finalized',
                     updated_at = CURRENT_TIMESTAMP
                 WHERE session_id = ?
-                  AND session_status IN ('under_review', 'in_progress', 'on_break')
+                  AND session_status IN ('under_review', 'in_progress')
                 """,
                 (finalized_at, session_id),
             )

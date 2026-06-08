@@ -81,7 +81,7 @@ body:has(.sidebar.expanded) .break-navigation-lock {
 
 .session-meta-grid {
   display: grid;
-  grid-template-columns: .75fr 1.35fr .65fr .9fr .9fr .9fr;
+  grid-template-columns: .75fr minmax(150px, 1.35fr) .65fr .9fr .9fr .9fr;
   gap: var(--space-7);
   align-items: center;
 }
@@ -136,7 +136,7 @@ body:has(.sidebar.expanded) .break-navigation-lock {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(560px, 1fr) 390px;
+  grid-template-columns: minmax(520px, 1fr) minmax(360px, 390px);
   gap: var(--space-7);
   align-items: start;
 }
@@ -154,7 +154,7 @@ body:has(.sidebar.expanded) .break-navigation-lock {
 
 .camera-shell {
   position: relative;
-  height: 520px;
+  height: clamp(420px, 58vh, 560px);
   overflow: hidden;
   border-radius: var(--radius-lg);
   background: linear-gradient(135deg, #101915, #24332b);
@@ -251,7 +251,7 @@ body:has(.sidebar.expanded) .break-navigation-lock {
 
 .activity-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, .85fr);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, .85fr);
   gap: var(--space-5);
   margin-top: var(--space-5);
 }
@@ -495,6 +495,29 @@ h2 {
   font-weight: var(--font-weight-bold);
 }
 
+.break-resume-box {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-success-soft);
+  border-radius: var(--radius-lg);
+  background: #fbfffc;
+}
+
+.break-resume-box span {
+  color: var(--color-success);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-heavy);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.break-resume-box strong {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
 .roster-panel {
   padding: var(--space-6);
 }
@@ -530,6 +553,14 @@ h2 {
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.roster-search input::placeholder {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
 }
 
 .student-list {
@@ -600,6 +631,10 @@ h2 {
   .session-meta-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -645,6 +680,11 @@ h2 {
 
   .break-unlock button {
     width: 100%;
+  }
+
+  .camera-footer,
+  .activity-item {
+    display: grid;
   }
 
 }

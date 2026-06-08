@@ -139,6 +139,11 @@ class V2ManualAttendanceRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class V2BreakUnlockRequest(BaseModel):
+    professor_email: str
+    password: str
+
+
 class V2ReviewSummary(BaseModel):
     present_count: int
     late_count: int

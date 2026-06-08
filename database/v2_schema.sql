@@ -192,7 +192,7 @@ CREATE TABLE blackboard_sync_logs (
 );
 
 INSERT INTO attendance_status_types (status_name)
-VALUES ('present'), ('late'), ('absent'), ('excused'), ('partial');
+VALUES ('present'), ('late'), ('absent'), ('excused');
 
 CREATE INDEX idx_classes_professor_day ON classes(professor_id, day_of_week);
 CREATE INDEX idx_enrollments_class ON enrollments(class_id);

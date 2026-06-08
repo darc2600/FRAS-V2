@@ -75,16 +75,12 @@ def upsert_student_embedding(
 
     cursor.execute(
         '''
-        DELETE FROM student_face_embeddings
-        WHERE student_id = ? AND model_name = ?
-        ''',
-        (student_id, model_name),
-    )
-
-    cursor.execute(
-        '''
         INSERT INTO student_face_embeddings (student_id, model_name, embedding_json, source_image_path)
         VALUES (?, ?, ?, ?)
+        ON CONFLICT (student_id, model_name) DO UPDATE SET
+            embedding_json = excluded.embedding_json,
+            source_image_path = excluded.source_image_path,
+            updated_at = CURRENT_TIMESTAMP
         ''',
         (student_id, model_name, embedding_json, source_image_path),
     )

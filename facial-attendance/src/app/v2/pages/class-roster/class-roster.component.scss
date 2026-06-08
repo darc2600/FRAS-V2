@@ -57,8 +57,9 @@ button {
 .page-head h1 {
   margin: var(--space-2) 0;
   color: var(--color-text-strong);
-  font-size: 28px;
+  font-size: var(--font-size-page-title);
   font-weight: var(--font-weight-black);
+  line-height: 1.12;
 }
 
 .context-line {
@@ -123,7 +124,7 @@ button {
 
 .roster-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
   gap: var(--space-5);
   align-items: start;
 }
@@ -139,6 +140,7 @@ button {
 .panel-head {
   display: flex;
   justify-content: space-between;
+  align-items: start;
   gap: var(--space-4);
   padding: var(--space-5);
   border-bottom: 1px solid var(--color-border);
@@ -177,11 +179,12 @@ button {
 
 .table-scroll {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
-  min-width: 1020px;
+  min-width: 960px;
   border-collapse: collapse;
 }
 
@@ -196,7 +199,7 @@ td {
 th {
   background: #f1f1f2;
   color: var(--color-text-muted);
-  font-size: var(--font-size-label);
+  font-size: var(--font-size-table-label);
   font-weight: var(--font-weight-heavy);
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -315,6 +318,7 @@ tbody tr.selected {
   display: grid;
   gap: var(--space-5);
   padding: var(--space-5);
+  min-width: 0;
 }
 
 .status-stack {
@@ -327,7 +331,7 @@ tbody tr.selected {
 .attendance-grid div {
   display: grid;
   gap: var(--space-2);
-  min-height: 86px;
+  min-height: 78px;
   align-content: start;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
@@ -354,7 +358,6 @@ tbody tr.selected {
 
 .face-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
 }
 
@@ -371,7 +374,7 @@ tbody tr.selected {
 
 .history-list {
   display: grid;
-  max-height: 220px;
+  max-height: 190px;
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -427,6 +430,10 @@ tbody tr.selected {
   .page-head,
   .panel-head {
     display: grid;
+  }
+
+  .page-head h1 {
+    font-size: var(--font-size-section-title);
   }
 
   .summary-grid,

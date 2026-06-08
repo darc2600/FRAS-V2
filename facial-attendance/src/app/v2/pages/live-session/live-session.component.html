@@ -12,7 +12,7 @@
   <div class="message success" *ngIf="actionMessage">{{ actionMessage }}</div>
 
   <ng-container *ngIf="!isLoading && detail">
-    <div class="break-navigation-lock" *ngIf="isBreakMode && !breakUnlocked" aria-hidden="true"></div>
+    <div class="break-navigation-lock" *ngIf="isBreakMode" aria-hidden="true"></div>
 
     <article class="session-header-card">
       <div class="session-meta-grid">
@@ -56,7 +56,7 @@
         <app-v2-action-button
           label="End Session"
           variant="danger"
-          [disabled]="isEnding || session?.session_status === 'under_review' || (isBreakMode && !breakUnlocked)"
+          [disabled]="isEnding || session?.session_status === 'under_review' || isBreakMode"
           (action)="endSession()">
         </app-v2-action-button>
       </div>
@@ -113,8 +113,8 @@
               <div class="break-status-copy">
                 <span>Session is on break</span>
                 <strong>Return Detection Mode Active</strong>
-                <em *ngIf="breakPreviewMode">Preview mode</em>
-                <p>Students can return through facial recognition only. Professor controls are locked until re-authentication.</p>
+                <em>{{ breakUnlocked ? 'Professor verified' : 'Controls locked' }}</em>
+                <p>Students can return through facial recognition only. Navigation and professor controls stay locked until the break is ended.</p>
               </div>
 
               <div class="break-return-grid">
@@ -154,13 +154,17 @@
               </div>
 
               <ng-template #breakUnlockedControls>
-                <app-v2-action-button
-                  [label]="isBreakEnding ? 'Ending Break...' : 'End Break / Resume Monitoring'"
-                  variant="primary"
-                  size="md"
-                  [disabled]="isBreakEnding"
-                  (action)="endBreak()">
-                </app-v2-action-button>
+                <div class="break-resume-box">
+                  <span>Professor controls verified</span>
+                  <strong>End break to resume normal monitoring.</strong>
+                  <app-v2-action-button
+                    [label]="isBreakEnding ? 'Ending Break...' : 'End Break / Resume Monitoring'"
+                    variant="primary"
+                    size="md"
+                    [disabled]="isBreakEnding"
+                    (action)="endBreak()">
+                  </app-v2-action-button>
+                </div>
               </ng-template>
             </div>
 

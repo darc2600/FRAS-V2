@@ -85,7 +85,7 @@ button:disabled {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
   gap: var(--space-6);
   margin-bottom: var(--space-6);
 }
@@ -112,18 +112,19 @@ button:disabled {
   height: 74px;
   display: grid;
   place-items: center;
-  border: 1px solid #ded8db;
+  border: 1px solid var(--color-border-maroon-soft);
   border-radius: var(--radius-circle);
-  background: linear-gradient(#f3f3f3, #dedede);
+  background: var(--color-primary-soft);
   color: var(--color-primary-maroon);
   font-size: 24px;
   font-weight: var(--font-weight-black);
+  line-height: 1;
 }
 
 .student-copy h1 {
   margin: 0 0 var(--space-3);
   color: var(--color-text-strong);
-  font-size: 30px;
+  font-size: var(--font-size-display);
   font-weight: var(--font-weight-black);
   line-height: 1.1;
 }
@@ -183,7 +184,7 @@ button:disabled {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: var(--space-4);
   margin-bottom: var(--space-6);
 }
@@ -198,7 +199,7 @@ button:disabled {
 
 .metric-card strong {
   color: var(--color-text-strong);
-  font-size: 26px;
+  font-size: var(--font-size-metric-sm);
   font-weight: var(--font-weight-black);
   font-variant-numeric: tabular-nums;
 }
@@ -217,7 +218,7 @@ button:disabled {
 
 .evidence-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
   gap: var(--space-6);
   align-items: start;
 }
@@ -542,6 +543,10 @@ button:disabled {
   .summary-grid,
   .evidence-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .student-copy h1 {
+    font-size: var(--font-size-section-title);
   }
 
   .evidence-timeline li {

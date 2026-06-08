@@ -52,9 +52,9 @@
         <em>Arrived after grace period</em>
       </article>
       <article class="metric-card">
-        <span>Partial Count</span>
-        <strong>{{ summary?.partial_count || 0 }}</strong>
-        <em>Needs presence attention</em>
+        <span>Warning Count</span>
+        <strong>{{ warningCount }}</strong>
+        <em>Needs professor attention</em>
       </article>
       <article class="metric-card">
         <span>Absent Count</span>
@@ -98,6 +98,7 @@
         </ng-template>
       </div>
 
+      <div class="table-scroll-hint">Scroll sideways to review all evidence columns on smaller screens.</div>
       <div class="table-scroll">
         <table aria-label="Student review table">
           <thead>

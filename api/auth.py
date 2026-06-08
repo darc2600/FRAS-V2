@@ -72,6 +72,15 @@ def _normalize_permission_name(permission_name: str) -> str:
 
     return raw.replace(" ", "_").replace("-", "_")
 
+
+def _is_missing_legacy_table_error(error: Exception) -> bool:
+    message = str(error).lower()
+    return (
+        "does not exist" in message
+        or "no such table" in message
+        or "undefinedtable" in message
+    )
+
 def get_current_user_type(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Extract user type from JWT token"""
     try:
@@ -110,7 +119,8 @@ def get_user_permissions(user_type: str) -> list:
             """, (user_type,))
             return [row[0] for row in cursor.fetchall()]
     except Exception as e:
-        print(f"Error fetching permissions for {user_type}: {e}")
+        if not _is_missing_legacy_table_error(e):
+            print(f"Error fetching permissions for {user_type}: {e}")
         return []
 
 def get_user_type_from_email(email: str) -> str:
@@ -155,7 +165,8 @@ def get_user_permissions(user_type: str) -> list:
             """, (user_type,))
             raw_permissions = [row[0] for row in cursor.fetchall()]
     except Exception as e:
-        print(f"Error getting permissions for {user_type}: {e}")
+        if not _is_missing_legacy_table_error(e):
+            print(f"Error getting permissions for {user_type}: {e}")
 
     permissions = {_normalize_permission_name(name) for name in raw_permissions if name}
 
@@ -334,6 +345,31 @@ def _get_user_password(email: str) -> Optional[str]:
     return None
 
 
+def _verify_stored_password(stored_password: str, password: str) -> bool:
+    if stored_password.startswith('$'):
+        try:
+            if pbkdf2_sha256 is not None and stored_password.startswith('$pbkdf2-sha256$'):
+                return pbkdf2_sha256.verify(password, stored_password)
+            if bcrypt is not None and stored_password.startswith('$2b$'):
+                return bcrypt.verify(password, stored_password)
+            if _HAS_BCRYPT and stored_password.startswith('$2b$'):
+                return bcrypt_pkg.checkpw(password.encode('utf-8'), stored_password.encode('utf-8'))
+        except Exception as e:
+            print(f"Password verification error: {e}")
+        return False
+    return password == stored_password
+
+
+def verify_user_password(email: str, password: str) -> bool:
+    user_data = _get_user_auth(email)
+    if user_data is None:
+        return False
+    stored_password, _user_type, _user_id, _reference_id, is_active = user_data
+    if not is_active:
+        return False
+    return _verify_stored_password(stored_password, password)
+
+
 @router.post("/api/login")
 async def login(payload: LoginRequest):
     """Login endpoint that returns JWT token.
@@ -350,24 +386,7 @@ async def login(payload: LoginRequest):
     if not is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
 
-    valid = False
-    if stored_password.startswith('$'):
-        try:
-            if pbkdf2_sha256 is not None and stored_password.startswith('$pbkdf2-sha256$'):
-                valid = pbkdf2_sha256.verify(payload.password, stored_password)
-            elif bcrypt is not None and stored_password.startswith('$2b$'):
-                valid = bcrypt.verify(payload.password, stored_password)
-            elif _HAS_BCRYPT and stored_password.startswith('$2b$'):
-                valid = bcrypt_pkg.checkpw(payload.password.encode('utf-8'), stored_password.encode('utf-8'))
-            else:
-                valid = False
-        except Exception as e:
-            print(f"Password verification error: {e}")
-            valid = False
-    else:
-        valid = (payload.password == stored_password)
-
-    if not valid:
+    if not _verify_stored_password(stored_password, payload.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     permissions = get_user_permissions(user_type)

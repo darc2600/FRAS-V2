@@ -23,6 +23,7 @@ from services.settings_service import get_settings_service
 from services.db import get_connection
 from v2.models import (
     V2AttendanceEvent,
+    V2BreakUnlockRequest,
     V2ClassCard,
     V2ClassRosterContext,
     V2ClassRosterHistoryItem,
@@ -53,6 +54,7 @@ from v2.models import (
     V2TodayClassesResponse,
 )
 from v2.repository import V2AttendanceRepository
+from api.auth import verify_user_password
 
 
 MANILA_TZ = ZoneInfo("Asia/Manila")
@@ -211,7 +213,7 @@ class V2AttendanceService:
             partial_sessions = int(row[10] or 0)
             absent_sessions = int(row[11] or 0)
             excused_sessions = int(row[12] or 0)
-            attended_sessions = present_sessions + late_sessions + partial_sessions + excused_sessions
+            attended_sessions = present_sessions + late_sessions + excused_sessions
             last_face_update = self._coerce_datetime(row[5]) if row[5] else None
             recognition_confidence = float(row[13]) if row[13] is not None else None
             last_recognition_at = self._coerce_datetime(row[14]) if row[14] else None
@@ -253,7 +255,7 @@ class V2AttendanceService:
             elif status == "late":
                 late += 1
             elif status == "partial":
-                partial += 1
+                absent += 1
             elif status == "excused":
                 excused += 1
             else:
@@ -275,7 +277,7 @@ class V2AttendanceService:
             )
 
         total = len(records)
-        attended = present + late + partial + excused
+        attended = present + late + excused
         attendance_rate = round((attended / total) * 100, 2) if total else 0.0
         header = V2StudentClassHistoryHeader(
             class_id=header_row[0],
@@ -508,6 +510,9 @@ class V2AttendanceService:
         session = self._get_session_or_404(session_id)
         if session.session_status not in {"in_progress", "on_break", "under_review"}:
             raise HTTPException(status_code=400, detail="Session is not accepting attendance events.")
+        if session.session_status == "on_break":
+            if payload.event_type != "break_in" or payload.event_source != "facial_recognition":
+                raise HTTPException(status_code=423, detail="Session Break is active. Only facial-recognition Break In return detection is allowed.")
 
         record_row = self.repo.get_record_for_student(session_id, payload.student_id)
         if not record_row:
@@ -515,6 +520,14 @@ class V2AttendanceService:
 
         event_time = payload.event_time or datetime.now(MANILA_TZ).replace(tzinfo=None)
         record_id = int(record_row[0])
+        if session.session_status == "on_break":
+            last_event = self.repo.get_student_events(session_id, payload.student_id)[-1:]
+            if not last_event or last_event[0][0] != "break_out":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Return Detection Mode only accepts Break In for students currently out on break.",
+                )
+
         self.repo.create_event(
             session_id=session_id,
             record_id=record_id,
@@ -532,6 +545,8 @@ class V2AttendanceService:
         session = self._get_session_or_404(session_id)
         if session.session_status == "finalized":
             raise HTTPException(status_code=400, detail="Finalized sessions cannot be changed.")
+        if session.session_status == "on_break":
+            raise HTTPException(status_code=423, detail="Session Break is active. Manual attendance is locked until the professor ends break.")
         if session.session_status not in {"in_progress", "on_break", "under_review"}:
             raise HTTPException(status_code=400, detail="Session is not accepting manual attendance.")
 
@@ -606,10 +621,12 @@ class V2AttendanceService:
 
         return self.get_session_detail(session_id)
 
-    def end_break(self, session_id: int) -> V2SessionDetailResponse:
+    def end_break(self, session_id: int, payload: V2BreakUnlockRequest) -> V2SessionDetailResponse:
         session = self._get_session_or_404(session_id)
         if session.session_status != "on_break":
             raise HTTPException(status_code=400, detail="Session is not currently on break.")
+        if not verify_user_password(payload.professor_email, payload.password):
+            raise HTTPException(status_code=401, detail="Professor password verification failed.")
 
         self.repo.set_session_status(session_id, "in_progress")
         return self.get_session_detail(session_id)
@@ -618,7 +635,9 @@ class V2AttendanceService:
         session = self._get_session_or_404(session_id)
         if session.session_status == "finalized":
             return self.get_session_review(session_id)
-        if session.session_status not in {"in_progress", "on_break", "under_review"}:
+        if session.session_status == "on_break":
+            raise HTTPException(status_code=423, detail="Session Break is active. End break before ending the session.")
+        if session.session_status not in {"in_progress", "under_review"}:
             raise HTTPException(status_code=400, detail="Session cannot be ended from its current status.")
 
         self.repo.end_session(session_id, datetime.now(MANILA_TZ).replace(tzinfo=None))
@@ -631,11 +650,14 @@ class V2AttendanceService:
         session = self._get_session_or_404(session_id)
         if session.session_status == "finalized":
             return self.get_session_review(session_id)
-        if session.session_status not in {"under_review", "in_progress", "on_break"}:
+        if session.session_status == "on_break":
+            raise HTTPException(status_code=423, detail="Session Break is active. End break before finalizing attendance.")
+        if session.session_status not in {"under_review", "in_progress"}:
             raise HTTPException(status_code=400, detail="Session cannot be finalized from its current status.")
 
         for record in self._get_roster(session_id):
             self._recalculate_student_record(session, record.record_id, record.student_id)
+        self.repo.confirm_session_records(session_id)
         self.repo.finalize_session(session_id, datetime.now(MANILA_TZ).replace(tzinfo=None))
         return self.get_session_review(session_id)
 
@@ -643,7 +665,9 @@ class V2AttendanceService:
         session = self._get_session_or_404(session_id)
         if session.session_status == "finalized":
             raise HTTPException(status_code=400, detail="Finalized sessions cannot be changed.")
-        if session.session_status not in {"under_review", "in_progress", "on_break"}:
+        if session.session_status == "on_break":
+            raise HTTPException(status_code=423, detail="Session Break is active. Student confirmations are locked until the professor ends break.")
+        if session.session_status not in {"under_review", "in_progress"}:
             raise HTTPException(status_code=400, detail="Session is not accepting confirmations.")
 
         record_row = self.repo.get_record_for_student(session_id, student_id)
@@ -667,6 +691,7 @@ class V2AttendanceService:
         outside_started_at = None
         inside_started_at = None
 
+        session_start = session.actual_start or session.scheduled_start
         session_end = session.actual_end or datetime.now(MANILA_TZ).replace(tzinfo=None)
 
         for event_type, event_time in normalized:
@@ -693,37 +718,49 @@ class V2AttendanceService:
         if outside_started_at:
             outside_minutes += self._minutes_between(outside_started_at, session_end)
 
-        scheduled_minutes = max(1, self._minutes_between(session.scheduled_start, session.scheduled_end))
-        ratio = presence_minutes / scheduled_minutes
+        monitored_minutes = max(1, self._minutes_between(session_start, session_end))
+        ratio = presence_minutes / monitored_minutes
         late_minutes = 0
         if time_in:
-            late_minutes = max(0, self._minutes_between(session.scheduled_start, time_in))
+            late_minutes = max(0, self._minutes_between(session_start, time_in))
 
         if not time_in:
             final_status = "absent"
             system_assessment = "absent"
             requires_review = False
             review_reason = None
+        elif late_minutes > 30:
+            final_status = "absent"
+            system_assessment = "requires_review"
+            requires_review = True
+            review_reason = (
+                f"Student arrived {late_minutes} minutes after the monitored session started. "
+                "Marked absent by attendance policy; professor may override to Late or Present."
+            )
         elif late_minutes > 15:
             final_status = "late"
             system_assessment = self._assessment_from_ratio(ratio)
             requires_review = system_assessment == "requires_review"
-            review_reason = "Student arrived after the 15-minute attendance window."
+            review_reason = (
+                f"Student arrived {late_minutes} minutes after the monitored session started."
+                if system_assessment == "valid_presence"
+                else self._presence_review_reason(presence_minutes, monitored_minutes)
+            )
         elif ratio >= 0.8:
             final_status = "present"
             system_assessment = "valid_presence"
             requires_review = False
             review_reason = None
         elif ratio >= 0.6:
-            final_status = "partial"
+            final_status = "present"
             system_assessment = "attendance_warning"
             requires_review = False
-            review_reason = "Presence is below 80% of the scheduled session."
+            review_reason = self._presence_review_reason(presence_minutes, monitored_minutes)
         else:
-            final_status = "partial"
+            final_status = "present"
             system_assessment = "requires_review"
             requires_review = True
-            review_reason = "Presence is below 60% of the scheduled session."
+            review_reason = self._presence_review_reason(presence_minutes, monitored_minutes)
 
         if professor_confirmed and professor_status in {"present", "late", "absent", "excused"}:
             final_status = professor_status
@@ -810,11 +847,11 @@ class V2AttendanceService:
         total = len(roster)
         present = sum(1 for record in roster if record.final_status == "present")
         late = sum(1 for record in roster if record.final_status == "late")
-        partial = sum(1 for record in roster if record.final_status == "partial")
+        partial = sum(1 for record in roster if record.system_assessment in {"attendance_warning", "requires_review"})
         absent = sum(1 for record in roster if record.final_status == "absent")
         excused = sum(1 for record in roster if record.final_status == "excused")
         review = sum(1 for record in roster if record.requires_review)
-        validated = present + late + partial + excused
+        validated = present + late + excused
         rate = round((validated / total) * 100, 2) if total else 0.0
         return V2ReviewSummary(
             present_count=present,
@@ -894,6 +931,12 @@ class V2AttendanceService:
         if ratio >= 0.6:
             return "attendance_warning"
         return "requires_review"
+
+    def _presence_review_reason(self, presence_minutes: int, monitored_minutes: int) -> str:
+        return (
+            f"Student had {presence_minutes} minutes of monitored presence out of "
+            f"{monitored_minutes} minutes. Professor review is recommended."
+        )
 
     def _combine_local(self, value_date: date, value_time: time) -> datetime:
         return datetime.combine(value_date, value_time)

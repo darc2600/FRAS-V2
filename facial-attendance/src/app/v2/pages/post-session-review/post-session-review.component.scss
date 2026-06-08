@@ -109,7 +109,7 @@ button:disabled {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   gap: var(--space-4);
   margin-bottom: var(--space-7);
 }
@@ -133,7 +133,7 @@ button:disabled {
 
 .metric-card strong {
   color: var(--color-text-strong);
-  font-size: 27px;
+  font-size: var(--font-size-metric);
   font-weight: var(--font-weight-black);
   font-variant-numeric: tabular-nums;
 }
@@ -238,10 +238,29 @@ button:disabled {
   background: transparent;
   color: var(--color-text);
   font: inherit;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.review-search input::placeholder {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-bold);
 }
 
 .table-scroll {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll-hint {
+  display: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-heavy);
+  text-transform: uppercase;
 }
 
 table {
@@ -261,7 +280,7 @@ td {
 th {
   background: #f2f2f3;
   color: var(--color-text-muted);
-  font-size: var(--font-size-label);
+  font-size: var(--font-size-table-label);
   font-weight: var(--font-weight-heavy);
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -388,6 +407,7 @@ tr.needs-review {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
+  flex-wrap: wrap;
   margin-top: var(--space-7);
   padding-top: var(--space-6);
   border-top: 1px solid #e3bfc7;
@@ -421,6 +441,22 @@ tr.needs-review {
   .summary-grid,
   .session-strip {
     grid-template-columns: 1fr;
+  }
+
+  .review-title h1 {
+    font-size: var(--font-size-panel-title);
+  }
+
+  .table-scroll-hint {
+    display: block;
+  }
+
+  .review-search {
+    width: 100%;
+  }
+
+  .footer-actions button {
+    width: 100%;
   }
 
   .footer-actions span {

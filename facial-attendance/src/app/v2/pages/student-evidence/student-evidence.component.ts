@@ -107,7 +107,9 @@ export class V2StudentEvidenceComponent implements OnInit {
 
   get sessionDurationMinutes(): number {
     if (!this.session) return 0;
-    return this.minutesBetween(this.session.scheduled_start, this.session.scheduled_end);
+    const start = this.session.actual_start || this.session.scheduled_start;
+    const end = this.session.actual_end || new Date().toISOString();
+    return this.minutesBetween(start, end);
   }
 
   get insideSeconds(): number {
@@ -137,10 +139,13 @@ export class V2StudentEvidenceComponent implements OnInit {
       return 'This record has been approved as an exception by the professor.';
     }
     if (this.student.final_status === 'absent') {
+      if (this.student.time_in) {
+        return `The student was recognized ${this.student.late_minutes || 0} minutes after the monitored session started and was marked absent by policy.`;
+      }
       return 'No valid classroom time in was recorded for this student.';
     }
     if (this.student.final_status === 'late') {
-      return `The student arrived ${this.student.late_minutes || 0} minutes after the scheduled start.`;
+      return `The student arrived ${this.student.late_minutes || 0} minutes after the monitored session started.`;
     }
     if (this.student.system_assessment === 'requires_review') {
       return 'Presence is below the expected threshold or the break pattern needs professor validation.';
@@ -155,8 +160,10 @@ export class V2StudentEvidenceComponent implements OnInit {
     if (!this.student) return 'No assessment notes available.';
     if (this.student.review_reason) return this.student.review_reason;
     if (this.student.final_status === 'present') return 'The student met the expected classroom presence threshold.';
-    if (this.student.final_status === 'partial') return 'The student has partial presence and should be reviewed before finalization.';
     if (this.student.final_status === 'late') return 'The student was present but arrived after the grace period.';
+    if (this.student.final_status === 'absent' && this.student.time_in) {
+      return `The student has a time in record but arrived ${this.student.late_minutes || 0} minutes after the monitored session started. The professor may override this if attendance should still be accepted.`;
+    }
     if (this.student.final_status === 'absent') return 'The system did not record a valid time in for this student.';
     if (this.student.final_status === 'excused') return 'The professor marked this student as excused.';
     return 'Review the timeline and presence ratio before confirming this record.';

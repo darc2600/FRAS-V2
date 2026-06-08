@@ -140,7 +140,7 @@ export class V2ClassRosterComponent implements OnInit {
 
   statusTone(status: string): V2StatusTone {
     if (status === 'present') return 'success';
-    if (status === 'late' || status === 'partial') return 'warning';
+    if (status === 'late') return 'warning';
     if (status === 'excused') return 'excused';
     return 'danger';
   }
