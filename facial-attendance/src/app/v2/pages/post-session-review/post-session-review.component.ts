@@ -168,6 +168,7 @@ export class V2PostSessionReviewComponent implements OnInit {
     this.api.saveV2ManualAttendance(this.sessionId, {
       professor_id: this.session.professor_id,
       records,
+      lock_status: true,
       notes: 'Saved from post-session override mode.'
     }).subscribe({
       next: () => {

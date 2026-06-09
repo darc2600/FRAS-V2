@@ -81,6 +81,8 @@ export interface V2StudentRecord {
   late_minutes: number;
   requires_review: boolean;
   review_reason?: string | null;
+  confirmed_by_professor?: boolean;
+  confirmed_at?: string | null;
 }
 
 export interface V2AttendanceEvent {
@@ -125,6 +127,7 @@ export interface V2ManualAttendanceRequest {
     status: V2ManualAttendanceStatus;
   }>;
   notes?: string | null;
+  lock_status?: boolean;
 }
 
 export interface V2SessionReviewResponse {
@@ -162,6 +165,11 @@ export interface V2SessionHistoryResponse {
   };
   sessions: Array<{
     session_id: number;
+    class_id?: number | null;
+    course_code?: string | null;
+    course_name?: string | null;
+    section?: string | null;
+    room?: string | null;
     date: string;
     scheduled_start: string;
     scheduled_end: string;

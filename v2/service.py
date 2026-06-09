@@ -189,6 +189,53 @@ class V2AttendanceService:
             sessions=sessions,
         )
 
+    def get_professor_session_history(self, professor_id: int) -> V2SessionHistoryResponse:
+        context_row = self.repo.get_professor_history_context(professor_id)
+        if not context_row:
+            raise HTTPException(status_code=404, detail="Professor not found.")
+
+        sessions: list[V2SessionHistoryRow] = []
+        for row in self.repo.list_professor_session_history(professor_id):
+            total_students = int(row[9] or 0)
+            attendance_count = int(row[10] or 0)
+            attendance_rate = round((attendance_count / total_students) * 100, 2) if total_students else 0.0
+            warning_count = int(row[12] or 0)
+            sessions.append(
+                V2SessionHistoryRow(
+                    session_id=row[0],
+                    class_id=row[4],
+                    course_code=row[5],
+                    course_name=row[6],
+                    section=row[7],
+                    room=row[8] or "TBA",
+                    date=self._coerce_datetime(row[1]).date(),
+                    scheduled_start=self._coerce_datetime(row[1]),
+                    scheduled_end=self._coerce_datetime(row[2]),
+                    attendance_count=attendance_count,
+                    total_students=total_students,
+                    attendance_rate=attendance_rate,
+                    average_presence_minutes=round(float(row[11] or 0)),
+                    warning_count=warning_count,
+                    excused_count=int(row[13] or 0),
+                    status=self._history_status(str(row[3]), warning_count),
+                )
+            )
+
+        total_sessions = len(sessions)
+        summary = V2SessionHistorySummary(
+            total_sessions=total_sessions,
+            average_attendance_rate=round(sum(item.attendance_rate for item in sessions) / total_sessions, 2) if total_sessions else 0.0,
+            average_presence_minutes=round(sum(item.average_presence_minutes for item in sessions) / total_sessions) if total_sessions else 0,
+            sessions_requiring_review=sum(1 for item in sessions if item.status == "needs_review"),
+            excused_students=sum(item.excused_count for item in sessions),
+        )
+
+        return V2SessionHistoryResponse(
+            class_context=None,
+            summary=summary,
+            sessions=sessions,
+        )
+
     def get_class_roster(self, class_id: int) -> V2ClassRosterResponse:
         context_row = self.repo.get_class_roster_context(class_id)
         if not context_row:
@@ -568,6 +615,7 @@ class V2AttendanceService:
                 assessment = "absent"
                 time_in = existing_time_in
 
+            lock_status = payload.lock_status or item.status in {"present", "late", "excused"}
             self.repo.apply_manual_status(
                 record_id=item.record_id,
                 professor_id=payload.professor_id,
@@ -576,6 +624,7 @@ class V2AttendanceService:
                 system_assessment=assessment,
                 time_in=time_in,
                 notes=payload.notes,
+                lock_status=lock_status,
             )
             if item.status in {"present", "late"} and not existing_time_in:
                 self.repo.create_event(
@@ -820,6 +869,8 @@ class V2AttendanceService:
                     late_minutes=row[12],
                     requires_review=bool(row[13]),
                     review_reason=row[14],
+                    confirmed_by_professor=bool(row[15]),
+                    confirmed_at=self._coerce_datetime(row[16]) if row[16] else None,
                 )
             )
         return records

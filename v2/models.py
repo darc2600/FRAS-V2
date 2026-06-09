@@ -86,6 +86,8 @@ class V2StudentRecord(BaseModel):
     late_minutes: int
     requires_review: bool
     review_reason: Optional[str] = None
+    confirmed_by_professor: bool = False
+    confirmed_at: Optional[datetime] = None
 
 
 class V2AttendanceEvent(BaseModel):
@@ -137,6 +139,7 @@ class V2ManualAttendanceRequest(BaseModel):
     professor_id: int = 1
     records: list[V2ManualAttendanceRecord]
     notes: Optional[str] = None
+    lock_status: bool = False
 
 
 class V2BreakUnlockRequest(BaseModel):
@@ -172,6 +175,11 @@ class V2SessionHistoryClassContext(BaseModel):
 
 class V2SessionHistoryRow(BaseModel):
     session_id: int
+    class_id: Optional[int] = None
+    course_code: Optional[str] = None
+    course_name: Optional[str] = None
+    section: Optional[str] = None
+    room: Optional[str] = None
     date: date
     scheduled_start: datetime
     scheduled_end: datetime

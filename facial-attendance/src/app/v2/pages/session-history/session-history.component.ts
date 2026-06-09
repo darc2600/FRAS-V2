@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../../api.service';
+import { AuthService } from '../../../auth.service';
 import { V2HistorySessionStatus, V2SessionHistoryResponse } from '../../models/v2-attendance.models';
 import { V2StatusTone } from '../../components';
 
@@ -16,6 +17,8 @@ type RateFilter = 'all' | 'below80' | '80to90' | 'above90';
 })
 export class V2SessionHistoryComponent implements OnInit {
   classId = 0;
+  professorId = 0;
+  professorName = '';
   history: V2SessionHistoryResponse | null = null;
   isLoading = true;
   errorMessage = '';
@@ -35,7 +38,8 @@ export class V2SessionHistoryComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private api: ApiService
+    private api: ApiService,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -48,14 +52,14 @@ export class V2SessionHistoryComponent implements OnInit {
   }
 
   loadHistory(): void {
+    this.isLoading = true;
+    this.errorMessage = '';
+
     if (!this.classId) {
-      this.errorMessage = 'Open Session History from a specific class to view its records.';
-      this.isLoading = false;
+      this.loadProfessorHistory();
       return;
     }
 
-    this.isLoading = true;
-    this.errorMessage = '';
     this.api.getV2ClassSessionHistory(this.classId).subscribe({
       next: (history) => {
         this.history = history;
@@ -68,12 +72,53 @@ export class V2SessionHistoryComponent implements OnInit {
     });
   }
 
+  loadProfessorHistory(): void {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) {
+      this.errorMessage = 'Login as an instructor to view session history.';
+      this.isLoading = false;
+      return;
+    }
+
+    this.api.getV2Professors().subscribe({
+      next: (professors) => {
+        const matchedProfessor = professors.find((professor) => professor.user_id === currentUser.userId);
+        if (!matchedProfessor) {
+          this.errorMessage = 'No professor profile is linked to this account.';
+          this.isLoading = false;
+          return;
+        }
+
+        this.professorId = matchedProfessor.professor_id;
+        this.professorName = matchedProfessor.professor_name;
+        this.api.getV2ProfessorSessionHistory(this.professorId).subscribe({
+          next: (history) => {
+            this.history = history;
+            this.isLoading = false;
+          },
+          error: () => {
+            this.errorMessage = 'Unable to load professor session history.';
+            this.isLoading = false;
+          }
+        });
+      },
+      error: () => {
+        this.errorMessage = 'Unable to load professor profile.';
+        this.isLoading = false;
+      }
+    });
+  }
+
   get context() {
     return this.history?.class_context || null;
   }
 
   get summary() {
     return this.history?.summary || null;
+  }
+
+  get isProfessorWideHistory(): boolean {
+    return !this.classId;
   }
 
   get filteredSessions(): HistoryRow[] {
@@ -117,9 +162,13 @@ export class V2SessionHistoryComponent implements OnInit {
   }
 
   exportFullHistory(): void {
+    const headers = this.isProfessorWideHistory
+      ? ['Course', 'Section', 'Room', 'Date', 'Start', 'End', 'Attendance Count', 'Total Students', 'Attendance Rate', 'Average Presence Minutes', 'Warnings', 'Excused', 'Status']
+      : ['Date', 'Start', 'End', 'Attendance Count', 'Total Students', 'Attendance Rate', 'Average Presence Minutes', 'Warnings', 'Excused', 'Status'];
     const rows = [
-      ['Date', 'Start', 'End', 'Attendance Count', 'Total Students', 'Attendance Rate', 'Average Presence Minutes', 'Warnings', 'Excused', 'Status'],
-      ...this.filteredSessions.map((row) => [
+      headers,
+      ...this.filteredSessions.map((row) => {
+        const base = [
         this.formatDate(row.date),
         this.formatTime(row.scheduled_start),
         this.formatTime(row.scheduled_end),
@@ -130,15 +179,24 @@ export class V2SessionHistoryComponent implements OnInit {
         String(row.warning_count),
         String(row.excused_count),
         this.statusLabel(row.status)
-      ])
+        ];
+        return this.isProfessorWideHistory
+          ? [row.course_code || '-', row.section || '-', row.room || '-', ...base]
+          : base;
+      })
     ];
     const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'fras-session-history.csv';
+    link.download = this.isProfessorWideHistory ? 'fras-professor-session-history.csv' : 'fras-class-session-history.csv';
     link.click();
     URL.revokeObjectURL(link.href);
+  }
+
+  classLabel(row: HistoryRow): string {
+    const section = row.section ? ` - ${row.section}` : '';
+    return `${row.course_code || 'Course'}${section}`;
   }
 
   statusTone(status: V2HistorySessionStatus): V2StatusTone {

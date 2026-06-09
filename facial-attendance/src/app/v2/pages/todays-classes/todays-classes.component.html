@@ -113,8 +113,9 @@
           <div class="day-slot" *ngFor="let classItem of allDayClasses">
             <div class="slot-time">{{ formatTime(classItem.start_time) }}</div>
             <div class="slot-card" [class.now]="classItem.status === 'current'">
-              <strong>{{ courseSectionLabel(classItem) }}</strong>
-              <span>Room {{ classItem.room }}</span>
+              <strong>{{ classItem.course_code }}</strong>
+              <span>{{ classItem.section }}</span>
+              <span>{{ classItem.room }}</span>
               <app-v2-status-badge [label]="classItem.status" [tone]="toneForStatus(classItem.status)"></app-v2-status-badge>
             </div>
           </div>
@@ -154,8 +155,9 @@
                   class="schedule-class"
                   *ngFor="let item of classesForSlotAndDay(slot, day)"
                   [class.current]="isCurrentCell(slot, day)">
-                  <strong>{{ courseSectionLabel(item) }}</strong>
-                  <span>Room {{ item.room }}</span>
+                  <strong>{{ item.course_code }}</strong>
+                  <span>{{ item.section }}</span>
+                  <span>{{ item.room }}</span>
                 </div>
                 <div class="empty-slot" *ngIf="classesForSlotAndDay(slot, day).length === 0"></div>
               </div>

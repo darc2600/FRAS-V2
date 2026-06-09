@@ -398,6 +398,7 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
         student_id: this.selectedStudent.student_id,
         status
       }],
+      lock_status: true,
       notes: `Quick override: ${this.statusLabel(status)}.`
     }).subscribe({
       next: (detail) => {

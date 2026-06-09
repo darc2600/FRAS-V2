@@ -40,7 +40,7 @@
 /* ===== Content Wrapper ===== */
 
 .app-content {
-  padding: 24px;
+  padding: 24px 24px 24px 52px;
   flex: 1;
 }
 
@@ -49,7 +49,7 @@
 .burger-btn {
   position: fixed;
   top: 15px;
-  left: 230px;
+  left: 186px;
   z-index: 1100;
 
   background: #FFD700;
@@ -73,6 +73,10 @@
 
 .sidebar.closed ~ .main-area {
   margin-left: 0;
+}
+
+.sidebar.closed ~ .main-area .app-content {
+  padding-left: 76px;
 }
 
 /* ===== Guest Layout ===== */

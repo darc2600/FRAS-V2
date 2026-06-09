@@ -109,6 +109,7 @@
               <th>Outside Duration</th>
               <th>Break Count</th>
               <th>System Assessment</th>
+              <th>Review State</th>
               <th>{{ overrideMode ? 'Override Status' : 'Professor Actions' }}</th>
             </tr>
           </thead>
@@ -133,6 +134,16 @@
                 <span class="assessment" [ngClass]="assessmentClass(student.system_assessment)">
                   {{ assessmentLabel(student.system_assessment) }}
                 </span>
+              </td>
+              <td>
+                <span
+                  class="review-state"
+                  [class.reviewed]="student.confirmed_by_professor"
+                  [class.needs]="student.requires_review"
+                >
+                  {{ student.confirmed_by_professor ? 'Reviewed' : (student.requires_review ? 'Needs Review' : 'Ready') }}
+                </span>
+                <small class="review-time" *ngIf="student.confirmed_at">{{ formatTime(student.confirmed_at) }}</small>
               </td>
               <td>
                 <div class="row-actions">

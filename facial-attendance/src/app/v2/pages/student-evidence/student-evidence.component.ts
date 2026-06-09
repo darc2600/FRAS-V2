@@ -221,7 +221,7 @@ export class V2StudentEvidenceComponent implements OnInit {
     this.api.confirmV2StudentRecord(this.sessionId, this.student.student_id).subscribe({
       next: () => {
         this.isSaving = false;
-        this.actionMessage = 'Attendance confirmed for this student.';
+        this.actionMessage = 'Current status accepted for this student.';
         this.loadEvidence();
       },
       error: () => {
@@ -309,6 +309,7 @@ export class V2StudentEvidenceComponent implements OnInit {
         student_id: this.student.student_id,
         status
       }],
+      lock_status: true,
       notes
     }).subscribe({
       next: () => {

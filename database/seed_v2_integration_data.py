@@ -149,11 +149,34 @@ def seed_faculty_load(cursor, docx: Path, replace_docx_schedules: bool) -> tuple
     if replace_docx_schedules:
         cursor.execute(
             """
+            DELETE FROM attendance_sessions
+            WHERE class_id IN (
+                SELECT c.class_id
+                FROM classes c
+                JOIN professors p ON p.professor_id = c.professor_id
+                WHERE p.faculty_number LIKE 'DOCX-%'
+            )
+            """
+        )
+        cursor.execute(
+            """
+            DELETE FROM enrollments
+            WHERE class_id IN (
+                SELECT c.class_id
+                FROM classes c
+                JOIN professors p ON p.professor_id = c.professor_id
+                WHERE p.faculty_number LIKE 'DOCX-%'
+            )
+            """
+        )
+        cursor.execute(
+            """
             DELETE FROM classes
-            WHERE professor_id IN (
-                SELECT professor_id
-                FROM professors
-                WHERE faculty_number LIKE 'DOCX-%'
+            WHERE class_id IN (
+                SELECT c.class_id
+                FROM classes c
+                JOIN professors p ON p.professor_id = c.professor_id
+                WHERE p.faculty_number LIKE 'DOCX-%'
             )
             """
         )

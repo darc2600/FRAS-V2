@@ -223,7 +223,7 @@ button:disabled {
 
 table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 1160px;
   border-collapse: collapse;
 }
 
@@ -254,6 +254,7 @@ tr.review {
   background: #fff8fa;
 }
 
+.course-cell strong,
 .date-cell strong,
 .time-cell strong {
   display: block;
@@ -261,6 +262,7 @@ tr.review {
   font-weight: var(--font-weight-black);
 }
 
+.course-cell span,
 .date-cell span,
 .time-cell span {
   display: block;

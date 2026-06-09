@@ -284,6 +284,11 @@
           <button class="modal-close" type="button" (click)="closeManualAttendanceModal()">×</button>
         </header>
 
+        <div class="manual-attendance-note">
+          <strong>Manual Present or Late creates a time-in.</strong>
+          Manual Absent stays provisional, so facial recognition can still update the student if they arrive later.
+        </div>
+
         <label class="manual-modal-search">
           <input type="search" [(ngModel)]="manualAttendanceSearch" placeholder="Search student name or ID..." />
         </label>

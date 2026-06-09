@@ -56,7 +56,6 @@
   </section>
 
   <div class="drawer-actions">
-    <app-v2-action-button label="Excuse" variant="outline" (action)="markExcused.emit()"></app-v2-action-button>
     <app-v2-action-button [label]="isStudentOut ? 'Break In' : 'Break Out'" variant="warning" (action)="bathroomBreak.emit()"></app-v2-action-button>
     <app-v2-action-button label="Override" variant="primary" (action)="toggleOverride()"></app-v2-action-button>
   </div>

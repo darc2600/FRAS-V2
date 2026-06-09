@@ -265,7 +265,7 @@ button:disabled {
 
 table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 1180px;
   border-collapse: collapse;
 }
 
@@ -360,6 +360,41 @@ tr.needs-review {
 
 .assessment.absent {
   color: var(--color-text-muted);
+}
+
+.review-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-3);
+  background: #f7f7f8;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-heavy);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.review-state.reviewed {
+  border-color: #bfe6d0;
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.review-state.needs {
+  border-color: #f0c6cf;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.review-time {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
 }
 
 .row-actions {

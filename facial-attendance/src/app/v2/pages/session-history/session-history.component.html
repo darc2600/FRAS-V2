@@ -1,13 +1,4 @@
 <section class="v2-page-content history-page">
-  <div class="v2-page-topbar">
-    <div class="section-tabs">
-      <strong>Attendance Suite</strong>
-      <span>Term Overview</span>
-      <span class="active">Session History</span>
-      <span>Reports</span>
-    </div>
-  </div>
-
   <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading session history...</div>
   <div class="message error" *ngIf="errorMessage">{{ errorMessage }}</div>
 
@@ -21,6 +12,11 @@
           <span>Room {{ context.room }}</span>
           <span>{{ context.professor_name }}</span>
         </div>
+        <div class="context-line" *ngIf="isProfessorWideHistory">
+          <span>{{ professorName || 'Instructor' }}</span>
+          <span>All assigned classes</span>
+          <span>Professor-wide attendance records</span>
+        </div>
       </div>
       <button type="button" class="export-btn" [disabled]="!filteredSessions.length" (click)="exportFullHistory()">Export Full History</button>
     </header>
@@ -29,7 +25,7 @@
       <article class="metric-card">
         <span>Total Sessions</span>
         <strong>{{ summary?.total_sessions || 0 }}</strong>
-        <em>Current class records</em>
+        <em>{{ isProfessorWideHistory ? 'Across all assigned classes' : 'Current class records' }}</em>
       </article>
       <article class="metric-card">
         <span>Average Attendance Rate</span>
@@ -97,6 +93,7 @@
         <table aria-label="Historical attendance sessions">
           <thead>
             <tr>
+              <th *ngIf="isProfessorWideHistory">Course</th>
               <th>Date</th>
               <th>Time Range</th>
               <th>Attendance Count</th>
@@ -110,6 +107,10 @@
           </thead>
           <tbody>
             <tr *ngFor="let row of filteredSessions" [class.review]="row.status === 'needs_review'">
+              <td class="course-cell" *ngIf="isProfessorWideHistory">
+                <strong>{{ classLabel(row) }}</strong>
+                <span>{{ row.room || 'TBA' }}</span>
+              </td>
               <td class="date-cell">
                 <strong>{{ formatDate(row.date) }}</strong>
                 <span>{{ formatDay(row.date) }}</span>
@@ -148,7 +149,7 @@
     <ng-template #emptyHistory>
       <div class="empty-state fras-v2-panel">
         <strong>No sessions match the current filters.</strong>
-        <span>Completed and review-needed sessions will appear here after monitoring sessions are ended.</span>
+        <span>{{ isProfessorWideHistory ? 'Sessions from every class you handle will appear here after monitoring is started.' : 'Completed and review-needed sessions will appear here after monitoring sessions are ended.' }}</span>
       </div>
     </ng-template>
   </ng-container>

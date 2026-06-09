@@ -62,6 +62,10 @@ export class ApiService {
     return this.http.get<V2ProfessorScheduleResponse>(`${this.backendUrl}/api/v2/professors/${professorId}/schedule`);
   }
 
+  getV2ProfessorSessionHistory(professorId: number): Observable<V2SessionHistoryResponse> {
+    return this.http.get<V2SessionHistoryResponse>(`${this.backendUrl}/api/v2/professors/${professorId}/session-history`);
+  }
+
   getV2ClassSessionHistory(classId: number): Observable<V2SessionHistoryResponse> {
     return this.http.get<V2SessionHistoryResponse>(`${this.backendUrl}/api/v2/classes/${classId}/session-history`);
   }

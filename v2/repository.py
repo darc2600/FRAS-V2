@@ -186,6 +186,70 @@ class V2AttendanceRepository:
             )
             return cursor.fetchall()
 
+    def get_professor_history_context(self, professor_id: int) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT professor_id, first_name, last_name
+                FROM professors
+                WHERE professor_id = ?
+                """,
+                (professor_id,),
+            )
+            return cursor.fetchone()
+
+    def list_professor_session_history(self, professor_id: int) -> list[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    s.session_id,
+                    s.scheduled_start,
+                    s.scheduled_end,
+                    s.session_status,
+                    c.class_id,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number,
+                    COUNT(ss.record_id) AS total_students,
+                    COALESCE(SUM(CASE
+                        WHEN ss.final_status IN ('present', 'late', 'excused') THEN 1
+                        ELSE 0
+                    END), 0) AS attendance_count,
+                    COALESCE(AVG(ss.total_presence_minutes), 0) AS average_presence_minutes,
+                    COALESCE(SUM(CASE
+                        WHEN ss.requires_review = TRUE THEN 1
+                        ELSE 0
+                    END), 0) AS warning_count,
+                    COALESCE(SUM(CASE
+                        WHEN ss.final_status = 'excused' THEN 1
+                        ELSE 0
+                    END), 0) AS excused_count
+                FROM attendance_sessions s
+                JOIN classes c ON c.class_id = s.class_id
+                JOIN courses co ON co.course_id = c.course_id
+                LEFT JOIN rooms r ON r.room_id = c.room_id
+                LEFT JOIN student_session_records ss ON ss.session_id = s.session_id
+                WHERE c.professor_id = ?
+                GROUP BY
+                    s.session_id,
+                    s.scheduled_start,
+                    s.scheduled_end,
+                    s.session_status,
+                    c.class_id,
+                    co.course_code,
+                    co.course_name,
+                    c.section,
+                    r.room_number
+                ORDER BY s.scheduled_start DESC, s.session_id DESC
+                """,
+                (professor_id,),
+            )
+            return cursor.fetchall()
+
     def get_class_roster_context(self, class_id: int) -> Optional[tuple[Any, ...]]:
         with get_connection() as conn:
             cursor = conn.cursor()
@@ -556,7 +620,9 @@ class V2AttendanceRepository:
                     r.break_count,
                     r.late_minutes,
                     r.requires_review,
-                    r.review_reason
+                    r.review_reason,
+                    r.confirmed_by_professor,
+                    r.confirmed_at
                 FROM student_session_records r
                 JOIN students s ON s.student_id = r.student_id
                 WHERE r.session_id = ?
@@ -765,23 +831,25 @@ class V2AttendanceRepository:
         system_assessment: str,
         time_in: Optional[datetime],
         notes: Optional[str],
+        lock_status: bool,
     ) -> None:
         with get_connection() as conn:
             cursor = conn.cursor()
+            confirmed_at_sql = "CURRENT_TIMESTAMP" if lock_status else "NULL"
             cursor.execute(
-                """
+                f"""
                 UPDATE student_session_records
                 SET final_status = ?,
                     system_assessment = ?,
                     time_in = COALESCE(?, time_in),
                     requires_review = FALSE,
                     review_reason = NULL,
-                    confirmed_by_professor = TRUE,
-                    confirmed_at = CURRENT_TIMESTAMP,
+                    confirmed_by_professor = ?,
+                    confirmed_at = {confirmed_at_sql},
                     updated_at = CURRENT_TIMESTAMP
                 WHERE record_id = ?
                 """,
-                (new_status, system_assessment, time_in, record_id),
+                (new_status, system_assessment, time_in, lock_status, record_id),
             )
             cursor.execute(
                 """
@@ -789,9 +857,17 @@ class V2AttendanceRepository:
                     record_id, professor_id, override_type,
                     previous_status, new_status, reason, notes
                 )
-                VALUES (?, ?, 'manual_attendance', ?, ?, 'Manual attendance modal', ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (record_id, professor_id, previous_status, new_status, notes),
+                (
+                    record_id,
+                    professor_id,
+                    "final_override" if lock_status else "manual_attendance",
+                    previous_status,
+                    new_status,
+                    "Professor final override" if lock_status else "Live manual attendance input",
+                    notes,
+                ),
             )
 
     def confirm_student_record(self, session_id: int, student_id: int) -> None:

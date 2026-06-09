@@ -49,6 +49,14 @@ def get_professor_schedule(
     return service.get_professor_schedule(professor_id=professor_id)
 
 
+@router.get("/professors/{professor_id}/session-history", response_model=V2SessionHistoryResponse)
+def get_professor_session_history(
+    professor_id: int,
+    service: V2AttendanceService = Depends(get_v2_attendance_service),
+):
+    return service.get_professor_session_history(professor_id=professor_id)
+
+
 @router.get("/classes/{class_id}/session-history", response_model=V2SessionHistoryResponse)
 def get_class_session_history(
     class_id: int,

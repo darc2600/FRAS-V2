@@ -136,7 +136,7 @@
           <button type="button" class="outline" [disabled]="isFinalized || isSaving" (click)="markExcused()">Mark Excused</button>
           <button type="button" class="outline" [disabled]="isFinalized || isSaving" (click)="openOverride()">Override Status</button>
           <button type="button" class="primary" [disabled]="isFinalized || isSaving" (click)="confirmAttendance()">
-            {{ isSaving ? 'Saving...' : 'Confirm Attendance' }}
+            {{ isSaving ? 'Saving...' : 'Accept Current Status' }}
           </button>
           <button type="button" class="neutral" (click)="backToReview()">Back to Session Review</button>
         </section>
