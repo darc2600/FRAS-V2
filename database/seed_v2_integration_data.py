@@ -80,6 +80,16 @@ SAMPLE_STUDENTS = [
     ("2025103062", "Ari", "Aquino"),
     ("2025103063", "Bianca", "Bautista"),
     ("2025103064", "Carlos", "Cruz"),
+    ("2025103065", "Daphne", "Del Rosario"),
+    ("2025103066", "Ethan", "Enriquez"),
+    ("2025103067", "Faye", "Flores"),
+    ("2025103068", "Gino", "Gonzales"),
+    ("2025103069", "Hannah", "Hernandez"),
+    ("2025103070", "Ivan", "Ignacio"),
+    ("2025103071", "Jasmine", "Jacinto"),
+    ("2025103072", "Kyle", "Katigbak"),
+    ("2025103073", "Lara", "Lim"),
+    ("2025103074", "Miguel", "Mercado"),
 ]
 
 
@@ -138,6 +148,20 @@ def enroll_students(cursor, student_ids: list[int], class_ids: list[int]) -> int
             )
             touched += 1
     return touched
+
+
+def list_active_non_online_class_ids(cursor) -> list[int]:
+    cursor.execute(
+        """
+        SELECT c.class_id
+        FROM classes c
+        LEFT JOIN rooms r ON r.room_id = c.room_id
+        WHERE c.is_active = TRUE
+          AND UPPER(COALESCE(r.room_number, '')) != 'ONLINE'
+        ORDER BY c.class_id
+        """
+    )
+    return [int(row[0]) for row in cursor.fetchall()]
 
 
 def seed_faculty_load(cursor, docx: Path, replace_docx_schedules: bool) -> tuple[int, int, list[int]]:
@@ -217,6 +241,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Seed FRAS V2 integration testing data.")
     parser.add_argument("--docx", type=Path, default=DEFAULT_DOCX_PATH)
     parser.add_argument("--replace-docx-schedules", action="store_true")
+    parser.add_argument(
+        "--enroll-all-active-classes",
+        action="store_true",
+        help="Enroll the sample students into every active non-online V2 class, including older local classes.",
+    )
     args = parser.parse_args(argv)
 
     if not args.docx.exists():
@@ -238,7 +267,12 @@ def main(argv: list[str] | None = None) -> int:
             )
             student_ids = ensure_sample_students(cursor)
             _test_professor_id, test_class_ids = seed_test_professor(cursor)
-            enrollment_count = enroll_students(cursor, student_ids, faculty_class_ids + test_class_ids)
+            enrollment_class_ids = (
+                list_active_non_online_class_ids(cursor)
+                if args.enroll_all_active_classes
+                else faculty_class_ids + test_class_ids
+            )
+            enrollment_count = enroll_students(cursor, student_ids, enrollment_class_ids)
 
     print(f"Imported faculty professors: {professor_count}")
     print(f"Imported faculty classes: {faculty_class_count}")
@@ -246,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Test professor: {TEST_EMAIL}")
     print(f"Test professor password: {TEST_PASSWORD}")
     print(f"Test professor classes: {len(test_class_ids)}")
+    print(f"Enrollment scope: {'all active non-online classes' if args.enroll_all_active_classes else 'seeded faculty and test classes'}")
     print(f"Enrollments touched: {enrollment_count}")
     return 0
 

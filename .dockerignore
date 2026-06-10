@@ -8,6 +8,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.venv-1/
 venv/
 env/
 
@@ -21,6 +22,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.v2.example
 *.log
 *.tmp
 *.bak
@@ -38,3 +40,14 @@ data/
 
 # Large deployment archives already generated outside Docker
 *.zip
+*.tar.gz
+*.b64
+*.chunked.b64
+
+# Local/generated project artifacts that should not be copied into backend image
+facial-attendance/.angular/
+facial-attendance/.vscode/
+facial-attendance/coverage/
+attendance.db SAMPLE DATA FINAL/
+deploy_frontend*/
+__pycache__/

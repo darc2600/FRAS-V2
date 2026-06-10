@@ -31,6 +31,9 @@ JWT_SECRET = "dev-secret-change-me"
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 1440
 MANILA_TZ = ZoneInfo("Asia/Manila")
+FRAS_MODE = os.getenv("FRAS_MODE", "full").strip().lower()
+V2_ONLY_MODE = FRAS_MODE in {"v2", "v2-only", "v2_only"}
+print(f"FRAS_MODE: {FRAS_MODE}")
 
 # Optional imports for secure password hashing / verification
 try:
@@ -52,8 +55,9 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
-# Import admin permission function
-from api.admin import require_admin_permission
+# Import admin permission function only outside V2-only mode.
+if not V2_ONLY_MODE:
+    from api.admin import require_admin_permission
 
 # -----------------------
 # Database setup
@@ -695,49 +699,44 @@ async def test_endpoint():
 # except Exception as e:
 #     print(f"Warning: could not include auth router: {e}")
 
-# Include other API routers
-# Temporarily disabled for debugging
-for module_name in ['admin', 'auth', 'recognition', 'capture', 'registration', 'attendance', 'schedule']:
+included_router_names = set()
+
+
+def include_api_router(module_name: str) -> None:
+    if module_name in included_router_names:
+        return
     try:
         module = __import__(f'api.{module_name}', fromlist=['router'])
         if hasattr(module, 'router'):
             app.include_router(module.router)
-            print(f"✅ {module_name} router included")
+            included_router_names.add(module_name)
+            print(f"[OK] {module_name} router included")
     except Exception as e:
         print(f"Warning: could not include {module_name} router: {e}")
 
-try:
-    from v2.api import router as v2_router
-    app.include_router(v2_router)
-    print("✅ v2 router included")
-except Exception as e:
-    print(f"Warning: could not include v2 router: {e}")
 
-# Try direct imports
-try:
-    print("Attempting to import auth module...")
-    from api import auth
-    print("Auth module imported, including router...")
-    app.include_router(auth.router)
-    print("Auth router enabled")
-    
-    print("Attempting to import admin module...")
-    from api import admin
-    print("Admin module imported, including router...")
-    app.include_router(admin.router)
-    print("Admin router enabled")
-    
-    print("Attempting to import recognition module...")
-    from api import recognition
-    print("Recognition module imported, including router...")
-    app.include_router(recognition.router)
-    print("Recognition router enabled")
-    
-    print("All routers loaded successfully")
-except Exception as e:
-    print(f"Error loading routers: {e}")
-    import traceback
-    traceback.print_exc()
+def include_v2_router() -> None:
+    if "v2" in included_router_names:
+        return
+    try:
+        from v2.api import router as v2_router
+        app.include_router(v2_router)
+        included_router_names.add("v2")
+        print("[OK] v2 router included")
+    except Exception as e:
+        print(f"Warning: could not include v2 router: {e}")
+
+
+if V2_ONLY_MODE:
+    print("V2-only mode enabled. Loading auth and V2 routers only.")
+    for module_name in ["auth"]:
+        include_api_router(module_name)
+    include_v2_router()
+else:
+    for module_name in ['admin', 'auth', 'recognition', 'capture', 'registration', 'attendance', 'schedule']:
+        include_api_router(module_name)
+    include_v2_router()
+    print("All configured routers loaded successfully")
 
 @app.post("/test-bulk")
 async def update_system_settings_bulk():

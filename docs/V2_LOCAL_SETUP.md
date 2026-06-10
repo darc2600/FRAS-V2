@@ -37,6 +37,7 @@ Create a `.env` file in the project root:
 ```text
 DATABASE_URL=postgresql://postgres:<YOUR_POSTGRES_PASSWORD>@localhost:5432/fras_v2
 JWT_SECRET=dev-local-secret-change-before-production
+FRAS_MODE=v2
 DATASET_PATH=dataset
 CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:4200
 ```
@@ -89,6 +90,22 @@ This seed command is additive by default. It creates or updates:
 
 It should not reset the whole database.
 
+The integration seed currently prepares 40 sample students and enrolls them into every non-online V2 class. This gives test rosters a more realistic Mapua class size.
+
+To update an existing database with newly added sample students without deleting schedules or sessions, run the same additive seed command again:
+
+```powershell
+.\.venv\Scripts\python.exe database\seed_v2_integration_data.py --docx "<FULL_PATH_TO_FRAS-prof-database.docx>"
+```
+
+To make sure the 40 sample students are enrolled in every active non-online class, including older local classes that were created before the latest seed, use:
+
+```powershell
+.\.venv\Scripts\python.exe database\seed_v2_integration_data.py --docx "<FULL_PATH_TO_FRAS-prof-database.docx>" --enroll-all-active-classes
+```
+
+This is still additive. It does not delete professors, classes, students, sessions, or schedules.
+
 ## 6. Test Accounts
 
 Development-only accounts:
@@ -118,18 +135,94 @@ Verify seeded professors, login, classes, students, and enrollments:
 .\.venv\Scripts\python.exe database\verify_v2_integration_seed.py
 ```
 
-## 8. Safe vs Destructive Commands
+## 8. Clear V2 Face Registration Data
+
+When preparing a clean deployment/demo database, you may want to remove saved face scans and embeddings while keeping professors, schedules, students, enrollments, and session history.
+
+Preview what will be cleared:
+
+```powershell
+.\.venv\Scripts\python.exe database\clear_v2_face_data.py
+```
+
+Actually clear V2 face profiles, embeddings, and saved face image files:
+
+```powershell
+.\.venv\Scripts\python.exe database\clear_v2_face_data.py --force
+```
+
+Clear only database face records but keep saved image files:
+
+```powershell
+.\.venv\Scripts\python.exe database\clear_v2_face_data.py --force --keep-images
+```
+
+This script does not delete:
+
+- professors
+- users
+- courses
+- rooms
+- classes
+- schedules
+- students
+- enrollments
+- attendance sessions
+- attendance events
+
+## 9. Clear V2 Session History
+
+When preparing a clean deployment/demo database, clear session history after QA testing so professors start with empty history pages.
+
+Preview what will be cleared:
+
+```powershell
+.\.venv\Scripts\python.exe database\clear_v2_session_data.py
+```
+
+Actually clear V2 attendance sessions, student session records, events, professor overrides, and CSV sync logs:
+
+```powershell
+.\.venv\Scripts\python.exe database\clear_v2_session_data.py --force
+```
+
+This script does not delete:
+
+- users
+- professors
+- courses
+- rooms
+- classes
+- schedules
+- students
+- enrollments
+- face profiles
+- face embeddings
+- saved face image files
+
+## 10. Safe vs Destructive Commands
 
 Safe or additive commands:
 
 ```powershell
 .\.venv\Scripts\python.exe database\check_v2_database.py
 .\.venv\Scripts\python.exe database\verify_v2_integration_seed.py
+.\.venv\Scripts\python.exe database\check_v2_roster_counts.py
 .\.venv\Scripts\python.exe database\seed_v2_integration_data.py --docx "<FULL_PATH_TO_FRAS-prof-database.docx>"
+.\.venv\Scripts\python.exe database\seed_v2_integration_data.py --docx "<FULL_PATH_TO_FRAS-prof-database.docx>" --enroll-all-active-classes
 .\.venv\Scripts\python.exe database\create_v2_test_professor.py
+.\.venv\Scripts\python.exe database\clear_v2_face_data.py
+.\.venv\Scripts\python.exe database\clear_v2_session_data.py
 ```
 
-Destructive or data-replacing commands:
+Narrow cleanup commands:
+
+```powershell
+.\.venv\Scripts\python.exe database\clear_v2_face_data.py --force
+.\.venv\Scripts\python.exe database\clear_v2_session_data.py --force
+```
+
+Destructive or broad data-replacing commands:
 
 ```powershell
 .\.venv\Scripts\python.exe database\init_v2_database.py --force
@@ -139,7 +232,7 @@ Destructive or data-replacing commands:
 
 Use destructive commands only when you intentionally want to reset or replace data.
 
-## 9. Run Backend
+## 11. Run Backend
 
 From the project root:
 
@@ -149,7 +242,19 @@ From the project root:
 
 If the backend starts successfully, it should include the V2 router in the startup logs.
 
-## 10. Run Frontend
+For instructor-only V2 development/deployment, keep this in `.env`:
+
+```text
+FRAS_MODE=v2
+```
+
+This does not delete old V1 files. It only makes `backend.py` skip legacy/admin/V1 router imports at startup and load the authentication router plus the V2 router. To restore the broader legacy router loading behavior, remove `FRAS_MODE` or set it to:
+
+```text
+FRAS_MODE=full
+```
+
+## 12. Run Frontend
 
 From the Angular project folder:
 
@@ -164,7 +269,7 @@ Open:
 http://localhost:4200
 ```
 
-## 11. Suggested Future Wrapper
+## 13. Suggested Future Wrapper
 
 A safer wrapper can be added later:
 

@@ -1,0 +1,9 @@
+node_modules/
+.angular/
+dist/
+coverage/
+.vscode/
+*.log
+*.tmp
+*.zip
+*.tar.gz
