@@ -759,6 +759,31 @@ class V2AttendanceRepository:
             )
             return cursor.fetchall()
 
+    def get_recent_student_event(
+        self,
+        session_id: int,
+        student_id: int,
+        event_type: str,
+        since_time: datetime,
+    ) -> Optional[tuple[Any, ...]]:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT event_id, event_time
+                FROM attendance_events
+                WHERE session_id = ?
+                  AND student_id = ?
+                  AND event_type = ?
+                  AND event_time >= ?
+                  AND is_voided = FALSE
+                ORDER BY event_time DESC, event_id DESC
+                LIMIT 1
+                """,
+                (session_id, student_id, event_type, since_time),
+            )
+            return cursor.fetchone()
+
     def get_record_recalculation_state(self, record_id: int) -> Optional[tuple[Any, ...]]:
         with get_connection() as conn:
             cursor = conn.cursor()

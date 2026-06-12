@@ -64,6 +64,36 @@ def extract_embedding_from_image(
         return None
 
 
+def extract_embeddings_from_image(
+    image_path: str,
+    model_name: str,
+    enforce_detection: bool = True,
+) -> list[list[float]]:
+    """Return all detected face embeddings in image order.
+
+    V2 recognition deliberately uses only the first detected face after this
+    extraction so multi-face frames do not silently register multiple people.
+    """
+    try:
+        reps = DeepFace.represent(
+            img_path=image_path,
+            model_name=model_name,
+            enforce_detection=enforce_detection,
+        )
+        if not reps:
+            return []
+
+        normalized_reps = reps if isinstance(reps, list) else [reps]
+        embeddings: list[list[float]] = []
+        for item in normalized_reps:
+            embedding = item.get("embedding") if isinstance(item, dict) else None
+            if embedding and isinstance(embedding, list):
+                embeddings.append([float(v) for v in embedding])
+        return embeddings
+    except Exception:
+        return []
+
+
 def upsert_student_embedding(
     cursor,
     student_id: int,
@@ -94,6 +124,41 @@ def load_enrolled_embeddings(cursor, class_id: int, model_name: str) -> List[Tup
         JOIN students s ON s.student_id = e.student_id
         JOIN student_face_embeddings sfe ON sfe.student_id = e.student_id
         WHERE e.class_id = ? AND sfe.model_name = ?
+        ''',
+        (class_id, model_name),
+    )
+    return cursor.fetchall()
+
+
+def load_active_enrolled_embeddings(cursor, class_id: int, model_name: str) -> List[Tuple[int, int, str, str, str, Optional[str], Optional[int]]]:
+    cursor.execute(
+        '''
+        SELECT
+            sfe.embedding_id,
+            e.student_id,
+            s.first_name,
+            s.last_name,
+            sfe.embedding_json,
+            sfe.source_image_path,
+            fp.face_profile_id
+        FROM enrollments e
+        JOIN students s ON s.student_id = e.student_id
+        JOIN student_face_embeddings sfe ON sfe.student_id = e.student_id
+        JOIN student_face_profiles fp ON fp.student_id = e.student_id
+            AND fp.is_active = TRUE
+            AND fp.face_profile_id = (
+                SELECT fp_latest.face_profile_id
+                FROM student_face_profiles fp_latest
+                WHERE fp_latest.student_id = e.student_id
+                  AND fp_latest.is_active = TRUE
+                ORDER BY COALESCE(fp_latest.updated_at, fp_latest.registered_at) DESC,
+                    fp_latest.face_profile_id DESC
+                LIMIT 1
+            )
+        WHERE e.class_id = ?
+          AND e.enrollment_status = 'active'
+          AND sfe.model_name = ?
+        ORDER BY s.last_name, s.first_name, sfe.embedding_id
         ''',
         (class_id, model_name),
     )

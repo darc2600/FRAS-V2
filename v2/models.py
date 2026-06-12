@@ -310,8 +310,16 @@ class V2FaceProfileSaveResponse(BaseModel):
 
 
 class V2RecognitionMatchResponse(BaseModel):
-    status: Literal["success", "failed", "error"]
+    status: Literal["success", "failed", "error", "no_face_recognized", "below_threshold", "ambiguous_match"]
     message: Optional[str] = None
     student_id: Optional[int] = None
     student_name: Optional[str] = None
     confidence: Optional[float] = Field(default=None, ge=0, le=100)
+    decision_result: Optional[str] = None
+    detected_face_count: int = 0
+    best_match_score: Optional[float] = None
+    second_best_match_score: Optional[float] = None
+    recognition_threshold: Optional[float] = None
+    match_margin: Optional[float] = None
+    matched_embedding_id: Optional[int] = None
+    matched_profile_id: Optional[int] = None

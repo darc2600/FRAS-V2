@@ -37,16 +37,19 @@
             <i></i>
             {{ cameraReady ? 'Camera Active' : 'Camera Standby' }}
           </div>
+          <div class="quality-chip" [class.ready]="frameQualityReady">
+            {{ frameQualityReady ? 'Quality Ready' : 'Quality Check' }}
+          </div>
           <div class="camera-footer">
             <strong>{{ currentAngle.label }}</strong>
-            <span>{{ currentAngle.instruction }}</span>
+            <span>{{ qualityMessage }}</span>
           </div>
         </div>
 
         <canvas #canvasEl class="hidden-canvas"></canvas>
 
         <div class="controls-grid">
-          <button type="button" class="primary" [disabled]="!cameraReady" (click)="captureCurrentFrame()">Capture Frame</button>
+          <button type="button" class="primary" [disabled]="!canCaptureFrame" (click)="captureCurrentFrame()">Capture Frame</button>
           <button type="button" (click)="retakeCurrentAngle()" [disabled]="currentAngle.status !== 'captured'">Retake Capture</button>
           <button type="button" (click)="resetCaptures()" [disabled]="capturedCount === 0">Reset Captures</button>
           <button type="button" class="save" [disabled]="!allCaptured || isSaving" (click)="saveFaceProfile()">
@@ -88,6 +91,11 @@
             <strong>{{ recognitionQuality }}%</strong>
             <span><i [style.width.%]="recognitionQuality"></i></span>
           </div>
+          <div class="auto-capture-meter" *ngIf="autoCaptureEnabled && !allCaptured">
+            <span>Auto Capture</span>
+            <strong>{{ autoCaptureProgress }}%</strong>
+            <i><b [style.width.%]="autoCaptureProgress"></b></i>
+          </div>
         </section>
 
         <section class="panel">
@@ -97,19 +105,27 @@
           <div class="check-list">
             <div>
               <span>Lighting Condition</span>
-              <strong>{{ lightingScore >= 45 ? 'Acceptable' : capturedCount ? 'Needs Improvement' : 'Waiting for capture' }}</strong>
+              <strong>{{ checkLabel(lightingState) }} · {{ lightingScore }}%</strong>
+            </div>
+            <div>
+              <span>Image Sharpness</span>
+              <strong>{{ checkLabel(blurState) }} · {{ blurScore }}%</strong>
+            </div>
+            <div>
+              <span>Face Count</span>
+              <strong>{{ faceDetectionLabel }}</strong>
             </div>
             <div>
               <span>Face Position</span>
-              <strong>{{ cameraReady ? 'Use guide frame' : 'Camera inactive' }}</strong>
+              <strong>{{ checkLabel(facePositionState) }}</strong>
+            </div>
+            <div>
+              <span>Face Size</span>
+              <strong>{{ checkLabel(faceSizeState) }}</strong>
             </div>
             <div>
               <span>Capture Status</span>
-              <strong>{{ allCaptured ? 'Complete' : 'Waiting for front face' }}</strong>
-            </div>
-            <div>
-              <span>Occlusion Warning</span>
-              <strong>Manual review</strong>
+              <strong>{{ allCaptured ? 'Complete' : frameQualityReady ? 'Ready' : 'Waiting for quality' }}</strong>
             </div>
           </div>
         </section>

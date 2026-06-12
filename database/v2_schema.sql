@@ -201,3 +201,6 @@ CREATE INDEX idx_attendance_sessions_professor ON attendance_sessions(professor_
 CREATE INDEX idx_student_session_records_session ON student_session_records(session_id);
 CREATE INDEX idx_attendance_events_session_time ON attendance_events(session_id, event_time);
 CREATE INDEX idx_attendance_events_student ON attendance_events(student_id);
+CREATE UNIQUE INDEX idx_one_active_face_profile_per_student
+    ON student_face_profiles(student_id)
+    WHERE is_active = TRUE;

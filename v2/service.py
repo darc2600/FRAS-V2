@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+import logging
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -13,8 +14,8 @@ from fastapi import HTTPException
 from services.face_embeddings import (
     cosine_similarity,
     ensure_embeddings_table,
-    extract_embedding_from_image,
-    load_enrolled_embeddings,
+    extract_embeddings_from_image,
+    load_active_enrolled_embeddings,
     parse_embedding_json,
     similarity_threshold_from_distance_threshold,
     upsert_student_embedding,
@@ -58,6 +59,9 @@ from api.auth import verify_user_password
 
 
 MANILA_TZ = ZoneInfo("Asia/Manila")
+LOG = logging.getLogger(__name__)
+V2_MIN_RECOGNITION_SIMILARITY = float(os.getenv("FRAS_V2_FACE_SIMILARITY_THRESHOLD", "0.70"))
+V2_RECOGNITION_MARGIN = float(os.getenv("FRAS_V2_FACE_MATCH_MARGIN", "0.07"))
 
 
 class V2AttendanceService:
@@ -383,60 +387,156 @@ class V2AttendanceService:
 
             settings = get_settings_service()
             model_name = settings.face_recognition_model
-            threshold = similarity_threshold_from_distance_threshold(settings.recognition_threshold)
-            query_embedding = extract_embedding_from_image(
+            configured_threshold = self._v2_similarity_threshold(settings.recognition_threshold)
+            query_embeddings = extract_embeddings_from_image(
                 temp_path,
                 model_name=model_name,
-                enforce_detection=False,
+                enforce_detection=True,
             )
+            detected_face_count = len(query_embeddings)
+            query_embedding = query_embeddings[0] if query_embeddings else None
             if not query_embedding:
+                LOG.info(
+                    "V2 recognition no_face_recognized class_id=%s detected_face_count=%s threshold=%.4f",
+                    class_id,
+                    detected_face_count,
+                    configured_threshold,
+                )
                 return V2RecognitionMatchResponse(
-                    status="failed",
-                    message="No recognizable face embedding was found in the frame.",
+                    status="no_face_recognized",
+                    decision_result="no_face_recognized",
+                    message="No face recognized in the frame.",
+                    detected_face_count=detected_face_count,
+                    recognition_threshold=round(configured_threshold, 4),
+                    match_margin=round(V2_RECOGNITION_MARGIN, 4),
                 )
 
             with get_connection() as conn:
                 cursor = conn.cursor()
                 ensure_embeddings_table(cursor)
-                enrolled_embeddings = load_enrolled_embeddings(cursor, class_id=class_id, model_name=model_name)
+                enrolled_embeddings = load_active_enrolled_embeddings(cursor, class_id=class_id, model_name=model_name)
 
-            best_student_id: int | None = None
-            best_similarity = -1.0
-            for candidate_student_id, _last_name, embedding_json in enrolled_embeddings:
+            candidates = []
+            for embedding_id, candidate_student_id, first_name, last_name, embedding_json, source_image_path, profile_id in enrolled_embeddings:
                 candidate_embedding = parse_embedding_json(embedding_json)
                 if not candidate_embedding:
                     continue
                 similarity = cosine_similarity(query_embedding, candidate_embedding)
-                if similarity > best_similarity:
-                    best_similarity = similarity
-                    best_student_id = int(candidate_student_id)
+                candidates.append({
+                    "embedding_id": int(embedding_id),
+                    "student_id": int(candidate_student_id),
+                    "student_name": f"{last_name}, {first_name}",
+                    "similarity": similarity,
+                    "source_image_path": source_image_path,
+                    "profile_id": int(profile_id) if profile_id is not None else None,
+                })
 
-            if best_student_id is None:
+            candidates.sort(key=lambda item: item["similarity"], reverse=True)
+            decision = self._decide_recognition_match(candidates, configured_threshold, V2_RECOGNITION_MARGIN)
+            best = decision["best"]
+            second = decision["second"]
+
+            if not best:
+                LOG.info(
+                    "V2 recognition failed_no_profiles class_id=%s detected_face_count=%s threshold=%.4f",
+                    class_id,
+                    detected_face_count,
+                    configured_threshold,
+                )
                 return V2RecognitionMatchResponse(
                     status="failed",
+                    decision_result="no_enrolled_profiles",
                     message="No enrolled face profiles are available for this class.",
-                )
-            if best_similarity < threshold:
-                return V2RecognitionMatchResponse(
-                    status="failed",
-                    message="No confident student match found.",
-                    confidence=round(max(0.0, best_similarity) * 100, 2),
+                    detected_face_count=detected_face_count,
+                    recognition_threshold=round(configured_threshold, 4),
+                    match_margin=round(V2_RECOGNITION_MARGIN, 4),
                 )
 
+            common = {
+                "detected_face_count": detected_face_count,
+                "confidence": self._confidence_percent(float(best["similarity"])),
+                "best_match_score": round(float(best["similarity"]), 4),
+                "second_best_match_score": round(float(second["similarity"]), 4) if second else None,
+                "recognition_threshold": round(configured_threshold, 4),
+                "match_margin": round(V2_RECOGNITION_MARGIN, 4),
+                "matched_embedding_id": best["embedding_id"],
+                "matched_profile_id": best["profile_id"],
+            }
+
+            if decision["result"] == "below_threshold":
+                LOG.info(
+                    "V2 recognition below_threshold class_id=%s best_student_id=%s best=%.4f second=%s threshold=%.4f margin=%.4f embedding_id=%s profile_id=%s faces=%s",
+                    class_id,
+                    best["student_id"],
+                    best["similarity"],
+                    f"{second['similarity']:.4f}" if second else None,
+                    configured_threshold,
+                    V2_RECOGNITION_MARGIN,
+                    best["embedding_id"],
+                    best["profile_id"],
+                    detected_face_count,
+                )
+                return V2RecognitionMatchResponse(
+                    status="below_threshold",
+                    decision_result="below_threshold",
+                    message="No confident student match found.",
+                    **common,
+                )
+
+            if decision["result"] == "ambiguous_match":
+                LOG.warning(
+                    "V2 recognition ambiguous_match class_id=%s best_student_id=%s second_student_id=%s best=%.4f second=%.4f threshold=%.4f margin=%.4f embedding_id=%s profile_id=%s faces=%s",
+                    class_id,
+                    best["student_id"],
+                    second["student_id"] if second else None,
+                    best["similarity"],
+                    second["similarity"] if second else -1.0,
+                    configured_threshold,
+                    V2_RECOGNITION_MARGIN,
+                    best["embedding_id"],
+                    best["profile_id"],
+                    detected_face_count,
+                )
+                return V2RecognitionMatchResponse(
+                    status="ambiguous_match",
+                    decision_result="ambiguous_match",
+                    message="Face match is ambiguous. Please use manual review or recapture.",
+                    student_id=int(best["student_id"]),
+                    student_name=str(best["student_name"]),
+                    **common,
+                )
+
+            best_student_id = int(best["student_id"])
             student = self.repo.get_student_name_for_class(class_id, best_student_id)
             if not student:
                 return V2RecognitionMatchResponse(
                     status="failed",
+                    decision_result="matched_student_not_enrolled",
                     message="Matched student is not enrolled in this class.",
-                    confidence=round(best_similarity * 100, 2),
+                    student_id=best_student_id,
+                    student_name=str(best["student_name"]),
+                    **common,
                 )
 
+            LOG.info(
+                "V2 recognition recognized class_id=%s student_id=%s best=%.4f second=%s threshold=%.4f margin=%.4f embedding_id=%s profile_id=%s faces=%s",
+                class_id,
+                best_student_id,
+                best["similarity"],
+                f"{second['similarity']:.4f}" if second else None,
+                configured_threshold,
+                V2_RECOGNITION_MARGIN,
+                best["embedding_id"],
+                best["profile_id"],
+                detected_face_count,
+            )
             return V2RecognitionMatchResponse(
                 status="success",
+                decision_result="recognized",
                 student_id=best_student_id,
                 student_name=f"{student[1]}, {student[0]}",
-                confidence=round(best_similarity * 100, 2),
                 message="Student recognized.",
+                **common,
             )
         except Exception as exc:
             raise HTTPException(status_code=500, detail="Unable to recognize the uploaded frame.") from exc
@@ -484,7 +584,18 @@ class V2AttendanceService:
         front_path = saved_paths[front_index]
         settings = get_settings_service()
         model_name = settings.face_recognition_model
-        embedding = extract_embedding_from_image(front_path, model_name=model_name, enforce_detection=False)
+        face_embeddings = extract_embeddings_from_image(front_path, model_name=model_name, enforce_detection=True)
+        if len(face_embeddings) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Multiple faces were detected in the capture. Please retake with only the selected student in frame.",
+            )
+        embedding = face_embeddings[0] if face_embeddings else None
+        if not embedding:
+            raise HTTPException(
+                status_code=400,
+                detail="No face was detected in the front capture. Please retake the face profile image.",
+            )
 
         self.repo.replace_student_face_profile(
             student_id=student_id,
@@ -493,17 +604,16 @@ class V2AttendanceService:
             model_name=None,
         )
 
-        if embedding:
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                ensure_embeddings_table(cursor)
-                upsert_student_embedding(
-                    cursor=cursor,
-                    student_id=student_id,
-                    model_name=model_name,
-                    embedding=embedding,
-                    source_image_path=front_path,
-                )
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            ensure_embeddings_table(cursor)
+            upsert_student_embedding(
+                cursor=cursor,
+                student_id=student_id,
+                model_name=model_name,
+                embedding=embedding,
+                source_image_path=front_path,
+            )
 
         return V2FaceProfileSaveResponse(
             status="success",
@@ -567,6 +677,16 @@ class V2AttendanceService:
 
         event_time = payload.event_time or datetime.now(MANILA_TZ).replace(tzinfo=None)
         record_id = int(record_row[0])
+        if payload.event_source == "facial_recognition" and payload.event_type in {"time_in", "break_in"}:
+            recent_window_start = event_time.replace(tzinfo=None) - timedelta(seconds=30)
+            if self.repo.get_recent_student_event(session_id, payload.student_id, payload.event_type, recent_window_start):
+                LOG.info(
+                    "V2 duplicate recognition event blocked session_id=%s student_id=%s event_type=%s",
+                    session_id,
+                    payload.student_id,
+                    payload.event_type,
+                )
+                return self.get_session_detail(session_id)
         if session.session_status == "on_break":
             last_event = self.repo.get_student_events(session_id, payload.student_id)[-1:]
             if not last_event or last_event[0][0] != "break_out":
@@ -833,6 +953,32 @@ class V2AttendanceService:
             requires_review=requires_review,
             review_reason=review_reason,
         )
+
+    def _v2_similarity_threshold(self, configured_distance_threshold: float) -> float:
+        configured_similarity = similarity_threshold_from_distance_threshold(configured_distance_threshold)
+        return max(configured_similarity, V2_MIN_RECOGNITION_SIMILARITY)
+
+    def _confidence_percent(self, similarity: float) -> float:
+        return round(min(100.0, max(0.0, similarity * 100)), 2)
+
+    def _decide_recognition_match(
+        self,
+        candidates: list[dict],
+        threshold: float,
+        margin: float,
+    ) -> dict:
+        best = candidates[0] if candidates else None
+        second = candidates[1] if len(candidates) > 1 else None
+        if not best:
+            return {"result": "no_enrolled_profiles", "best": None, "second": None}
+
+        best_score = float(best["similarity"])
+        second_score = float(second["similarity"]) if second else -1.0
+        if best_score < threshold:
+            return {"result": "below_threshold", "best": best, "second": second}
+        if second and best_score - second_score < margin:
+            return {"result": "ambiguous_match", "best": best, "second": second}
+        return {"result": "recognized", "best": best, "second": second}
 
     def _get_session_or_404(self, session_id: int) -> V2SessionResponse:
         row = self.repo.get_session(session_id)

@@ -6,6 +6,21 @@ import { V2FaceProfileContextResponse, V2FaceProfileStatus } from '../../models/
 import { V2StatusTone } from '../../components';
 
 type CaptureStatus = 'pending' | 'captured';
+type FaceQualityState = 'good' | 'warning' | 'bad' | 'unknown';
+
+type BrowserFaceDetection = {
+  boundingBox: DOMRectReadOnly;
+};
+
+type BrowserFaceDetector = {
+  detect(image: CanvasImageSource): Promise<BrowserFaceDetection[]>;
+};
+
+declare global {
+  interface Window {
+    FaceDetector?: new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => BrowserFaceDetector;
+  }
+}
 
 interface FaceAngle {
   key: 'front';
@@ -35,6 +50,17 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   stream: MediaStream | null = null;
   cameraReady = false;
   lightingScore = 0;
+  blurScore = 0;
+  faceCount: number | null = null;
+  faceCentered = false;
+  faceLargeEnough = false;
+  qualityMessage = 'Start the camera and align the face inside the guide.';
+  autoCaptureEnabled = true;
+  autoCaptureProgress = 0;
+  isAutoCapturing = false;
+  private qualityTimer: any;
+  private faceDetector: BrowserFaceDetector | null = null;
+  private qualityStableStartedAt: number | null = null;
 
   angles: FaceAngle[] = [
     { key: 'front', label: 'Front', instruction: 'Face the camera directly inside the guide frame.', status: 'pending' }
@@ -104,6 +130,8 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       this.videoEl.nativeElement.srcObject = this.stream;
       await this.videoEl.nativeElement.play();
       this.cameraReady = true;
+      this.setupFaceDetector();
+      this.startQualityLoop();
       this.errorMessage = '';
     } catch (error) {
       this.cameraReady = false;
@@ -112,9 +140,12 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   }
 
   stopCamera(): void {
+    this.stopQualityLoop();
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
     this.cameraReady = false;
+    this.qualityStableStartedAt = null;
+    this.autoCaptureProgress = 0;
   }
 
   get currentAngle(): FaceAngle {
@@ -130,9 +161,12 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   }
 
   get recognitionQuality(): number {
-    const completion = this.allCaptured ? 70 : 0;
-    const lighting = Math.min(30, Math.round((this.lightingScore / 100) * 30));
-    return Math.min(100, Math.round(completion + lighting));
+    const lighting = this.checkPassed(this.lightingState) ? 25 : this.lightingState === 'warning' ? 12 : 0;
+    const blur = this.checkPassed(this.blurState) ? 25 : this.blurState === 'warning' ? 12 : 0;
+    const face = this.checkPassed(this.faceCountState) ? 20 : this.faceCountState === 'unknown' ? 10 : 0;
+    const position = this.checkPassed(this.facePositionState) ? 15 : this.facePositionState === 'unknown' ? 8 : 0;
+    const size = this.checkPassed(this.faceSizeState) ? 15 : this.faceSizeState === 'unknown' ? 8 : 0;
+    return Math.min(100, lighting + blur + face + position + size);
   }
 
   get qualityStatus(): 'Good' | 'Needs Improvement' | 'Poor' {
@@ -146,8 +180,62 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     return this.context.face_profile_status === 'no_face_profile' ? 'Register Face Profile' : 'Update Face Profile';
   }
 
-  async captureCurrentFrame(): Promise<void> {
+  get canCaptureFrame(): boolean {
+    return this.cameraReady && this.frameQualityReady && this.currentAngle.status !== 'captured' && !this.isAutoCapturing;
+  }
+
+  get frameQualityReady(): boolean {
+    const faceChecksPass = this.faceDetector
+      ? this.faceCountState === 'good' && this.facePositionState === 'good' && this.faceSizeState === 'good'
+      : true;
+    return this.lightingState === 'good' && this.blurState === 'good' && faceChecksPass;
+  }
+
+  get faceDetectionLabel(): string {
+    if (!this.faceDetector) return 'Browser unavailable';
+    if (this.faceCount === null) return 'Scanning';
+    if (this.faceCount === 1) return 'One face';
+    if (this.faceCount === 0) return 'No face';
+    return `${this.faceCount} faces`;
+  }
+
+  get lightingState(): FaceQualityState {
+    if (!this.cameraReady || !this.lightingScore) return 'unknown';
+    if (this.lightingScore >= 45 && this.lightingScore <= 82) return 'good';
+    if (this.lightingScore >= 32 && this.lightingScore <= 90) return 'warning';
+    return 'bad';
+  }
+
+  get blurState(): FaceQualityState {
+    if (!this.cameraReady || !this.blurScore) return 'unknown';
+    if (this.blurScore >= 42) return 'good';
+    if (this.blurScore >= 24) return 'warning';
+    return 'bad';
+  }
+
+  get faceCountState(): FaceQualityState {
+    if (!this.faceDetector) return 'unknown';
+    if (this.faceCount === 1) return 'good';
+    if (this.faceCount === null) return 'unknown';
+    return 'bad';
+  }
+
+  get facePositionState(): FaceQualityState {
+    if (!this.faceDetector) return 'unknown';
+    return this.faceCentered ? 'good' : 'bad';
+  }
+
+  get faceSizeState(): FaceQualityState {
+    if (!this.faceDetector) return 'unknown';
+    return this.faceLargeEnough ? 'good' : 'bad';
+  }
+
+  async captureCurrentFrame(source: 'manual' | 'auto' = 'manual'): Promise<void> {
     if (!this.cameraReady || !this.videoEl?.nativeElement || !this.canvasEl?.nativeElement) return;
+    if (source === 'manual' && !this.canCaptureFrame) {
+      this.errorMessage = 'Improve the camera quality checks before capturing the face profile.';
+      return;
+    }
     const video = this.videoEl.nativeElement;
     const canvas = this.canvasEl.nativeElement;
     const width = video.videoWidth || 1280;
@@ -158,7 +246,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     if (!context) return;
 
     context.drawImage(video, 0, 0, width, height);
-    this.lightingScore = this.estimateLighting(context, width, height);
+    this.updateImageQuality(context, width, height);
     const blob = await new Promise<Blob>((resolve) => {
       canvas.toBlob((value) => resolve(value as Blob), 'image/jpeg', 0.92);
     });
@@ -168,7 +256,9 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     angle.blob = blob;
     angle.previewUrl = URL.createObjectURL(blob);
     angle.status = 'captured';
-    this.successMessage = 'Front face captured.';
+    this.successMessage = source === 'auto' ? 'Best quality frame captured automatically.' : 'Front face captured.';
+    this.qualityStableStartedAt = null;
+    this.autoCaptureProgress = 0;
 
     this.currentAngleIndex = 0;
   }
@@ -195,6 +285,9 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     });
     this.currentAngleIndex = 0;
     this.lightingScore = 0;
+    this.blurScore = 0;
+    this.qualityStableStartedAt = null;
+    this.autoCaptureProgress = 0;
     this.successMessage = '';
   }
 
@@ -246,6 +339,19 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     return 'danger';
   }
 
+  checkLabel(state: FaceQualityState): string {
+    if (state === 'good') return 'Good';
+    if (state === 'warning') return 'Needs Improvement';
+    if (state === 'bad') return 'Not Ready';
+    return 'Scanning';
+  }
+
+  checkTone(state: FaceQualityState): V2StatusTone {
+    if (state === 'good') return 'success';
+    if (state === 'warning' || state === 'unknown') return 'warning';
+    return 'danger';
+  }
+
   formatDate(value?: string | null): string {
     if (!value) return 'No update yet';
     return new Intl.DateTimeFormat('en-US', {
@@ -253,6 +359,125 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       day: 'numeric',
       year: 'numeric'
     }).format(new Date(value));
+  }
+
+  private setupFaceDetector(): void {
+    if (!window.FaceDetector) {
+      this.faceDetector = null;
+      this.faceCount = null;
+      return;
+    }
+    this.faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 2 });
+  }
+
+  private startQualityLoop(): void {
+    this.stopQualityLoop();
+    this.qualityTimer = setInterval(() => this.runQualityCheck(), 450);
+  }
+
+  private stopQualityLoop(): void {
+    if (this.qualityTimer) {
+      clearInterval(this.qualityTimer);
+      this.qualityTimer = null;
+    }
+  }
+
+  private async runQualityCheck(): Promise<void> {
+    if (!this.cameraReady || !this.videoEl?.nativeElement || !this.canvasEl?.nativeElement || this.currentAngle.status === 'captured') {
+      return;
+    }
+
+    const video = this.videoEl.nativeElement;
+    const canvas = this.canvasEl.nativeElement;
+    const width = Math.max(1, video.videoWidth || 640);
+    const height = Math.max(1, video.videoHeight || 360);
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return;
+
+    canvas.width = width;
+    canvas.height = height;
+    context.drawImage(video, 0, 0, width, height);
+    this.updateImageQuality(context, width, height);
+    await this.updateFaceQuality(canvas, width, height);
+    this.updateQualityMessage();
+    this.maybeAutoCapture();
+  }
+
+  private async updateFaceQuality(canvas: HTMLCanvasElement, width: number, height: number): Promise<void> {
+    if (!this.faceDetector) {
+      this.faceCount = null;
+      this.faceCentered = false;
+      this.faceLargeEnough = false;
+      return;
+    }
+
+    try {
+      const faces = await this.faceDetector.detect(canvas);
+      this.faceCount = faces.length;
+      const firstFace = faces[0]?.boundingBox;
+      if (!firstFace || faces.length !== 1) {
+        this.faceCentered = false;
+        this.faceLargeEnough = false;
+        return;
+      }
+
+      const centerX = firstFace.x + firstFace.width / 2;
+      const centerY = firstFace.y + firstFace.height / 2;
+      const xOffset = Math.abs(centerX - width / 2) / width;
+      const yOffset = Math.abs(centerY - height / 2) / height;
+      const faceAreaRatio = (firstFace.width * firstFace.height) / (width * height);
+      this.faceCentered = xOffset <= 0.16 && yOffset <= 0.18;
+      this.faceLargeEnough = faceAreaRatio >= 0.08 && faceAreaRatio <= 0.48;
+    } catch {
+      this.faceDetector = null;
+      this.faceCount = null;
+      this.faceCentered = false;
+      this.faceLargeEnough = false;
+    }
+  }
+
+  private updateQualityMessage(): void {
+    if (!this.cameraReady) {
+      this.qualityMessage = 'Start the camera and align the face inside the guide.';
+    } else if (this.faceDetector && this.faceCount !== 1) {
+      this.qualityMessage = this.faceCount && this.faceCount > 1
+        ? 'Only one student should be visible in the frame.'
+        : 'Align the student face inside the guide frame.';
+    } else if (this.lightingState !== 'good') {
+      this.qualityMessage = 'Adjust lighting so the face is clear and not too dark or overexposed.';
+    } else if (this.blurState !== 'good') {
+      this.qualityMessage = 'Hold still until the camera image is sharp.';
+    } else if (this.faceDetector && !this.faceCentered) {
+      this.qualityMessage = 'Center the face inside the guide frame.';
+    } else if (this.faceDetector && !this.faceLargeEnough) {
+      this.qualityMessage = 'Move closer or farther until the face fits the guide frame.';
+    } else {
+      this.qualityMessage = this.autoCaptureEnabled ? 'Good frame detected. Auto capture will start shortly.' : 'Good frame detected. Capture is ready.';
+    }
+  }
+
+  private maybeAutoCapture(): void {
+    if (!this.autoCaptureEnabled || !this.frameQualityReady || this.currentAngle.status === 'captured' || this.isAutoCapturing) {
+      this.qualityStableStartedAt = null;
+      this.autoCaptureProgress = 0;
+      return;
+    }
+
+    const now = Date.now();
+    this.qualityStableStartedAt = this.qualityStableStartedAt || now;
+    const elapsed = now - this.qualityStableStartedAt;
+    this.autoCaptureProgress = Math.min(100, Math.round((elapsed / 2500) * 100));
+    if (elapsed >= 2500) {
+      this.isAutoCapturing = true;
+      this.captureCurrentFrame('auto').finally(() => {
+        this.isAutoCapturing = false;
+      });
+    }
+  }
+
+  private updateImageQuality(context: CanvasRenderingContext2D, width: number, height: number): void {
+    this.lightingScore = this.estimateLighting(context, width, height);
+    this.blurScore = this.estimateSharpness(context, width, height);
   }
 
   private estimateLighting(context: CanvasRenderingContext2D, width: number, height: number): number {
@@ -270,6 +495,48 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     }
     const average = total / (imageData.data.length / 4);
     return Math.max(0, Math.min(100, Math.round((average / 255) * 100)));
+  }
+
+  private estimateSharpness(context: CanvasRenderingContext2D, width: number, height: number): number {
+    const sampleWidth = Math.min(180, width);
+    const sampleHeight = Math.min(120, height);
+    const imageData = context.getImageData(
+      Math.floor((width - sampleWidth) / 2),
+      Math.floor((height - sampleHeight) / 2),
+      sampleWidth,
+      sampleHeight
+    );
+    const gray: number[] = [];
+    for (let index = 0; index < imageData.data.length; index += 4) {
+      gray.push(
+        (imageData.data[index] * 0.299) +
+        (imageData.data[index + 1] * 0.587) +
+        (imageData.data[index + 2] * 0.114)
+      );
+    }
+
+    let totalEdge = 0;
+    let count = 0;
+    for (let y = 1; y < sampleHeight - 1; y += 1) {
+      for (let x = 1; x < sampleWidth - 1; x += 1) {
+        const center = gray[y * sampleWidth + x] * 4;
+        const laplacian = Math.abs(
+          center -
+          gray[y * sampleWidth + x - 1] -
+          gray[y * sampleWidth + x + 1] -
+          gray[(y - 1) * sampleWidth + x] -
+          gray[(y + 1) * sampleWidth + x]
+        );
+        totalEdge += laplacian;
+        count += 1;
+      }
+    }
+
+    return Math.max(0, Math.min(100, Math.round((totalEdge / Math.max(1, count)) * 4)));
+  }
+
+  private checkPassed(state: FaceQualityState): boolean {
+    return state === 'good';
   }
 
   private cameraErrorMessage(error: unknown): string {

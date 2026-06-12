@@ -282,9 +282,17 @@ export interface V2FaceProfileSaveResponse {
 }
 
 export interface V2RecognitionMatchResponse {
-  status: 'success' | 'failed' | 'error';
+  status: 'success' | 'failed' | 'error' | 'no_face_recognized' | 'below_threshold' | 'ambiguous_match';
   message?: string | null;
   student_id?: number | null;
   student_name?: string | null;
   confidence?: number | null;
+  decision_result?: string | null;
+  detected_face_count?: number;
+  best_match_score?: number | null;
+  second_best_match_score?: number | null;
+  recognition_threshold?: number | null;
+  match_margin?: number | null;
+  matched_embedding_id?: number | null;
+  matched_profile_id?: number | null;
 }
