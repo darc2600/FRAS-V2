@@ -49,6 +49,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   successMessage = '';
   stream: MediaStream | null = null;
   cameraReady = false;
+  cameraAspectRatio = '16 / 9';
   lightingScore = 0;
   blurScore = 0;
   faceCount: number | null = null;
@@ -128,7 +129,9 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       }
 
       this.videoEl.nativeElement.srcObject = this.stream;
+      this.videoEl.nativeElement.onloadedmetadata = () => this.updateCameraAspectRatio();
       await this.videoEl.nativeElement.play();
+      this.updateCameraAspectRatio();
       this.cameraReady = true;
       this.setupFaceDetector();
       this.startQualityLoop();
@@ -181,7 +184,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   }
 
   get canCaptureFrame(): boolean {
-    return this.cameraReady && this.frameQualityReady && this.currentAngle.status !== 'captured' && !this.isAutoCapturing;
+    return this.cameraReady && this.frameQualityUsable && this.currentAngle.status !== 'captured' && !this.isAutoCapturing;
   }
 
   get frameQualityReady(): boolean {
@@ -189,6 +192,13 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       ? this.faceCountState === 'good' && this.facePositionState === 'good' && this.faceSizeState === 'good'
       : true;
     return this.lightingState === 'good' && this.blurState === 'good' && faceChecksPass;
+  }
+
+  get frameQualityUsable(): boolean {
+    const faceChecksPass = this.faceDetector
+      ? this.faceCountState === 'good' && this.facePositionState !== 'bad' && this.faceSizeState !== 'bad'
+      : true;
+    return this.isUsableQuality(this.lightingState) && this.isUsableQuality(this.blurState) && faceChecksPass;
   }
 
   get faceDetectionLabel(): string {
@@ -201,15 +211,15 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
 
   get lightingState(): FaceQualityState {
     if (!this.cameraReady || !this.lightingScore) return 'unknown';
-    if (this.lightingScore >= 45 && this.lightingScore <= 82) return 'good';
-    if (this.lightingScore >= 32 && this.lightingScore <= 90) return 'warning';
+    if (this.lightingScore >= 36 && this.lightingScore <= 88) return 'good';
+    if (this.lightingScore >= 24 && this.lightingScore <= 94) return 'warning';
     return 'bad';
   }
 
   get blurState(): FaceQualityState {
     if (!this.cameraReady || !this.blurScore) return 'unknown';
-    if (this.blurScore >= 42) return 'good';
-    if (this.blurScore >= 24) return 'warning';
+    if (this.blurScore >= 24) return 'good';
+    if (this.blurScore >= 12) return 'warning';
     return 'bad';
   }
 
@@ -233,7 +243,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   async captureCurrentFrame(source: 'manual' | 'auto' = 'manual'): Promise<void> {
     if (!this.cameraReady || !this.videoEl?.nativeElement || !this.canvasEl?.nativeElement) return;
     if (source === 'manual' && !this.canCaptureFrame) {
-      this.errorMessage = 'Improve the camera quality checks before capturing the face profile.';
+      this.errorMessage = 'Improve the camera frame until lighting and sharpness are at least usable.';
       return;
     }
     const video = this.videoEl.nativeElement;
@@ -370,6 +380,15 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     this.faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 2 });
   }
 
+  private updateCameraAspectRatio(): void {
+    const video = this.videoEl?.nativeElement;
+    if (!video?.videoWidth || !video.videoHeight) {
+      this.cameraAspectRatio = '16 / 9';
+      return;
+    }
+    this.cameraAspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+  }
+
   private startQualityLoop(): void {
     this.stopQualityLoop();
     this.qualityTimer = setInterval(() => this.runQualityCheck(), 450);
@@ -443,10 +462,10 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       this.qualityMessage = this.faceCount && this.faceCount > 1
         ? 'Only one student should be visible in the frame.'
         : 'Align the student face inside the guide frame.';
-    } else if (this.lightingState !== 'good') {
-      this.qualityMessage = 'Adjust lighting so the face is clear and not too dark or overexposed.';
-    } else if (this.blurState !== 'good') {
-      this.qualityMessage = 'Hold still until the camera image is sharp.';
+    } else if (!this.isUsableQuality(this.lightingState)) {
+      this.qualityMessage = 'Add light or reduce glare so the face is visible.';
+    } else if (!this.isUsableQuality(this.blurState)) {
+      this.qualityMessage = 'Hold still or move closer until the image is clearer.';
     } else if (this.faceDetector && !this.faceCentered) {
       this.qualityMessage = 'Center the face inside the guide frame.';
     } else if (this.faceDetector && !this.faceLargeEnough) {
@@ -537,6 +556,10 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
 
   private checkPassed(state: FaceQualityState): boolean {
     return state === 'good';
+  }
+
+  private isUsableQuality(state: FaceQualityState): boolean {
+    return state === 'good' || state === 'warning';
   }
 
   private cameraErrorMessage(error: unknown): string {

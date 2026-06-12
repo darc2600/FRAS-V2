@@ -23,7 +23,7 @@
 
     <section class="capture-layout">
       <article class="camera-panel">
-        <div class="camera-stage" [class.ready]="cameraReady">
+        <div class="camera-stage" [class.ready]="cameraReady" [style.--camera-aspect-ratio]="cameraAspectRatio">
           <video #videoEl playsinline muted></video>
           <div class="camera-placeholder" *ngIf="!cameraReady">
             <strong>Camera Preview</strong>
@@ -37,8 +37,8 @@
             <i></i>
             {{ cameraReady ? 'Camera Active' : 'Camera Standby' }}
           </div>
-          <div class="quality-chip" [class.ready]="frameQualityReady">
-            {{ frameQualityReady ? 'Quality Ready' : 'Quality Check' }}
+          <div class="quality-chip" [class.ready]="frameQualityUsable">
+            {{ frameQualityReady ? 'Auto Ready' : frameQualityUsable ? 'Capture Ready' : 'Quality Check' }}
           </div>
           <div class="camera-footer">
             <strong>{{ currentAngle.label }}</strong>

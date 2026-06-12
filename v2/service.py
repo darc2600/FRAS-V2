@@ -566,7 +566,7 @@ class V2AttendanceService:
 
         dataset_base = Path(os.getenv("DATASET_PATH", "dataset"))
         safe_student = "".join(ch for ch in context.student_number if ch.isalnum() or ch in ("-", "_"))
-        save_dir = dataset_base / "v2_face_profiles" / safe_student / f"class_{class_id}"
+        save_dir = dataset_base / "v2_face_profiles" / safe_student / "active"
         save_dir.mkdir(parents=True, exist_ok=True)
 
         saved_paths: list[str] = []

@@ -57,6 +57,20 @@ button:disabled {
   font-weight: var(--font-weight-heavy);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.export-log-btn.secondary {
+  border: 1px solid var(--color-border-action);
+  background: var(--color-surface);
+  color: var(--color-primary-maroon);
+}
+
 .loading-state,
 .message {
   margin-bottom: var(--space-5);
@@ -467,6 +481,7 @@ tr.needs-review {
 
 @media (max-width: 760px) {
   .v2-page-topbar,
+  .topbar-actions,
   .table-tools,
   .footer-actions {
     display: grid;

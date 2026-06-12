@@ -170,7 +170,48 @@ This script does not delete:
 - attendance sessions
 - attendance events
 
-## 9. Clear V2 Session History
+## 9. Restore Demo Face Profiles From Saved Images
+
+If you want a clean demo database but do not want to retake all saved face photos, keep the files under:
+
+```text
+dataset/v2_face_profiles/<student_number>/active/front.jpg
+```
+
+Then seed face profiles and embeddings from those images:
+
+```powershell
+.\.venv\Scripts\python.exe database\seed_v2_face_profiles_from_images.py
+```
+
+Preview first without writing to the database:
+
+```powershell
+.\.venv\Scripts\python.exe database\seed_v2_face_profiles_from_images.py --dry-run
+```
+
+By default, the script skips locally flagged photos that need retaking:
+
+- `2025103053`
+- `2025103056`
+- `2025103069`
+
+`2025103037` is also expected to be missing when the tester should register their own face manually.
+
+To force one of the flagged photos into the database anyway, use:
+
+```powershell
+.\.venv\Scripts\python.exe database\seed_v2_face_profiles_from_images.py --include-problematic
+```
+
+Recommended demo flow:
+
+1. Seed students, classes, and enrollments.
+2. Run `seed_v2_face_profiles_from_images.py`.
+3. Manually register `2025103037` with the tester's face.
+4. Retake the skipped problematic students only if they are needed for recognition testing.
+
+## 10. Clear V2 Session History
 
 When preparing a clean deployment/demo database, clear session history after QA testing so professors start with empty history pages.
 
@@ -200,7 +241,7 @@ This script does not delete:
 - face embeddings
 - saved face image files
 
-## 10. Safe vs Destructive Commands
+## 11. Safe vs Destructive Commands
 
 Safe or additive commands:
 
@@ -210,6 +251,8 @@ Safe or additive commands:
 .\.venv\Scripts\python.exe database\check_v2_roster_counts.py
 .\.venv\Scripts\python.exe database\seed_v2_integration_data.py --docx "<FULL_PATH_TO_FRAS-prof-database.docx>"
 .\.venv\Scripts\python.exe database\seed_v2_integration_data.py --docx "<FULL_PATH_TO_FRAS-prof-database.docx>" --enroll-all-active-classes
+.\.venv\Scripts\python.exe database\seed_v2_face_profiles_from_images.py --dry-run
+.\.venv\Scripts\python.exe database\seed_v2_face_profiles_from_images.py
 .\.venv\Scripts\python.exe database\create_v2_test_professor.py
 .\.venv\Scripts\python.exe database\clear_v2_face_data.py
 .\.venv\Scripts\python.exe database\clear_v2_session_data.py
@@ -232,7 +275,7 @@ Destructive or broad data-replacing commands:
 
 Use destructive commands only when you intentionally want to reset or replace data.
 
-## 11. Run Backend
+## 12. Run Backend
 
 From the project root:
 
@@ -254,7 +297,7 @@ This does not delete old V1 files. It only makes `backend.py` skip legacy/admin/
 FRAS_MODE=full
 ```
 
-## 12. Run Frontend
+## 13. Run Frontend
 
 From the Angular project folder:
 
@@ -269,7 +312,7 @@ Open:
 http://localhost:4200
 ```
 
-## 13. Suggested Future Wrapper
+## 14. Suggested Future Wrapper
 
 A safer wrapper can be added later:
 

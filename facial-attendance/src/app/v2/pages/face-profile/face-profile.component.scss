@@ -99,7 +99,10 @@ button:disabled {
 
 .camera-stage {
   position: relative;
-  min-height: clamp(360px, 52vh, 520px);
+  width: 100%;
+  aspect-ratio: var(--camera-aspect-ratio, 16 / 9);
+  min-height: 320px;
+  max-height: min(68vh, 620px);
   overflow: hidden;
   border-radius: var(--radius-lg);
   background: #14231d;
@@ -107,9 +110,9 @@ button:disabled {
 
 .camera-stage video {
   width: 100%;
-  height: clamp(360px, 52vh, 520px);
+  height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   background: #14231d;
 }
 

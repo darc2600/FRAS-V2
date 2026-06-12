@@ -4,7 +4,10 @@
       <h1>Post-Session Presence Review</h1>
       <span>Validate attendance before finalizing and exporting Blackboard records.</span>
     </div>
-    <button type="button" class="export-log-btn" [disabled]="!review" (click)="exportLogs()">Export Logs</button>
+    <div class="topbar-actions">
+      <button type="button" class="export-log-btn secondary" [disabled]="!review" (click)="exportActivityLogs()">Export Activity Logs</button>
+      <button type="button" class="export-log-btn" [disabled]="!review" (click)="exportLogs()">Export Review CSV</button>
+    </div>
   </div>
 
   <div class="loading-state fras-v2-panel" *ngIf="isLoading">Loading post-session review...</div>

@@ -3,8 +3,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../../api.service';
 import {
+  V2AttendanceEvent,
   V2ManualAttendanceStatus,
   V2ProfessorScheduleClass,
+  V2SessionDetailResponse,
   V2SessionReviewResponse,
   V2StudentRecord
 } from '../../models/v2-attendance.models';
@@ -206,6 +208,18 @@ export class V2PostSessionReviewComponent implements OnInit {
     this.downloadCsv(this.sessionLogFilename(), this.buildCsvRows(false));
   }
 
+  exportActivityLogs(): void {
+    if (!this.sessionId) return;
+    this.api.getV2Session(this.sessionId).subscribe({
+      next: (detail) => {
+        this.downloadCsv(this.activityLogFilename(), this.buildActivityLogRows(detail));
+      },
+      error: () => {
+        this.errorMessage = 'Unable to export session activity logs.';
+      }
+    });
+  }
+
   exportBlackboardCsv(): void {
     if (!this.isFinalized) return;
     this.downloadCsv(this.blackboardFilename(), this.buildCsvRows(true));
@@ -325,6 +339,39 @@ export class V2PostSessionReviewComponent implements OnInit {
     return [header, ...rows];
   }
 
+  private buildActivityLogRows(detail: V2SessionDetailResponse): string[][] {
+    const header = [
+      'Event ID',
+      'Event Date',
+      'Event Time',
+      'Student Number',
+      'Student Name',
+      'Event Type',
+      'Event Source',
+      'Recognition Confidence',
+      'Notes'
+    ];
+    const studentById = new Map(detail.roster.map((student) => [student.student_id, student]));
+    const rows = [...detail.events]
+      .filter((event) => !event.is_voided)
+      .sort((a, b) => a.event_time.localeCompare(b.event_time) || a.event_id - b.event_id)
+      .map((event) => {
+        const student = event.student_id ? studentById.get(event.student_id) : null;
+        return [
+          String(event.event_id),
+          this.formatDateForCsv(event.event_time),
+          this.formatTime(event.event_time),
+          student?.student_number || '',
+          student?.student_name || 'System Event',
+          this.statusLabel(event.event_type),
+          this.statusLabel(event.event_source),
+          event.recognition_confidence == null ? '' : `${event.recognition_confidence}%`,
+          event.notes || ''
+        ];
+      });
+    return [header, ...rows];
+  }
+
   private blackboardStatusLabel(status: string): string {
     const normalized = (status || '').toLowerCase();
     if (normalized === 'present') return 'Present';
@@ -341,6 +388,10 @@ export class V2PostSessionReviewComponent implements OnInit {
     return `fras_session_review_${this.classFilenamePart()}_${this.sessionDatePart()}_session-${this.sessionId}.csv`;
   }
 
+  private activityLogFilename(): string {
+    return `fras_activity_logs_${this.classFilenamePart()}_${this.sessionDatePart()}_session-${this.sessionId}.csv`;
+  }
+
   private classFilenamePart(): string {
     const course = this.safeFilenamePart(this.classInfo?.course_code || 'course');
     const section = this.safeFilenamePart(this.classInfo?.section || 'section');
@@ -354,6 +405,15 @@ export class V2PostSessionReviewComponent implements OnInit {
 
   private safeFilenamePart(value: string): string {
     return value.trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'value';
+  }
+
+  private formatDateForCsv(value?: string | null): string {
+    if (!value) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date(value));
   }
 
   private downloadCsv(filename: string, rows: string[][]): void {
