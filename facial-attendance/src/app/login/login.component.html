@@ -1,34 +1,74 @@
-<div class="login-center">
-  <!-- Background image injected as an <img> so bundler serves it reliably -->
-  <img class="bg-img" src="/assets/mapua-bg2.jpg" alt="" aria-hidden="true" />
-  <div class="bg-overlay" aria-hidden="true"></div>
-  <div class="login-card">
-    <img class="brand-logo" src="/assets/mapua-logo.png" alt="Mapúa logo" />
-    <div class="system-title">Mapúa Facial Recognition Attendance System</div>
-    <h2>Login</h2>
-    <p class="login-hint">Local V2 professor accounts use password: <strong>password</strong></p>
+<div class="login-shell">
+  <div class="login-backdrop" aria-hidden="true">
+    <img src="/assets/mapua-bg2.jpg" alt="" />
+  </div>
 
-    <form (ngSubmit)="login()">
-      <label>Email</label>
-      <input type="text" [(ngModel)]="email" name="email" required>
+  <main class="login-frame" aria-label="FRAS V2 professor login">
+    <section class="brand-panel">
+      <img class="brand-logo" src="/assets/mapua-logo.png" alt="Mapua University logo" />
 
-      <label>Password</label>
-      <div class="password-container">
-        <input class="password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" required>
-        <span 
-          role="button" tabindex="0" 
-          class="toggle-eye material-icons" 
-          (click)="togglePasswordVisibility()" 
-          (keydown.enter)="togglePasswordVisibility()"
-          [attr.aria-pressed]="showPassword" aria-label="Toggle password visibility">
-          {{ showPassword ? 'visibility_off' : 'visibility' }}
-        </span>
+      <div class="brand-copy">
+        <span class="eyebrow">FRAS V2</span>
+        <h1>Classroom Presence Monitoring</h1>
+        <p>
+          Instructor access for class schedules, live facial recognition attendance,
+          post-session review, and Blackboard-ready exports.
+        </p>
+      </div>
+    </section>
+
+    <section class="login-panel">
+      <div class="login-header">
+        <span class="eyebrow">Professor Portal</span>
+        <h2>Sign in to FRAS</h2>
+        <p>Use your instructor account to continue.</p>
       </div>
 
-      <button class="primary" type="submit">Login</button>
+      <form class="login-form" (ngSubmit)="login()">
+        <label for="email">Email address</label>
+        <input
+          id="email"
+          type="email"
+          [(ngModel)]="email"
+          name="email"
+          autocomplete="username"
+          placeholder="professor@mapua.test"
+          required
+        />
 
-      <div class="error" *ngIf="error">{{ error }}</div>
-      <div class="success" *ngIf="success">{{ success }}</div>
-    </form>
-  </div>
+        <label for="password">Password</label>
+        <div class="password-container">
+          <input
+            id="password"
+            class="password-input"
+            [type]="showPassword ? 'text' : 'password'"
+            [(ngModel)]="password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="Enter password"
+            required
+          />
+          <button
+            type="button"
+            class="toggle-eye material-icons"
+            (click)="togglePasswordVisibility()"
+            [attr.aria-pressed]="showPassword"
+            aria-label="Toggle password visibility">
+            {{ showPassword ? 'visibility_off' : 'visibility' }}
+          </button>
+        </div>
+
+        <button class="primary" type="submit">Sign In</button>
+
+        <div class="message error" role="alert" *ngIf="error">{{ error }}</div>
+        <div class="message success" role="status" *ngIf="success">{{ success }}</div>
+      </form>
+
+      <div class="login-note">
+        <strong>Local demo note:</strong>
+        Faculty-load professor accounts use <code>password</code>. The test professor uses
+        <code>password123</code>.
+      </div>
+    </section>
+  </main>
 </div>

@@ -1,121 +1,195 @@
 :host {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   min-height: 100vh;
-
-  /* IMPORTANT: transparent so global background shows through */
-  background: transparent;
-}
-
-.login-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  padding: 24px;
-  min-height: 100vh; /* ensure this page fills the viewport so global background shows */
-  background: transparent;
+  color: #1f171b;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
 
-/* Background image element placed behind card to avoid css bundler resolution issues */
-.bg-img {
-  position: absolute;
+.login-shell {
+  position: fixed;
   inset: 0;
+  min-height: 100vh;
+  width: 100vw;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 4vw, 58px);
+  overflow: hidden;
+  background: #191919;
+}
+
+.login-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #191919;
+}
+
+.login-backdrop img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  z-index: 0;
-  pointer-events: none;
+  opacity: 0.46;
+  filter: grayscale(8%);
 }
 
-.bg-overlay {
+.login-backdrop::after {
+  content: "";
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 1;
-  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(18, 18, 18, 0.72) 0%, rgba(18, 18, 18, 0.42) 42%, rgba(247, 247, 248, 0.42) 100%),
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.16), transparent 44%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.24));
 }
 
-.login-card {
+.login-frame {
   position: relative;
-  z-index: 2;
-  background: rgba(30, 30, 30, 0.9);
-  padding: 28px;
-  border-radius: 12px;
-  width: 320px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  backdrop-filter: blur(8px);
-  color: #fff;
-  text-align: center;
-  animation: fadeIn 0.6s ease;
+  z-index: 1;
+  width: min(1040px, calc(100vw - 72px));
+  min-height: 560px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+  background: #ffffff;
+  border: 1px solid #e7dfe3;
+  box-shadow: 0 18px 44px rgba(15, 10, 12, 0.26);
+}
+
+.brand-panel,
+.login-panel {
+  padding: 42px;
+}
+
+.brand-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 42px;
+  min-height: 560px;
+  color: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(25, 25, 25, 0.78), rgba(25, 25, 25, 0.64)),
+    url("/assets/mapua-bg2.jpg") center/cover no-repeat;
 }
 
 .brand-logo {
-  height: 72px;
+  width: 180px;
+  height: auto;
   object-fit: contain;
-  margin: 0 auto 8px auto;
-  display: block;
 }
 
-.system-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #ffdede;
+.brand-copy {
+  max-width: 460px;
 }
 
-h2 {
-  margin: 6px 0 8px 0;
-  font-size: 1.1rem;
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  color: #f3c400;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.login-hint {
-  margin: 0 0 16px;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.82rem;
-  line-height: 1.35;
+.brand-copy h1,
+.login-header h2 {
+  margin: 8px 0 0;
+  letter-spacing: 0;
 }
 
-.login-hint strong {
-  color: #ffd15c;
+.brand-copy h1 {
+  max-width: 500px;
+  color: #ffffff;
+  font-size: 36px;
+  line-height: 1.06;
+  font-weight: 950;
+}
+
+.brand-copy p,
+.login-header p,
+.login-note {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.brand-copy p {
+  margin-top: 16px;
+  max-width: 500px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.login-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #ffffff;
+}
+
+.login-header {
+  margin-bottom: 28px;
+}
+
+.login-header .eyebrow {
+  color: #87002f;
+}
+
+.login-header h2 {
+  color: #090909;
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 950;
+}
+
+.login-header p {
+  margin-top: 8px;
+  color: #675d62;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.login-form {
+  display: grid;
+  gap: 10px;
 }
 
 label {
-  display: block;
-  margin-top: 8px;
+  color: #5b4f54;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
   text-align: left;
+  text-transform: uppercase;
 }
 
-input[type="text"], .password-input {
+input[type="email"],
+.password-input {
   width: 100%;
-  padding: 10px;
-  margin-top: 6px;
-  margin-bottom: 12px;
-  box-sizing: border-box;
-  border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.03);
-  color: #fff;
+  min-height: 46px;
+  padding: 11px 12px;
+  color: #1f171b;
+  background: #ffffff;
+  border: 1px solid #d8aab4;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.primary {
-  margin-top: 10px;
-  width: 100%;
-  padding: 10px;
-  border-radius: 6px;
-  border: none;
-  background: linear-gradient(90deg,#c62828,#ef5350);
-  color: #fff;
-  font-weight: 600;
+input[type="email"]::placeholder,
+.password-input::placeholder {
+  color: #9b9094;
+  font-weight: 650;
 }
 
-.error {
-  color: #ffb3b3;
-  margin-top: 10px;
-}
-.success {
-  color: #b8ffb8;
-  margin-top: 10px;
+input[type="email"]:focus,
+.password-input:focus {
+  border-color: #87002f;
+  box-shadow: 0 0 0 3px rgba(135, 0, 47, 0.12);
 }
 
 .password-container {
@@ -124,38 +198,141 @@ input[type="text"], .password-input {
 }
 
 .password-input {
-  width: 100%;
-  padding: 10px 40px 10px 10px; /* space for icon on right */
-  border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.03);
-  color: #fff;
-  box-sizing: border-box;
-}
-
-.password-input:focus {
-  outline: none;
-  border-color: #c62828;
-  box-shadow: 0 0 0 4px rgba(198,40,40,0.12);
+  padding-right: 48px;
 }
 
 .toggle-eye {
   position: absolute;
-  right: 10px;
   top: 50%;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
   transform: translateY(-50%);
+  color: #675d62;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
   cursor: pointer;
   font-size: 20px;
-  color: #000; /* black icon per request */
-  opacity: 1;
-  transition: 0.15s ease;
 }
 
-.toggle-eye:hover {
-  opacity: 1;
+.toggle-eye:hover,
+.toggle-eye:focus-visible {
+  color: #87002f;
+  background: #f7e9ee;
+  outline: none;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+.primary {
+  min-height: 48px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 6px;
+  color: #ffffff;
+  background: #87002f;
+  box-shadow: 0 8px 18px rgba(138, 0, 48, 0.18);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+}
+
+.primary:hover,
+.primary:focus-visible {
+  background: #650023;
+  outline: none;
+}
+
+.message {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.error {
+  color: #b4232f;
+  background: #fde8e8;
+  border: 1px solid #f4caca;
+}
+
+.success {
+  color: #16804a;
+  background: #e8f7ee;
+  border: 1px solid #bfe6cf;
+}
+
+.login-note {
+  margin-top: 22px;
+  padding: 12px 14px;
+  color: #5b4f54;
+  background: #fff8db;
+  border: 1px solid #f1d77a;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.login-note strong {
+  color: #650023;
+}
+
+.login-note code {
+  color: #87002f;
+  background: rgba(135, 0, 47, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 900;
+}
+
+@media (max-width: 860px) {
+  .login-shell {
+    padding: 18px;
+  }
+
+  .login-frame {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .brand-panel {
+    min-height: auto;
+    padding: 28px;
+  }
+
+  .brand-copy h1 {
+    font-size: 28px;
+  }
+
+  .login-panel {
+    padding: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-shell {
+    padding: 0;
+    place-items: stretch;
+  }
+
+  .login-frame {
+    width: 100%;
+    min-height: 100vh;
+    border: 0;
+  }
+
+  .brand-panel {
+    padding: 24px 22px;
+  }
+
+  .brand-logo {
+    width: 150px;
+  }
+
+  .login-panel {
+    padding: 24px 22px 32px;
+  }
 }
