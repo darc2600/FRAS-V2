@@ -570,32 +570,44 @@ class V2AttendanceService:
         save_dir.mkdir(parents=True, exist_ok=True)
 
         saved_paths: list[str] = []
+        angle_counts: dict[str, int] = {}
         for angle, upload in zip(normalized_angles, images):
             extension = Path(upload.filename or "").suffix.lower() or ".jpg"
             if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
                 extension = ".jpg"
-            filename = f"{angle}{extension}"
+            angle_counts[angle] = angle_counts.get(angle, 0) + 1
+            suffix = f"-{angle_counts[angle]}" if normalized_angles.count(angle) > 1 else ""
+            filename = f"{angle}{suffix}{extension}"
             path = save_dir / filename
             content = await upload.read()
             path.write_bytes(content)
             saved_paths.append(str(path))
 
-        front_index = normalized_angles.index("front")
-        front_path = saved_paths[front_index]
+        front_paths = [
+            path
+            for angle, path in zip(normalized_angles, saved_paths)
+            if angle == "front"
+        ]
+        front_path = front_paths[0]
         settings = get_settings_service()
         model_name = settings.face_recognition_model
-        face_embeddings = extract_embeddings_from_image(front_path, model_name=model_name, enforce_detection=True)
-        if len(face_embeddings) > 1:
+        reference_embeddings: list[list[float]] = []
+        for path in front_paths:
+            face_embeddings = extract_embeddings_from_image(path, model_name=model_name, enforce_detection=True)
+            if len(face_embeddings) > 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Multiple faces were detected in a capture. Please retake with only the selected student in frame.",
+                )
+            if face_embeddings:
+                reference_embeddings.append(face_embeddings[0])
+
+        if not reference_embeddings:
             raise HTTPException(
                 status_code=400,
-                detail="Multiple faces were detected in the capture. Please retake with only the selected student in frame.",
+                detail="No face was detected in the front captures. Please retake the face profile images.",
             )
-        embedding = face_embeddings[0] if face_embeddings else None
-        if not embedding:
-            raise HTTPException(
-                status_code=400,
-                detail="No face was detected in the front capture. Please retake the face profile image.",
-            )
+        embedding = self._average_embeddings(reference_embeddings)
 
         self.repo.replace_student_face_profile(
             student_id=student_id,
@@ -623,6 +635,24 @@ class V2AttendanceService:
             saved_angles=normalized_angles,
             image_paths=saved_paths,
         )
+
+    def _average_embeddings(self, embeddings: list[list[float]]) -> list[float]:
+        if len(embeddings) == 1:
+            return embeddings[0]
+
+        dimension = len(embeddings[0])
+        compatible_embeddings = [
+            embedding
+            for embedding in embeddings
+            if len(embedding) == dimension
+        ]
+        if not compatible_embeddings:
+            return embeddings[0]
+
+        return [
+            sum(embedding[index] for embedding in compatible_embeddings) / len(compatible_embeddings)
+            for index in range(dimension)
+        ]
 
     def start_session(self, class_id: int, payload: V2StartSessionRequest) -> V2SessionDetailResponse:
         session_date = payload.session_date or datetime.now(MANILA_TZ).date()

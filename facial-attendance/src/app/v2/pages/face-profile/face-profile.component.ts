@@ -69,7 +69,9 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   private qualityStableStartedAt: number | null = null;
 
   angles: FaceAngle[] = [
-    { key: 'front', label: 'Front', instruction: 'Face the camera directly inside the guide frame.', status: 'pending' }
+    { key: 'front', label: 'Front 1', instruction: 'Face the camera directly inside the guide frame.', status: 'pending' },
+    { key: 'front', label: 'Front 2', instruction: 'Hold the same front-facing position for a second reference frame.', status: 'pending' },
+    { key: 'front', label: 'Front 3', instruction: 'Hold still for the final front-facing reference frame.', status: 'pending' }
   ];
   currentAngleIndex = 0;
 
@@ -87,7 +89,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopCamera();
-    this.angles.forEach((angle) => {
+    this.angles.forEach((angle, index) => {
       if (angle.previewUrl) URL.revokeObjectURL(angle.previewUrl);
     });
   }
@@ -177,8 +179,8 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   }
 
   get qualityStatus(): 'Good' | 'Needs Improvement' | 'Poor' {
-    if (this.recognitionQuality >= 80) return 'Good';
-    if (this.recognitionQuality >= 50) return 'Needs Improvement';
+    if (this.recognitionQuality >= 70) return 'Good';
+    if (this.recognitionQuality >= 45) return 'Needs Improvement';
     return 'Poor';
   }
 
@@ -193,9 +195,9 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
 
   get frameQualityReady(): boolean {
     const faceChecksPass = this.faceDetector
-      ? this.faceCountState === 'good' && this.facePositionState === 'good' && this.faceSizeState === 'good'
+      ? this.faceCountState === 'good' && this.facePositionState !== 'bad' && this.faceSizeState !== 'bad'
       : true;
-    return this.lightingState === 'good' && this.blurState === 'good' && faceChecksPass;
+    return this.recognitionQuality >= 60 && this.isUsableQuality(this.lightingState) && this.isUsableQuality(this.blurState) && faceChecksPass;
   }
 
   get frameQualityUsable(): boolean {
@@ -215,15 +217,15 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
 
   get lightingState(): FaceQualityState {
     if (!this.cameraReady || !this.lightingScore) return 'unknown';
-    if (this.lightingScore >= 36 && this.lightingScore <= 88) return 'good';
-    if (this.lightingScore >= 24 && this.lightingScore <= 94) return 'warning';
+    if (this.lightingScore >= 30 && this.lightingScore <= 92) return 'good';
+    if (this.lightingScore >= 18 && this.lightingScore <= 97) return 'warning';
     return 'bad';
   }
 
   get blurState(): FaceQualityState {
     if (!this.cameraReady || !this.blurScore) return 'unknown';
-    if (this.blurScore >= 24) return 'good';
-    if (this.blurScore >= 12) return 'warning';
+    if (this.blurScore >= 16) return 'good';
+    if (this.blurScore >= 8) return 'warning';
     return 'bad';
   }
 
@@ -270,11 +272,12 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     angle.blob = blob;
     angle.previewUrl = URL.createObjectURL(blob);
     angle.status = 'captured';
-    this.successMessage = source === 'auto' ? 'Best quality frame captured automatically.' : 'Front face captured.';
+    this.successMessage = source === 'auto' ? 'Best quality frame captured automatically.' : `${angle.label} captured.`;
     this.qualityStableStartedAt = null;
     this.autoCaptureProgress = 0;
 
-    this.currentAngleIndex = 0;
+    const nextPendingIndex = this.angles.findIndex((item) => item.status !== 'captured');
+    this.currentAngleIndex = nextPendingIndex >= 0 ? nextPendingIndex : this.currentAngleIndex;
   }
 
   selectAngle(index: number): void {
@@ -291,7 +294,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   }
 
   resetCaptures(): void {
-    this.angles.forEach((angle) => {
+    this.angles.forEach((angle, index) => {
       if (angle.previewUrl) URL.revokeObjectURL(angle.previewUrl);
       angle.previewUrl = undefined;
       angle.blob = undefined;
@@ -308,10 +311,10 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   saveFaceProfile(): void {
     if (!this.allCaptured || this.isSaving) return;
     const formData = new FormData();
-    this.angles.forEach((angle) => {
+    this.angles.forEach((angle, index) => {
       if (!angle.blob) return;
       formData.append('angles', angle.key);
-      formData.append('images', angle.blob, `${angle.key}.jpg`);
+      formData.append('images', angle.blob, `${angle.key}-${index + 1}.jpg`);
     });
 
     this.isSaving = true;
@@ -534,8 +537,8 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       const xOffset = Math.abs(centerX - width / 2) / width;
       const yOffset = Math.abs(centerY - height / 2) / height;
       const faceAreaRatio = (firstFace.width * firstFace.height) / (width * height);
-      this.faceCentered = xOffset <= 0.16 && yOffset <= 0.18;
-      this.faceLargeEnough = faceAreaRatio >= 0.08 && faceAreaRatio <= 0.48;
+      this.faceCentered = xOffset <= 0.22 && yOffset <= 0.24;
+      this.faceLargeEnough = faceAreaRatio >= 0.03 && faceAreaRatio <= 0.6;
     } catch {
       this.faceDetector = null;
       this.faceCount = null;
@@ -574,8 +577,8 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     const now = Date.now();
     this.qualityStableStartedAt = this.qualityStableStartedAt || now;
     const elapsed = now - this.qualityStableStartedAt;
-    this.autoCaptureProgress = Math.min(100, Math.round((elapsed / 2500) * 100));
-    if (elapsed >= 2500) {
+    this.autoCaptureProgress = Math.min(100, Math.round((elapsed / 1200) * 100));
+    if (elapsed >= 1200) {
       this.isAutoCapturing = true;
       this.captureCurrentFrame('auto').finally(() => {
         this.isAutoCapturing = false;
