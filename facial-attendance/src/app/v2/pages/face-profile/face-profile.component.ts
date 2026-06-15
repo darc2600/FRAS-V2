@@ -4,6 +4,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../../api.service';
 import { V2FaceProfileContextResponse, V2FaceProfileStatus } from '../../models/v2-attendance.models';
 import { V2StatusTone } from '../../components';
+import {
+  HIGH_QUALITY_WEBCAM_IMAGE_QUALITY,
+  HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS
+} from '../../../shared/camera-quality';
 
 type CaptureStatus = 'pending' | 'captured';
 type FaceQualityState = 'good' | 'warning' | 'bad' | 'unknown';
@@ -119,6 +123,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
 
       this.stopCamera();
       this.stream = await this.requestBestCameraStream();
+      await this.applyBestAvailableCameraSettings(this.stream);
 
       if (!this.videoEl?.nativeElement) {
         this.cameraReady = false;
@@ -257,7 +262,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     context.drawImage(video, 0, 0, width, height);
     this.updateImageQuality(context, width, height);
     const blob = await new Promise<Blob>((resolve) => {
-      canvas.toBlob((value) => resolve(value as Blob), 'image/jpeg', 0.98);
+      canvas.toBlob((value) => resolve(value as Blob), 'image/jpeg', HIGH_QUALITY_WEBCAM_IMAGE_QUALITY);
     });
 
     const angle = this.currentAngle;
@@ -393,6 +398,20 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   private async requestBestCameraStream(): Promise<MediaStream> {
     const highQualityConstraints: MediaStreamConstraints[] = [
       {
+        video: HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS,
+        audio: false
+      },
+      {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 2560 },
+          height: { ideal: 1440 },
+          frameRate: { ideal: 30 },
+          resizeMode: 'none'
+        } as MediaTrackConstraints,
+        audio: false
+      },
+      {
         video: {
           facingMode: 'user',
           width: { ideal: 1920 },
@@ -428,6 +447,35 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       }
     }
     throw lastError;
+  }
+
+  private async applyBestAvailableCameraSettings(stream: MediaStream): Promise<void> {
+    const track = stream.getVideoTracks()[0];
+    if (!track?.getCapabilities || !track.applyConstraints) return;
+
+    const capabilities = track.getCapabilities() as any;
+    const constraints: MediaTrackConstraints = {};
+
+    if (capabilities.width?.max) {
+      constraints.width = { ideal: capabilities.width.max };
+    }
+    if (capabilities.height?.max) {
+      constraints.height = { ideal: capabilities.height.max };
+    }
+    if (capabilities.frameRate?.max) {
+      constraints.frameRate = { ideal: capabilities.frameRate.max };
+    }
+    if (capabilities.resizeMode?.includes?.('none')) {
+      (constraints as any).resizeMode = 'none';
+    }
+
+    if (!Object.keys(constraints).length) return;
+
+    try {
+      await track.applyConstraints(constraints);
+    } catch {
+      // The initial stream is still usable if the browser refuses its highest camera mode.
+    }
   }
 
   private startQualityLoop(): void {

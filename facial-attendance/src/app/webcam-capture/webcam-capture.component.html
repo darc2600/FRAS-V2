@@ -50,6 +50,10 @@
     <!-- Webcam Capture Box -->
     <div class="webcam-box">
       <webcam
+        [width]="webcamPreviewWidth"
+        [height]="webcamPreviewHeight"
+        [videoOptions]="webcamVideoOptions"
+        [imageQuality]="webcamImageQuality"
         [trigger]="triggerObservable"
         (imageCapture)="handleImage($event)">
       </webcam>

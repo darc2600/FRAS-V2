@@ -6,6 +6,10 @@ import { WebcamModule, WebcamImage, WebcamInitError } from 'ngx-webcam';
 import { Subject, Observable } from 'rxjs';
 import { ApiService } from '../api.service';
 import { CommonModule } from '@angular/common';
+import {
+  HIGH_QUALITY_WEBCAM_IMAGE_QUALITY,
+  HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS
+} from '../shared/camera-quality';
 
 @Component({
   selector: 'app-webcam-capture',
@@ -18,6 +22,10 @@ export class WebcamCaptureComponent {
   courseCodeSection = '';
   message = '';
   webcamImage: WebcamImage | null = null;
+  webcamVideoOptions = HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS;
+  webcamPreviewWidth = 4096;
+  webcamPreviewHeight = 2160;
+  webcamImageQuality = HIGH_QUALITY_WEBCAM_IMAGE_QUALITY;
   private trigger: Subject<void> = new Subject<void>();
 
   availableRooms: any[] = [];

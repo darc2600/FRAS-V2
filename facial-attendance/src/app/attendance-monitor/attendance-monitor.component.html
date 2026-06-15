@@ -28,7 +28,14 @@
         <div class="left-panel">
           <div class="clock">{{ currentTime }}</div>
           <div class="monitor">
-            <webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)"></webcam>
+            <webcam
+              [width]="webcamPreviewWidth"
+              [height]="webcamPreviewHeight"
+              [videoOptions]="webcamVideoOptions"
+              [imageQuality]="webcamImageQuality"
+              [trigger]="triggerObservable"
+              (imageCapture)="handleImage($event)">
+            </webcam>
             <div class="status-indicators">
               <div class="status-indicator" [class.active]="autoRecognitionActive">
                 <span class="indicator-dot"></span>

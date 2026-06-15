@@ -16,6 +16,10 @@ import {
 } from '../../models/v2-attendance.models';
 import { V2StatusTone } from '../../components';
 import { SESSION_BREAK_LOCK_KEY } from '../../../auth.guard';
+import {
+  HIGH_QUALITY_WEBCAM_IMAGE_QUALITY,
+  HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS
+} from '../../../shared/camera-quality';
 
 @Component({
   selector: 'app-v2-live-session',
@@ -47,16 +51,10 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
   isUnlockingBreak = false;
   cameraReady = false;
   webcamImage: WebcamImage | null = null;
-  webcamVideoOptions: MediaTrackConstraints = {
-    facingMode: 'user',
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
-    frameRate: { ideal: 30 },
-    resizeMode: 'none'
-  } as MediaTrackConstraints;
-  webcamCaptureWidth = 1920;
-  webcamCaptureHeight = 1080;
-  webcamImageQuality = 0.98;
+  webcamVideoOptions = HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS;
+  webcamPreviewWidth = 4096;
+  webcamPreviewHeight = 2160;
+  webcamImageQuality = HIGH_QUALITY_WEBCAM_IMAGE_QUALITY;
   now = new Date();
   private timer: any;
   private autoCaptureTimer: any;

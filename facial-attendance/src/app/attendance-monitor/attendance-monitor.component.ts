@@ -6,6 +6,10 @@ import { WebcamImage, WebcamModule } from 'ngx-webcam';
 import { ApiService } from '../api.service';
 import { CommonModule } from '@angular/common';
 import { NavbarComponent } from '../components/navbar/navbar.component';
+import {
+  HIGH_QUALITY_WEBCAM_IMAGE_QUALITY,
+  HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS
+} from '../shared/camera-quality';
 
 const MANILA_TIME_ZONE = 'Asia/Manila';
 
@@ -26,6 +30,10 @@ export class AttendanceMonitorComponent implements OnInit, OnDestroy {
   message = '';
   webcamImage: WebcamImage | null = null;
   attendanceLogs: any[] = [];
+  webcamVideoOptions = HIGH_QUALITY_WEBCAM_VIDEO_OPTIONS;
+  webcamPreviewWidth = 4096;
+  webcamPreviewHeight = 2160;
+  webcamImageQuality = HIGH_QUALITY_WEBCAM_IMAGE_QUALITY;
   private trigger: Subject<void> = new Subject<void>();
 
   // --- New properties for improved UX ---
