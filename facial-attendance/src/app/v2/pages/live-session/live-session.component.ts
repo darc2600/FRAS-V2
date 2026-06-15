@@ -47,6 +47,16 @@ export class V2LiveSessionComponent implements OnInit, OnDestroy {
   isUnlockingBreak = false;
   cameraReady = false;
   webcamImage: WebcamImage | null = null;
+  webcamVideoOptions: MediaTrackConstraints = {
+    facingMode: 'user',
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30 },
+    resizeMode: 'none'
+  } as MediaTrackConstraints;
+  webcamCaptureWidth = 1920;
+  webcamCaptureHeight = 1080;
+  webcamImageQuality = 0.98;
   now = new Date();
   private timer: any;
   private autoCaptureTimer: any;

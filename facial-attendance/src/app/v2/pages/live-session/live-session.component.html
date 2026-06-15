@@ -72,6 +72,10 @@
           <div class="camera-id">CAM_FRONT</div>
           <webcam
             class="camera-webcam"
+            [width]="webcamCaptureWidth"
+            [height]="webcamCaptureHeight"
+            [videoOptions]="webcamVideoOptions"
+            [imageQuality]="webcamImageQuality"
             [trigger]="triggerObservable"
             (imageCapture)="handleImage($event)">
           </webcam>

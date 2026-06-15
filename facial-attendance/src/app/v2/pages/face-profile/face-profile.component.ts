@@ -50,6 +50,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
   stream: MediaStream | null = null;
   cameraReady = false;
   cameraAspectRatio = '16 / 9';
+  cameraResolutionLabel = 'Camera resolution pending';
   lightingScore = 0;
   blurScore = 0;
   faceCount: number | null = null;
@@ -117,10 +118,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
       }
 
       this.stopCamera();
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
+      this.stream = await this.requestBestCameraStream();
 
       if (!this.videoEl?.nativeElement) {
         this.cameraReady = false;
@@ -147,6 +145,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
     this.cameraReady = false;
+    this.cameraResolutionLabel = 'Camera resolution pending';
     this.qualityStableStartedAt = null;
     this.autoCaptureProgress = 0;
   }
@@ -258,7 +257,7 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     context.drawImage(video, 0, 0, width, height);
     this.updateImageQuality(context, width, height);
     const blob = await new Promise<Blob>((resolve) => {
-      canvas.toBlob((value) => resolve(value as Blob), 'image/jpeg', 0.92);
+      canvas.toBlob((value) => resolve(value as Blob), 'image/jpeg', 0.98);
     });
 
     const angle = this.currentAngle;
@@ -384,9 +383,51 @@ export class V2FaceProfileComponent implements OnInit, OnDestroy {
     const video = this.videoEl?.nativeElement;
     if (!video?.videoWidth || !video.videoHeight) {
       this.cameraAspectRatio = '16 / 9';
+      this.cameraResolutionLabel = 'Camera resolution pending';
       return;
     }
     this.cameraAspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+    this.cameraResolutionLabel = `${video.videoWidth} x ${video.videoHeight}`;
+  }
+
+  private async requestBestCameraStream(): Promise<MediaStream> {
+    const highQualityConstraints: MediaStreamConstraints[] = [
+      {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+          resizeMode: 'none'
+        } as MediaTrackConstraints,
+        audio: false
+      },
+      {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
+        audio: false
+      },
+      {
+        video: {
+          facingMode: 'user'
+        },
+        audio: false
+      }
+    ];
+
+    let lastError: unknown;
+    for (const constraints of highQualityConstraints) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
   }
 
   private startQualityLoop(): void {
