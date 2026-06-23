@@ -1,27 +1,115 @@
-# FacialAttendance
+# FRAS V2 Frontend
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 18.2.9.
+This Angular/Ionic application contains the professor-facing FRAS V2 user interface. The final V2 workflow is located primarily under:
 
-## Development server
+```text
+src/app/v2/
+```
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+## V2 Pages
 
-## Code scaffolding
+| Page | Path |
+|---|---|
+| Today's Classes / Schedule | `src/app/v2/pages/todays-classes/` |
+| Class Roster | `src/app/v2/pages/class-roster/` |
+| Face Profile Registration/Update | `src/app/v2/pages/face-profile/` |
+| Live Session Monitoring | `src/app/v2/pages/live-session/` |
+| Post-Session Review | `src/app/v2/pages/post-session-review/` |
+| Student Evidence | `src/app/v2/pages/student-evidence/` |
+| Student Class History | `src/app/v2/pages/student-class-history/` |
+| Session History | `src/app/v2/pages/session-history/` |
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+Shared V2 UI components are in:
 
-## Build
+```text
+src/app/v2/components/
+```
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+The TypeScript API contract for V2 is in:
 
-## Running unit tests
+```text
+src/app/v2/models/v2-attendance.models.ts
+```
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+The HTTP wrapper methods are in:
 
-## Running end-to-end tests
+```text
+src/app/api.service.ts
+```
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+## API Integration
 
-## Further help
+The frontend calls the V2 FastAPI backend under:
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+```text
+/api/v2
+```
+
+Important V2 methods in `api.service.ts` include:
+
+| Method | Purpose |
+|---|---|
+| `getV2TodayClasses` | Loads professor classes for the selected date |
+| `getV2ClassRoster` | Loads class roster and face profile status |
+| `saveV2FaceProfile` | Uploads face profile images |
+| `recognizeV2Face` | Sends recognition capture image |
+| `startV2Session` | Starts live monitoring session |
+| `createV2SessionEvent` | Records attendance/break/recognition events |
+| `saveV2ManualAttendance` | Saves manual attendance, overrides, and Mark Excused |
+| `getV2SessionReview` | Loads post-session review |
+| `finalizeV2Session` | Finalizes attendance |
+
+## Blackboard-ready CSV Export
+
+Blackboard-ready CSV export is generated in the browser by:
+
+```text
+src/app/v2/pages/post-session-review/post-session-review.component.ts
+```
+
+It is a frontend CSV download after finalization. It is not direct Blackboard API synchronization.
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run local dev server:
+
+```bash
+npm start
+```
+
+or:
+
+```bash
+ng serve
+```
+
+Build:
+
+```bash
+npm run build
+```
+
+## Docker Frontend
+
+The V2 Docker frontend files are:
+
+```text
+Dockerfile.v2
+nginx.v2.conf
+```
+
+For full-stack V2 deployment, run Docker Compose from the repository root:
+
+```bash
+docker compose -f docker-compose.v2.yml up -d --build
+```
+
+## Scope Note
+
+Older admin, report, room schedule, and V1 pages may still exist in the repository for history or earlier work. The final thesis workflow should use the V2 pages under `src/app/v2/`.
