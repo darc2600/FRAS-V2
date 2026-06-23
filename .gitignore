@@ -57,3 +57,6 @@ logs/
 # Deployment bundles
 *.zip
 !docs/**/*.zip
+
+# Deployment archives
+*.tar.gz

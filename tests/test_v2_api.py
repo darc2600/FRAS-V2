@@ -8,8 +8,8 @@ from v2.service import V2AttendanceService
 
 
 def setup_module():
-    assert init_v2_database() == 0
-    assert seed_v2_database() == 0
+    assert init_v2_database(["--force"]) == 0
+    assert seed_v2_database([]) == 0
 
 
 def test_v2_routes_are_registered():

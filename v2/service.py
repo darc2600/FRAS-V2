@@ -834,13 +834,12 @@ class V2AttendanceService:
         session = self._get_session_or_404(session_id)
         if session.session_status == "finalized":
             return self.get_session_review(session_id)
-        if session.session_status == "on_break":
-            raise HTTPException(status_code=423, detail="Session Break is active. End break before ending the session.")
-        if session.session_status not in {"in_progress", "under_review"}:
+        if session.session_status not in {"in_progress", "on_break", "under_review"}:
             raise HTTPException(status_code=400, detail="Session cannot be ended from its current status.")
 
         self.repo.end_session(session_id, datetime.now(MANILA_TZ).replace(tzinfo=None))
         refreshed = self._get_session_or_404(session_id)
+        self._close_open_student_timelines(refreshed)
         for record in self._get_roster(session_id):
             self._recalculate_student_record(refreshed, record.record_id, record.student_id)
         return self.get_session_review(session_id)
@@ -849,11 +848,14 @@ class V2AttendanceService:
         session = self._get_session_or_404(session_id)
         if session.session_status == "finalized":
             return self.get_session_review(session_id)
-        if session.session_status == "on_break":
-            raise HTTPException(status_code=423, detail="Session Break is active. End break before finalizing attendance.")
-        if session.session_status not in {"under_review", "in_progress"}:
+        if session.session_status not in {"under_review", "in_progress", "on_break"}:
             raise HTTPException(status_code=400, detail="Session cannot be finalized from its current status.")
 
+        if not session.actual_end:
+            self.repo.end_session(session_id, datetime.now(MANILA_TZ).replace(tzinfo=None))
+            session = self._get_session_or_404(session_id)
+
+        self._close_open_student_timelines(session)
         for record in self._get_roster(session_id):
             self._recalculate_student_record(session, record.record_id, record.student_id)
         self.repo.confirm_session_records(session_id)
@@ -875,6 +877,36 @@ class V2AttendanceService:
 
         self.repo.confirm_student_record(session_id, student_id)
         return self.get_session_review(session_id)
+
+    def _close_open_student_timelines(self, session: V2SessionResponse) -> None:
+        if not session.actual_end:
+            return
+
+        for record in self._get_roster(session.session_id):
+            events = self.repo.get_student_events(session.session_id, record.student_id)
+            if not events:
+                continue
+
+            last_event_type = str(events[-1][0])
+            if last_event_type in {"time_out", "missed_recognition", "camera_failure", "network_failure"}:
+                continue
+            if last_event_type in {"time_in", "break_in", "manual_attendance"}:
+                notes = "Session ended by professor. Student automatically timed out at session end."
+            elif last_event_type == "break_out":
+                notes = "Session ended while student was out on break. Outside duration closed at session end."
+            else:
+                continue
+
+            self.repo.create_event(
+                session_id=session.session_id,
+                record_id=record.record_id,
+                student_id=record.student_id,
+                event_type="time_out",
+                event_time=session.actual_end,
+                event_source="system",
+                recognition_confidence=None,
+                notes=notes,
+            )
 
     def _recalculate_student_record(self, session: V2SessionResponse, record_id: int, student_id: int) -> None:
         record_state = self.repo.get_record_recalculation_state(record_id)

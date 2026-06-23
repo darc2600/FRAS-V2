@@ -946,11 +946,11 @@ class V2AttendanceRepository:
             cursor.execute(
                 """
                 UPDATE attendance_sessions
-                SET actual_end = ?,
+                SET actual_end = COALESCE(actual_end, ?),
                     session_status = 'under_review',
                     updated_at = CURRENT_TIMESTAMP
                 WHERE session_id = ?
-                  AND session_status IN ('in_progress')
+                  AND session_status IN ('in_progress', 'on_break', 'under_review')
                 """,
                 (actual_end, session_id),
             )
